@@ -2,7 +2,8 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './hooks/useAuth'
 import { LoginPage } from './pages/LoginPage'
 import { SignupPage } from './pages/SignupPage'
-import { HomePage } from './pages/HomePage'
+import { FazendasPage } from './pages/FazendasPage'
+import { FazendaDetalhePage } from './pages/FazendaDetalhePage'
 import { theme } from './styles/theme'
 import { Logo } from './components/Logo'
 
@@ -10,7 +11,6 @@ const C = theme.normal
 
 function PrivateRoute({ children }) {
   const { session, loading } = useAuth()
-
   if (loading) return <LoadingScreen />
   if (!session) return <Navigate to="/login" replace />
   return children
@@ -18,7 +18,6 @@ function PrivateRoute({ children }) {
 
 function PublicRoute({ children }) {
   const { session, loading } = useAuth()
-
   if (loading) return <LoadingScreen />
   if (session) return <Navigate to="/" replace />
   return children
@@ -48,7 +47,8 @@ export default function App() {
         <Routes>
           <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
           <Route path="/signup" element={<PublicRoute><SignupPage /></PublicRoute>} />
-          <Route path="/" element={<PrivateRoute><HomePage /></PrivateRoute>} />
+          <Route path="/" element={<PrivateRoute><FazendasPage /></PrivateRoute>} />
+          <Route path="/fazenda/:id" element={<PrivateRoute><FazendaDetalhePage /></PrivateRoute>} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AuthProvider>
