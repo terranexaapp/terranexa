@@ -5,6 +5,7 @@ import { SignupPage } from './pages/SignupPage'
 import { FazendasPage } from './pages/FazendasPage'
 import { FazendaDetalhePage } from './pages/FazendaDetalhePage'
 import { InsumosPage } from './pages/InsumosPage'
+import { OSPage } from './pages/OSPage'
 import { theme } from './styles/theme'
 import { Logo } from './components/Logo'
 
@@ -43,6 +44,7 @@ export default function App() {
           <Route path="/"            element={<PrivateRoute><FazendasPage/></PrivateRoute>}/>
           <Route path="/fazenda/:id" element={<PrivateRoute><FazendaDetalhePage/></PrivateRoute>}/>
           <Route path="/insumos"     element={<PrivateRoute><InsumosPage/></PrivateRoute>}/>
+          <Route path="/os"          element={<PrivateRoute><OSPage/></PrivateRoute>}/>
           <Route path="*"            element={<Navigate to="/" replace/>}/>
         </Routes>
       </AuthProvider>
