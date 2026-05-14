@@ -1411,10 +1411,25 @@ function midpointBetween(a, b) {
   return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
 }
 
+function pointInPolygon(point, polygon) {
+  if (!polygon?.length) return false
+  let inside = false
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const xi = polygon[i].x
+    const yi = polygon[i].y
+    const xj = polygon[j].x
+    const yj = polygon[j].y
+    const intersects = ((yi > point.y) !== (yj > point.y)) && (point.x < ((xj - xi) * (point.y - yi)) / ((yj - yi) || 1) + xi)
+    if (intersects) inside = !inside
+  }
+  return inside
+}
+
 function SatelliteFarmMap({ normalized = [], onFeatureClick, height = 340, selectedCode = null, selectedMode = 'timeline', fullBleed = false }) {
   const containerRef = useRef(null)
   const pointersRef = useRef(new Map())
   const gestureRef = useRef(null)
+  const tapRef = useRef(null)
   const suppressClickRef = useRef(false)
   const [size, setSize] = useState({ width: 0, height: 0 })
   const [view, setView] = useState(() => getSatelliteInitialView(normalized.map(item => item.feature), { width: 0, height: 0 }, fullBleed))
@@ -1501,14 +1516,32 @@ function SatelliteFarmMap({ normalized = [], onFeatureClick, height = 340, selec
   function handleWheel(e) {
     e.preventDefault()
     const nextZoom = view.zoom + (e.deltaY < 0 ? 1 : -1)
-    suppressClickRef.current = true
     zoomAt(pointFromEvent(e), nextZoom)
   }
 
   function handleDoubleClick(e) {
     e.preventDefault()
-    suppressClickRef.current = true
     zoomAt(pointFromEvent(e), view.zoom + 1)
+  }
+
+  function screenRingForFeature(feature) {
+    const zoom = tileLayer.zoom || view.zoom
+    return (getFeatureRing(feature) || []).map(coord => {
+      const world = lngLatToWorld(coord, zoom)
+      return { x: world.x - tileLayer.topLeft.x, y: world.y - tileLayer.topLeft.y }
+    })
+  }
+
+  function selectFeatureAtPoint(point) {
+    if (!onFeatureClick) return false
+    for (let i = normalized.length - 1; i >= 0; i--) {
+      const { feature, index } = normalized[i]
+      if (pointInPolygon(point, screenRingForFeature(feature))) {
+        onFeatureClick(index, feature)
+        return true
+      }
+    }
+    return false
   }
 
   function handlePointerDown(e) {
@@ -1519,8 +1552,10 @@ function SatelliteFarmMap({ normalized = [], onFeatureClick, height = 340, selec
     const points = Array.from(pointersRef.current.values())
     if (points.length >= 2) {
       const [a, b] = points
+      tapRef.current = null
       gestureRef.current = { type: 'pinch', startDistance: Math.max(1, distanceBetween(a, b)), startMidpoint: midpointBetween(a, b), startView: view }
     } else {
+      tapRef.current = { id: e.pointerId, start: point, moved: false }
       gestureRef.current = { type: 'pan', lastPoint: point }
     }
   }
@@ -1529,8 +1564,12 @@ function SatelliteFarmMap({ normalized = [], onFeatureClick, height = 340, selec
     if (!pointersRef.current.has(e.pointerId)) return
     const point = pointFromEvent(e)
     pointersRef.current.set(e.pointerId, point)
+    if (tapRef.current?.id === e.pointerId && distanceBetween(point, tapRef.current.start) > 6) {
+      tapRef.current = { ...tapRef.current, moved: true }
+    }
     const points = Array.from(pointersRef.current.values())
     if (points.length >= 2) {
+      tapRef.current = null
       const [a, b] = points
       const currentMidpoint = midpointBetween(a, b)
       const gesture = gestureRef.current?.type === 'pinch'
@@ -1563,20 +1602,25 @@ function SatelliteFarmMap({ normalized = [], onFeatureClick, height = 340, selec
   }
 
   function handlePointerUp(e) {
+    if (!pointersRef.current.has(e.pointerId)) return
+    const point = pointFromEvent(e)
+    const wasSinglePointer = pointersRef.current.size === 1
+    const tap = tapRef.current
+    const shouldSelect = wasSinglePointer && tap?.id === e.pointerId && !tap.moved && !suppressClickRef.current
     pointersRef.current.delete(e.pointerId)
     e.currentTarget.releasePointerCapture?.(e.pointerId)
-    const points = Array.from(pointersRef.current.values())
-    if (points.length === 1) gestureRef.current = { type: 'pan', lastPoint: points[0] }
-    if (points.length === 0) gestureRef.current = null
-  }
-
-  function handleFeatureClick(e, index, feature) {
-    e.stopPropagation()
-    if (suppressClickRef.current) {
-      suppressClickRef.current = false
+    if (shouldSelect && selectFeatureAtPoint(point)) {
+      tapRef.current = null
+      gestureRef.current = null
       return
     }
-    onFeatureClick?.(index, feature)
+    const points = Array.from(pointersRef.current.values())
+    if (points.length === 1) gestureRef.current = { type: 'pan', lastPoint: points[0] }
+    if (points.length === 0) {
+      tapRef.current = null
+      gestureRef.current = null
+      if (suppressClickRef.current) window.setTimeout(() => { suppressClickRef.current = false }, 0)
+    }
   }
 
   function resetMap(e) {
@@ -1626,7 +1670,7 @@ function SatelliteFarmMap({ normalized = [], onFeatureClick, height = 340, selec
           const selectedFill = selectedMode === 'chuvas' ? 'rgba(55,145,210,0.42)' : 'rgba(232,168,76,0.40)'
           const labelSize = selected ? (fullBleed ? 11 : 10) : (fullBleed ? 9 : 8)
           return (
-            <g key={`${feature.properties?.codigo || index}-${index}`} onClick={e => handleFeatureClick(e, index, feature)} style={{ cursor: onFeatureClick ? 'pointer' : 'default' }}>
+            <g key={`${feature.properties?.codigo || index}-${index}`} style={{ cursor: onFeatureClick ? 'pointer' : 'default' }}>
               <polygon points={points} fill={selected ? selectedFill : 'rgba(46,124,42,0.26)'} stroke={selected ? 'rgba(255,255,255,0.96)' : 'rgba(255,255,255,0.70)'} strokeWidth={selected ? 1.4 : 0.8} />
               {labelWorld && (
                 <text
