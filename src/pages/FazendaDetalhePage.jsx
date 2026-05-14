@@ -82,6 +82,13 @@ function money(value) {
   return `R$ ${Number(value || 0).toFixed(2)}`
 }
 
+function formatShortDate(value) {
+  if (!value) return 'Sem data'
+  const [year, month, day] = String(value).split('-')
+  if (year && month && day) return `${day}/${month}/${year}`
+  return String(value)
+}
+
 function calcularAreaGeo(feature) {
   if (!feature?.geometry?.coordinates?.[0]) return 0
   try {
@@ -494,6 +501,7 @@ export function FazendaDetalhePage() {
             alternarTalhao={alternarTalhao}
             navigate={navigate}
             setActiveView={setActiveView}
+            setShowNovaOp={setShowNovaOp}
           />
         )}
         {activeView === 'dashboard' && (
@@ -568,36 +576,42 @@ export function FazendaDetalhePage() {
   )
 }
 
-function FazendaMapaPrincipal({ fazenda, talhoes, pluviometros = [], talhaoSel, operacoes, custos, totalCusto, loadOps, alternarTalhao, navigate, setActiveView }) {
+function FazendaMapaPrincipal({ fazenda, talhoes, pluviometros = [], talhaoSel, operacoes, custos, totalCusto, loadOps, alternarTalhao, navigate, setActiveView, setShowNovaOp }) {
   const timelineIsDocked = useMediaQuery('(min-width: 900px)')
-  const [timelineMode, setTimelineMode] = useState('timeline')
+  const [timelineMode, setTimelineMode] = useState('resumo')
   const [chuvaInicio, setChuvaInicio] = useState('2026-05-01')
   const [chuvaFim, setChuvaFim] = useState('2026-05-15')
   const features = talhoes.map(talhao => ({ talhao, feature: normalizeFeature(talhao.geometria, talhao.codigo) })).filter(item => item.feature)
   const selected = talhaoSel || null
-  const custoHa = selected?.area_ha ? totalCusto / Number(selected.area_ha || 1) : 0
   const chuvaSeed = selected ? String(selected.codigo || '').split('').reduce((sum, char) => sum + char.charCodeAt(0), 0) : 0
   const chuvaAcumulada = selected ? (82 + (chuvaSeed % 88) + Number(selected.area_ha || 0) % 18).toFixed(1) : '0.0'
   const chuvaMediaDia = selected ? (Number(chuvaAcumulada) / 15).toFixed(1) : '0.0'
   const maiorChuva = selected ? (18 + (chuvaSeed % 24)).toFixed(1) : '0.0'
   const menorChuva = selected ? (2 + (chuvaSeed % 9)).toFixed(1) : '0.0'
+  const ultimaOperacao = operacoes[0] || null
+  const ultimaOperacaoInfo = ultimaOperacao ? getCategoriaInfo(ultimaOperacao.categoria) : null
+  const activePluviometros = pluviometros.filter(p => p.ativo !== false)
+  const resumoRows = [
+    { label: 'Situacao atual', value: loadOps ? 'Carregando operacoes' : operacoes.length ? 'Com historico registrado' : 'Sem operacoes registradas' },
+    { label: 'Proxima acao', value: operacoes.length ? 'Revisar monitoramento de campo' : 'Monitoramento de campo' },
+    { label: 'Ultima chuva', value: activePluviometros.length ? `${chuvaAcumulada} mm no periodo` : 'Sem registro no periodo' },
+    { label: 'Ultima operacao', value: ultimaOperacao ? `${formatShortDate(ultimaOperacao.data_operacao)} · ${ultimaOperacaoInfo.label}` : 'Nenhuma operacao cadastrada' }
+  ]
   const timeline = operacoes.length > 0
     ? operacoes.map(op => ({
-      data: op.data_operacao || 'Sem data',
+      data: formatShortDate(op.data_operacao),
       titulo: getCategoriaInfo(op.categoria).label,
       status: 'Executada',
       valor: money((op.insumos || []).reduce((s, i) => s + Number(i.custo_total || 0), 0) + Number(op.custo_aplicacao || 0))
     }))
     : [
-      { data: 'Hoje', titulo: 'Sem operacoes registradas', status: 'Pendente', valor: 'Adicionar historico' },
-      { data: 'Proximo passo', titulo: 'Monitoramento de campo', status: 'Aberta', valor: 'Scouting' },
-      { data: 'Proximo passo', titulo: 'Ordem de servico', status: 'Aberta', valor: 'Planejar' }
+      { data: 'Hoje', titulo: 'Sem operacoes registradas', status: 'Pendente', valor: 'Adicionar primeiro registro' }
     ]
 
   async function handleFeatureClick(index) {
     const talhao = features[index]?.talhao
     if (!talhao) return
-    if (talhaoSel?.id !== talhao.id) setTimelineMode('timeline')
+    if (talhaoSel?.id !== talhao.id) setTimelineMode('resumo')
     await alternarTalhao(talhao)
   }
 
@@ -608,7 +622,7 @@ function FazendaMapaPrincipal({ fazenda, talhoes, pluviometros = [], talhaoSel, 
         height={timelineIsDocked || !selected ? '100vh' : '58vh'}
         fullBleed
         selectedCode={selected?.codigo}
-        selectedMode={timelineMode}
+        selectedMode={timelineMode === 'chuvas' ? 'chuvas' : 'timeline'}
         pluviometros={pluviometros}
         onFeatureClick={handleFeatureClick}
       />
@@ -631,26 +645,51 @@ function FazendaMapaPrincipal({ fazenda, talhoes, pluviometros = [], talhaoSel, 
         <div style={timelineIsDocked ? timelineDockStyle : timelineMobileStyle}>
           <div style={timelineHeaderStyle}>
             <div>
-              <p style={eyebrowStyle}>LINHA DO TEMPO DO TALHAO</p>
-              <h3 style={{ margin: '4px 0 0', color: C.bg, fontSize: 19, fontFamily: 'Georgia, serif' }}>{selected.codigo} · {formatCultura(selected.cultura)}</h3>
+              <p style={eyebrowStyle}>TALHAO SELECIONADO</p>
+              <h3 style={{ margin: '4px 0 0', color: C.bg, fontSize: 20, fontFamily: 'Georgia, serif' }}>{selected.codigo} · {formatCultura(selected.cultura)}</h3>
             </div>
-            <div style={timelineStatsStyle}>
-              <span>Área: {Number(selected.area_ha || 0).toFixed(2)} ha</span>
-              <span>Custo: {loadOps ? 'Carregando' : money(totalCusto)}</span>
-              <span>Custo/ha: {loadOps ? '...' : money(custoHa)}</span>
-            </div>
+            <span style={timelineAreaPillStyle}>{Number(selected.area_ha || 0).toFixed(2)} ha</span>
           </div>
           <div style={timelineActionsStyle}>
             <button onClick={() => setActiveView('monitoramento')} style={timelineActionButtonStyle}>Monitorar</button>
             <button onClick={() => navigate('/os')} style={timelineActionButtonStyle}>Criar ordem</button>
-            <button onClick={() => setActiveView('solo')} style={timelineActionButtonStyle}>Solo</button>
-            <button onClick={() => setTimelineMode('chuvas')} style={timelineActionButtonStyle}>Chuvas</button>
           </div>
           <div style={timelineModeTabsStyle}>
-            <button onClick={() => setTimelineMode('timeline')} style={{ ...timelineModeButtonStyle, background: C.bg, color: C.textDk, borderColor: timelineMode === 'timeline' ? C.greenDp : 'rgba(255,255,255,0.72)' }}>Linha do tempo</button>
-            <button onClick={() => setTimelineMode('chuvas')} style={{ ...timelineModeButtonStyle, background: C.bg, color: C.textDk, borderColor: timelineMode === 'chuvas' ? C.greenDp : 'rgba(255,255,255,0.72)' }}>Chuvas</button>
+            {[
+              ['resumo', 'Resumo'],
+              ['historico', 'Historico'],
+              ['chuvas', 'Chuvas'],
+              ['solo', 'Solo']
+            ].map(([id, label]) => (
+              <button
+                key={id}
+                onClick={() => setTimelineMode(id)}
+                style={{
+                  ...timelineModeButtonStyle,
+                  background: timelineMode === id ? C.bg : 'rgba(255,255,255,0.08)',
+                  color: timelineMode === id ? C.textDk : C.bg,
+                  borderColor: timelineMode === id ? C.bg : 'rgba(255,255,255,0.28)'
+                }}
+              >
+                {label}
+              </button>
+            ))}
           </div>
-          {timelineMode === 'timeline' ? (
+          {timelineMode === 'resumo' && (
+            <div style={timelineSummaryCardStyle}>
+              <h4 style={timelineCardTitleStyle}>Resumo do talhao</h4>
+              <div style={timelineSummaryRowsStyle}>
+                {resumoRows.map(item => (
+                  <div key={item.label} style={timelineSummaryRowStyle}>
+                    <span style={timelineSummaryLabelStyle}>{item.label}</span>
+                    <strong style={timelineSummaryValueStyle}>{item.value}</strong>
+                  </div>
+                ))}
+              </div>
+              <button onClick={() => setShowNovaOp(true)} style={timelineTextButtonStyle}>{operacoes.length ? 'Registrar nova operacao' : 'Adicionar primeiro registro'}</button>
+            </div>
+          )}
+          {timelineMode === 'historico' && (
             <div style={timelineIsDocked ? timelineTableDesktopStyle : timelineTableStyle}>
               {timeline.map((item, index) => (
                 <button key={`${item.data}-${item.titulo}-${index}`} style={timelineCellStyle}>
@@ -661,7 +700,8 @@ function FazendaMapaPrincipal({ fazenda, talhoes, pluviometros = [], talhaoSel, 
                 </button>
               ))}
             </div>
-          ) : (
+          )}
+          {timelineMode === 'chuvas' && (
             <div style={timelineRainLayoutStyle}>
               <div style={timelineDateGridStyle}>
                 <label style={timelineDateLabelStyle}>
@@ -680,6 +720,17 @@ function FazendaMapaPrincipal({ fazenda, talhoes, pluviometros = [], talhaoSel, 
                 <div style={timelineRainMetricStyle}><span>Maior precipitacao</span><strong>{maiorChuva} mm</strong></div>
                 <div style={timelineRainMetricStyle}><span>Menor precipitacao</span><strong>{menorChuva} mm</strong></div>
               </div>
+            </div>
+          )}
+          {timelineMode === 'solo' && (
+            <div style={timelineSummaryCardStyle}>
+              <h4 style={timelineCardTitleStyle}>Solo do talhao</h4>
+              <div style={timelineSummaryRowsStyle}>
+                <div style={timelineSummaryRowStyle}><span style={timelineSummaryLabelStyle}>Camada atual</span><strong style={timelineSummaryValueStyle}>Mapa de solo disponivel</strong></div>
+                <div style={timelineSummaryRowStyle}><span style={timelineSummaryLabelStyle}>Fertilidade</span><strong style={timelineSummaryValueStyle}>Aguardando leitura recente</strong></div>
+                <div style={timelineSummaryRowStyle}><span style={timelineSummaryLabelStyle}>Recomendacao</span><strong style={timelineSummaryValueStyle}>Conferir pagina Solo</strong></div>
+              </div>
+              <button onClick={() => setActiveView('solo')} style={timelineTextButtonStyle}>Abrir pagina Solo</button>
             </div>
           )}
         </div>
@@ -2558,7 +2609,14 @@ const mapTalhaoChipStyle = { position: 'absolute', top: 92, right: 18, zIndex: 5
 const timelineDockStyle = { position: 'absolute', top: 92, right: 16, bottom: 16, zIndex: 6, width: 'min(360px, calc(100% - 32px))', background: 'rgba(18,73,37,0.68)', border: '1px solid rgba(168,217,143,0.58)', borderRadius: 16, padding: 13, backdropFilter: 'blur(14px)', boxShadow: '0 18px 48px rgba(0,0,0,0.32)', overflowY: 'auto', display: 'flex', flexDirection: 'column' }
 const timelineMobileStyle = { position: 'relative', zIndex: 6, margin: 12, background: 'rgba(18,73,37,0.78)', border: '1px solid rgba(168,217,143,0.58)', borderRadius: 16, padding: 13, boxShadow: '0 16px 36px rgba(0,0,0,0.26)' }
 const timelineHeaderStyle = { display: 'grid', gap: 8, marginBottom: 10 }
-const timelineStatsStyle = { display: 'flex', gap: 8, flexWrap: 'wrap', color: 'rgba(255,255,255,0.90)', fontSize: 11, fontFamily: 'monospace', fontWeight: 800 }
+const timelineAreaPillStyle = { justifySelf: 'flex-start', background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.24)', borderRadius: 999, padding: '5px 9px', color: C.bg, fontSize: 11, fontFamily: 'monospace', fontWeight: 900 }
+const timelineSummaryCardStyle = { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, padding: 12, color: C.textDk, display: 'grid', gap: 11 }
+const timelineCardTitleStyle = { margin: 0, color: C.textDk, fontSize: 15, fontFamily: 'Georgia, serif', fontWeight: 900 }
+const timelineSummaryRowsStyle = { display: 'grid', gap: 9 }
+const timelineSummaryRowStyle = { display: 'grid', gap: 2, paddingBottom: 8, borderBottom: `1px solid ${C.borderSoft}` }
+const timelineSummaryLabelStyle = { color: C.textDim, fontSize: 10, fontFamily: 'monospace', fontWeight: 900, letterSpacing: '0.7px' }
+const timelineSummaryValueStyle = { color: C.textDk, fontSize: 13, lineHeight: 1.3 }
+const timelineTextButtonStyle = { justifySelf: 'flex-start', background: 'transparent', border: 'none', color: C.greenDp, padding: 0, fontSize: 12, fontWeight: 900, cursor: 'pointer' }
 const timelineTableStyle = { display: 'grid', gap: 8, paddingBottom: 3 }
 const timelineTableDesktopStyle = { display: 'grid', gap: 8, paddingBottom: 3, flex: 1, gridAutoRows: 'minmax(96px, 1fr)' }
 const timelineCellStyle = { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 10, minHeight: 92, textAlign: 'left', color: C.textDk, display: 'grid', gap: 3, cursor: 'pointer' }
