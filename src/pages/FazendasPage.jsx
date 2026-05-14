@@ -4,6 +4,7 @@ import { useAuth } from '../hooks/useAuth'
 import { supabase } from '../lib/supabase'
 import { theme } from '../styles/theme'
 import { Logo } from '../components/Logo'
+import { AppNav } from '../components/AppNav'
 
 const C = theme.normal
 
@@ -45,7 +46,7 @@ export function FazendasPage() {
   return (
     <div style={{ minHeight: '100vh', background: C.bgSoft }}>
       <header style={{ background: C.bg, borderBottom: `1px solid ${C.border}`, padding: '14px 16px', position: 'sticky', top: 0, zIndex: 10 }}>
-        <div style={{ maxWidth: 800, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ maxWidth: 900, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <Logo size={32} />
             <div>
@@ -53,10 +54,11 @@ export function FazendasPage() {
               <p style={{ margin: '2px 0 0', fontSize: 8, color: C.textDim, fontFamily: 'monospace', letterSpacing: '2px' }}>{profile?.nome?.toUpperCase() || 'PRODUTOR'}</p>
             </div>
           </div>
+          <AppNav compact />
           <button onClick={signOut} style={{ background: C.bgLight, border: `1px solid ${C.border}`, borderRadius: 8, padding: '7px 12px', color: C.textDk, fontSize: 10, fontFamily: 'monospace', fontWeight: 700, letterSpacing: '1px', cursor: 'pointer' }}>SAIR</button>
         </div>
       </header>
-      <main style={{ maxWidth: 800, margin: '0 auto', padding: '24px 16px' }}>
+      <main style={{ maxWidth: 800, margin: '0 auto', padding: '24px 16px 96px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 20 }}>
           <div>
             <p style={{ margin: 0, fontSize: 10, color: C.textDim, fontFamily: 'monospace', letterSpacing: '2px' }}>MINHAS PROPRIEDADES</p>

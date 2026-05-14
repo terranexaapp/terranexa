@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { listarInsumos, criarInsumo, atualizarInsumo, desativarInsumo, atualizarEstoque, popularCatalogoBase, CLASSES_INSUMO, getClasseInfo, statusEstoqueInfo } from '../lib/insumos'
 import { listarFazendas } from '../lib/fazendas'
 import { theme } from '../styles/theme'
+import { AppNav } from '../components/AppNav'
 
 const C = theme.normal
 
@@ -81,11 +82,12 @@ export function InsumosPage() {
               {fazendas.map(f => <option key={f.id} value={f.id}>{f.nome}</option>)}
             </select>
           )}
+          <AppNav compact />
           <button onClick={() => setModal('novo')} style={{background:C.greenDp, color:C.bg, border:'none', borderRadius:10, padding:'9px 14px', fontSize:11, fontFamily:'monospace', fontWeight:700, cursor:'pointer'}}>+ NOVO</button>
         </div>
       </header>
 
-      <main style={{maxWidth:900, margin:'0 auto', padding:'20px 16px'}}>
+      <main style={{maxWidth:900, margin:'0 auto', padding:'20px 16px 96px'}}>
         <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:8, marginBottom:16}}>
           {[
             {l:'PRODUTOS', v:String(insumos.length), c:C.greenDp},

@@ -10,11 +10,15 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     // Pega sessão atual
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session }, error }) => {
+      if (error) {
+        await clearLocalAuth()
+        return
+      }
       setSession(session)
       if (session?.user) loadProfile(session.user.id)
       else setLoading(false)
-    })
+    }).catch(() => clearLocalAuth())
 
     // Escuta mudanças de auth
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -34,6 +38,17 @@ export function AuthProvider({ children }) {
       .single()
 
     if (!error) setProfile(data)
+    setLoading(false)
+  }
+
+  async function clearLocalAuth() {
+    try {
+      await supabase.auth.signOut({ scope: 'local' })
+    } catch {
+      try { await supabase.auth.signOut() } catch {}
+    }
+    setSession(null)
+    setProfile(null)
     setLoading(false)
   }
 
