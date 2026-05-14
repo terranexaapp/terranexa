@@ -7,7 +7,6 @@ import { listarEquipes, criarEquipe, desativarEquipe } from '../lib/equipes'
 import { calcularCustoInsumo } from '../lib/operacoes'
 import { supabase } from '../lib/supabase'
 import { theme } from '../styles/theme'
-import { AppNav } from '../components/AppNav'
 
 const C = theme.normal
 
@@ -57,7 +56,6 @@ export function OSPage() {
             <h1 style={{margin:'2px 0 0',fontSize:18,color:C.textDk,fontWeight:700,fontFamily:'Georgia, serif'}}>Ordens de Serviço</h1>
           </div>
           {fazendas.length>1 && <select value={fazendaId||''} onChange={e=>setFazendaId(e.target.value)} style={{padding:'7px 10px',background:C.bgLight,border:`1px solid ${C.border}`,borderRadius:8,fontSize:12,color:C.textDk}}>{fazendas.map(f=><option key={f.id} value={f.id}>{f.nome}</option>)}</select>}
-          <AppNav compact />
           <button onClick={()=>setModal('equipes')} style={{background:C.bgLight,border:`1px solid ${C.border}`,borderRadius:10,padding:'8px 12px',color:C.textDk,fontSize:10,fontFamily:'monospace',fontWeight:700,cursor:'pointer'}}>EQUIPES</button>
           <button onClick={()=>setModal('nova')} style={{background:C.greenDp,color:C.bg,border:'none',borderRadius:10,padding:'9px 14px',fontSize:11,fontFamily:'monospace',fontWeight:700,cursor:'pointer'}}>+ NOVA ORDEM</button>
         </div>

@@ -29,7 +29,7 @@ const NAV_ITEMS = [
   { id: 'chuvas', label: 'Chuvas' },
   { id: 'solo', label: 'Solo' },
   { id: 'scouting', label: 'Scouting' },
-  { id: 'gerencial', label: 'Gerencial' },
+  { id: 'gerencial', label: 'Gerenciamento' },
   { id: 'relatorios', label: 'Relatórios' }
 ]
 
@@ -524,6 +524,7 @@ export function FazendaDetalhePage() {
         {activeView === 'scouting' && <ScoutingView talhoes={talhoes} talhaoSel={talhaoSel} abrirTalhao={abrirTalhao} />}
         {activeView === 'gerencial' && (
           <GerencialView
+            fazenda={fazenda}
             talhoes={talhoes}
             talhaoSel={talhaoSel}
             operacoes={operacoes}
@@ -1194,7 +1195,7 @@ function InterpolacaoView({ tipo, talhoes, pluviometros = [] }) {
             </div>
             {pluviometros.length === 0 && (
               <div style={rainEmptyOverlayStyle}>
-                Cadastre pluviometros na pagina Gerencial para gerar a camada interpolada.
+                Cadastre pluviometros na pagina Gerenciamento para gerar a camada interpolada.
               </div>
             )}
           </div>
@@ -1293,7 +1294,7 @@ function ScoutingView({ talhoes, talhaoSel, abrirTalhao }) {
   )
 }
 
-function MapaCadastroTalhoes({ talhoes, onOpenCadastro, onSelectTalhao }) {
+function MapaCadastroTalhoes({ talhoes, total, onOpenCadastro, onSelectTalhao }) {
   const features = talhoes.map(talhao => ({ talhao, feature: normalizeFeature(talhao.geometria, talhao.codigo) })).filter(item => item.feature)
 
   return (
@@ -1310,7 +1311,21 @@ function MapaCadastroTalhoes({ talhoes, onOpenCadastro, onSelectTalhao }) {
             <p style={eyebrowStyle}>TALHÕES GEOREFERENCIADOS</p>
             <h3 style={panelTitleStyle}>Mapa da fazenda</h3>
           </div>
-          <span style={mapCounterStyle}>{features.length} com geometria</span>
+          <span style={mapCounterStyle}>{talhoes.length} talhoes</span>
+        </div>
+        <div style={managementSummaryStripStyle}>
+          <div style={managementSummaryCardStyle}>
+            <span>AREA TOTAL</span>
+            <strong>{Number(total || 0).toFixed(2)} ha</strong>
+          </div>
+          <div style={managementSummaryCardStyle}>
+            <span>TALHOES</span>
+            <strong>{talhoes.length}</strong>
+          </div>
+          <div style={managementSummaryCardStyle}>
+            <span>COM GEOMETRIA</span>
+            <strong>{features.length}</strong>
+          </div>
         </div>
         <SimpleFarmMap
           features={features.map(item => ({ ...item.feature, properties: { ...item.feature.properties, codigo: item.talhao.codigo } }))}
@@ -2175,55 +2190,126 @@ function PluviometroManager({ fazendaId, talhoes, pluviometros, pluviometrosErro
   )
 }
 
-function GerencialView({ fazendaId, talhoes, pluviometros = [], pluviometrosErro = '', talhaoSel, operacoes, custos, total, totalCusto, loadOps, opSel, setOpSel, abrirTalhao, excluirTalhao, setShowNovo, setShowNovaOp, onCreatePluviometro, onUpdatePluviometro, onDeletePluviometro, navigate }) {
-  const menu = [
-    { title: 'Ordem de Serviço', text: 'Planejar e fechar operações da fazenda', action: () => navigate('/os') },
-    { title: 'Estoque', text: 'Saldos, entradas, saídas e estoque mínimo', action: () => navigate('/insumos') },
-    { title: 'Equipe', text: 'Técnicos, operadores e responsáveis por visita' },
-    { title: 'Cadastro de Talhão', text: 'Áreas, culturas, fases e limites dos talhões', action: () => setShowNovo() },
-    { title: 'Insumos', text: 'Produtos, doses, custo medio e fornecedores', action: () => navigate('/insumos') },
-    { title: 'Gerência de Contas', text: 'Usuários, níveis de acesso e permissões' },
-    { title: 'Safras e Culturas', text: 'Ciclo agrícola, variedades e metas por talhão' },
-    { title: 'Máquinas e Implementos', text: 'Frota, capacidade operacional e custo hora' },
-    { title: 'Centros de Custo', text: 'Agrupar custos por fazenda, safra e atividade' }
+function GerencialView({ fazenda, fazendaId, talhoes, pluviometros = [], pluviometrosErro = '', total, abrirTalhao, setShowNovo, onCreatePluviometro, onUpdatePluviometro, onDeletePluviometro, navigate }) {
+  const [activeManager, setActiveManager] = useState('talhoes')
+  const managementMenu = [
+    { id: 'talhoes', title: 'Cadastro de Talhao', text: 'Areas, culturas, fases e limites dos talhoes' },
+    { id: 'pluviometros', title: 'Pluviometros', text: 'Pontos georreferenciados e chuva interpolada' },
+    { id: 'estoque', title: 'Estoque', text: 'Saldos, entradas, saidas e estoque minimo' },
+    { id: 'equipe', title: 'Equipe', text: 'Tecnicos, operadores e responsaveis' },
+    { id: 'insumos', title: 'Insumos', text: 'Produtos, doses, custo medio e fornecedores' },
+    { id: 'safras', title: 'Safras e Culturas', text: 'Ciclo agricola, variedades e metas' },
+    { id: 'maquinas', title: 'Maquinas e Implementos', text: 'Frota, capacidade e custo hora' },
+    { id: 'custos', title: 'Centros de Custo', text: 'Custos por fazenda, safra e atividade' },
+    { id: 'produtividade', title: 'Historico de Produtividade', text: 'Safras, rendimento e comparativos' },
+    { id: 'configuracao', title: 'Configuracao da Fazenda', text: 'Nome, municipio, usuarios e preferencias' }
+  ]
+  const activeItem = managementMenu.find(item => item.id === activeManager) || managementMenu[0]
+
+  return (
+    <section style={managementPageStyle}>
+      <div style={managementHeroStyle}>
+        <p style={eyebrowStyle}>GESTAO OPERACIONAL</p>
+        <h2 style={viewTitleStyle}>Gerenciamento da fazenda</h2>
+        <p style={viewSubtitleStyle}>Cadastros administrativos, mapas, equipe, estoque e configuracoes da propriedade.</p>
+      </div>
+
+      <div style={managementMenuGridStyle}>
+        {managementMenu.map(item => {
+          const active = activeManager === item.id
+          return (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => setActiveManager(item.id)}
+              style={{
+                ...managementMenuCardStyle,
+                background: active ? C.greenLight : C.bg,
+                borderColor: active ? C.greenDp : C.border
+              }}
+            >
+              <strong>{item.title}</strong>
+              <span>{item.text}</span>
+            </button>
+          )
+        })}
+      </div>
+
+      {activeManager === 'talhoes' && (
+        <MapaCadastroTalhoes talhoes={talhoes} total={total} onOpenCadastro={setShowNovo} onSelectTalhao={abrirTalhao} />
+      )}
+
+      {activeManager === 'pluviometros' && (
+        <PluviometroManager
+          fazendaId={fazendaId}
+          talhoes={talhoes}
+          pluviometros={pluviometros}
+          pluviometrosErro={pluviometrosErro}
+          onCreate={onCreatePluviometro}
+          onUpdate={onUpdatePluviometro}
+          onDelete={onDeletePluviometro}
+        />
+      )}
+
+      {activeManager === 'configuracao' && (
+        <ConfiguracaoFazendaPanel fazenda={fazenda} talhoes={talhoes} total={total} />
+      )}
+
+      {!['talhoes', 'pluviometros', 'configuracao'].includes(activeManager) && (
+        <ManagementModulePanel item={activeItem} navigate={navigate} />
+      )}
+    </section>
+  )
+}
+
+function ManagementModulePanel({ item, navigate }) {
+  const actions = {
+    estoque: { label: 'Abrir estoque', run: () => navigate('/insumos') },
+    insumos: { label: 'Abrir insumos', run: () => navigate('/insumos') }
+  }
+  const action = actions[item.id]
+
+  return (
+    <div style={managementContentPanelStyle}>
+      <p style={eyebrowStyle}>{item.title.toUpperCase()}</p>
+      <h3 style={panelTitleStyle}>{item.title}</h3>
+      <p style={viewSubtitleStyle}>{item.text}. Este modulo fica isolado aqui para nao misturar informacoes de cadastro, mapa e operacao.</p>
+      <div style={managementPlaceholderGridStyle}>
+        {['Cadastro', 'Indicadores', 'Historico'].map(label => (
+          <div key={label} style={managementPlaceholderCardStyle}>
+            <span>{label}</span>
+            <strong>Em organizacao</strong>
+          </div>
+        ))}
+      </div>
+      {action && <button type="button" onClick={action.run} style={primaryActionStyle}>{action.label}</button>}
+    </div>
+  )
+}
+
+function ConfiguracaoFazendaPanel({ fazenda, talhoes, total }) {
+  const rows = [
+    ['Nome da fazenda', fazenda?.nome || 'Nao informado'],
+    ['Municipio', fazenda?.municipio || 'Nao informado'],
+    ['UF', fazenda?.estado || 'Nao informado'],
+    ['Area calculada', `${Number(total || 0).toFixed(2)} ha`],
+    ['Talhoes ativos', String(talhoes.length)],
+    ['Preferencias', 'Mapa satelite e gerenciamento modular']
   ]
 
   return (
-    <section style={viewStackStyle}>
-      <div style={heroPanelStyle}>
-        <div>
-          <p style={eyebrowStyle}>GESTAO OPERACIONAL</p>
-          <h2 style={viewTitleStyle}>Gerencial da fazenda</h2>
-          <p style={viewSubtitleStyle}>Menus administrativos, cadastros, estoque, equipe, contas e histórico dos talhões.</p>
-        </div>
-      </div>
-
-      <MapaCadastroTalhoes talhoes={talhoes} onOpenCadastro={setShowNovo} onSelectTalhao={abrirTalhao} />
-
-      <PluviometroManager
-        fazendaId={fazendaId}
-        talhoes={talhoes}
-        pluviometros={pluviometros}
-        pluviometrosErro={pluviometrosErro}
-        onCreate={onCreatePluviometro}
-        onUpdate={onUpdatePluviometro}
-        onDelete={onDeletePluviometro}
-      />
-
-      <div style={managerGridStyle}>
-        {menu.map(item => (
-          <button key={item.title} onClick={item.action} style={managerCardStyle}>
-            <strong>{item.title}</strong>
-            <span>{item.text}</span>
-          </button>
+    <div style={managementContentPanelStyle}>
+      <p style={eyebrowStyle}>CONFIGURACAO DA FAZENDA</p>
+      <h3 style={panelTitleStyle}>Dados e preferencias da propriedade</h3>
+      <div style={farmConfigGridStyle}>
+        {rows.map(([label, value]) => (
+          <div key={label} style={farmConfigFieldStyle}>
+            <span>{label}</span>
+            <strong>{value}</strong>
+          </div>
         ))}
       </div>
-
-      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-        <TalhoesPanel talhoes={talhoes} total={total} talhaoSel={talhaoSel} abrirTalhao={abrirTalhao} excluirTalhao={excluirTalhao} setShowNovo={setShowNovo} />
-        <HistoricoPanel talhaoSel={talhaoSel} operacoes={operacoes} custos={custos} totalCusto={totalCusto} loadOps={loadOps} opSel={opSel} setOpSel={setOpSel} setShowNovaOp={setShowNovaOp} />
-      </div>
-    </section>
+    </div>
   )
 }
 
@@ -2681,6 +2767,17 @@ const scoutingMapStyle = { position: 'relative', minHeight: 430, borderRadius: 1
 const plotShapeStyle = { position: 'absolute', border: '2px solid rgba(255,255,255,0.85)', borderRadius: '34% 22% 31% 18%', color: C.bg, textShadow: '0 1px 4px rgba(0,0,0,0.55)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2, fontSize: 12, fontWeight: 800, cursor: 'pointer' }
 const legendStyle = { position: 'absolute', left: 14, bottom: 14, background: 'rgba(5,14,11,0.86)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 10, color: C.bg, padding: 12, width: 190 }
 const gradientBarStyle = { height: 10, borderRadius: 99, margin: '8px 0 5px', background: 'linear-gradient(90deg, #2fb15f, #e8c84c, #ef4d39)' }
+const managementPageStyle = { display: 'grid', gap: 14 }
+const managementHeroStyle = { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 14, padding: 16 }
+const managementMenuGridStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 10 }
+const managementMenuCardStyle = { minHeight: 82, border: '1px solid', borderRadius: 10, padding: '12px 13px', display: 'grid', alignContent: 'start', gap: 5, textAlign: 'left', color: C.textDk, cursor: 'pointer' }
+const managementContentPanelStyle = { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 14, padding: 16, display: 'grid', gap: 12 }
+const managementSummaryStripStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8, marginBottom: 10 }
+const managementSummaryCardStyle = { background: C.greenLight, border: `1px solid ${C.greenDp}22`, borderRadius: 12, padding: '10px 12px', display: 'grid', gap: 2 }
+const managementPlaceholderGridStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10 }
+const managementPlaceholderCardStyle = { background: C.bgSoft, border: `1px solid ${C.border}`, borderRadius: 12, padding: 12, display: 'grid', gap: 4 }
+const farmConfigGridStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 10 }
+const farmConfigFieldStyle = { background: C.bgSoft, border: `1px solid ${C.border}`, borderRadius: 12, padding: 12, display: 'grid', gap: 4 }
 const managerGridStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10 }
 const managerCardStyle = { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, padding: 14, minHeight: 92, display: 'flex', flexDirection: 'column', gap: 6, textAlign: 'left', color: C.textDk }
 const reportButtonStyle = { background: C.bgSoft, border: `1px solid ${C.border}`, borderRadius: 10, padding: 11, display: 'grid', gridTemplateColumns: '34px 1fr', gap: 9, textAlign: 'left', alignItems: 'center', color: C.textDk }
