@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { listarOperacoes, getCategoriaInfo, resumoCustosPorCategoria } from '../lib/operacoes'
 import { criarTalhao } from '../lib/fazendas'
+import { listarPluviometros, criarPluviometro, atualizarPluviometro, desativarPluviometro } from '../lib/pluviometros'
 import { uploadArquivoFazenda } from '../lib/storage'
 import { NovaOperacaoModal } from '../components/NovaOperacaoModal'
 import { theme } from '../styles/theme'
@@ -197,6 +198,18 @@ function getRingLabelCoord(ring) {
   ]
 }
 
+function pointInFeatureCoord([lng, lat], feature) {
+  const ring = getFeatureRing(feature) || []
+  return pointInPolygon({ x: lng, y: lat }, ring.map(([ringLng, ringLat]) => ({ x: ringLng, y: ringLat })))
+}
+
+function findTalhaoForCoord(talhoes, lng, lat) {
+  return talhoes.find(talhao => {
+    const feature = normalizeFeature(talhao.geometria, talhao.codigo)
+    return feature ? pointInFeatureCoord([lng, lat], feature) : false
+  }) || null
+}
+
 function pointToCoord(point) {
   const lng = MAP_DEFAULT_BOUNDS.minLng + (point.x / 100) * (MAP_DEFAULT_BOUNDS.maxLng - MAP_DEFAULT_BOUNDS.minLng)
   const lat = MAP_DEFAULT_BOUNDS.maxLat - (point.y / 100) * (MAP_DEFAULT_BOUNDS.maxLat - MAP_DEFAULT_BOUNDS.minLat)
@@ -226,6 +239,8 @@ export function FazendaDetalhePage() {
   const [talhaoSel, setTalhaoSel] = useState(null)
   const [operacoes, setOperacoes] = useState([])
   const [custos, setCustos] = useState([])
+  const [pluviometros, setPluviometros] = useState([])
+  const [pluviometrosErro, setPluviometrosErro] = useState('')
   const [loadOps, setLoadOps] = useState(false)
   const [showNovaOp, setShowNovaOp] = useState(false)
   const [opSel, setOpSel] = useState(null)
@@ -234,12 +249,18 @@ export function FazendaDetalhePage() {
 
   async function carregar() {
     setLoading(true)
-    const [{ data: f }, { data: ts }] = await Promise.all([
+    setPluviometrosErro('')
+    const [{ data: f }, { data: ts }, pluviometrosData] = await Promise.all([
       supabase.from('fazendas').select('*').eq('id', id).single(),
-      supabase.from('talhoes').select('*').eq('fazenda_id', id).eq('ativo', true).order('codigo')
+      supabase.from('talhoes').select('*').eq('fazenda_id', id).eq('ativo', true).order('codigo'),
+      listarPluviometros(id).catch(error => {
+        setPluviometrosErro(error.message || 'Nao foi possivel carregar pluviometros')
+        return []
+      })
     ])
     setFazenda(f)
     setTalhoes(ts || [])
+    setPluviometros(pluviometrosData || [])
     const nums = (ts || []).map(t => parseInt(String(t.codigo).replace(/\D/g, ''), 10)).filter(n => !isNaN(n))
     setForm(p => ({ ...p, codigo: 'T' + (nums.length === 0 ? 1 : Math.max(...nums) + 1) }))
     setLoading(false)
@@ -314,6 +335,21 @@ export function FazendaDetalhePage() {
     await supabase.from('talhoes').update({ ativo: false }).eq('id', tid)
     if (talhaoSel?.id === tid) setTalhaoSel(null)
     carregar()
+  }
+
+  async function salvarPluviometro(payload) {
+    await criarPluviometro(payload)
+    await carregar()
+  }
+
+  async function editarPluviometro(idPluviometro, payload) {
+    await atualizarPluviometro(idPluviometro, payload)
+    await carregar()
+  }
+
+  async function excluirPluviometro(idPluviometro) {
+    await desativarPluviometro(idPluviometro)
+    await carregar()
   }
 
   const total = useMemo(() => talhoes.reduce((s, t) => s + Number(t.area_ha || 0), 0), [talhoes])
@@ -414,6 +450,7 @@ export function FazendaDetalhePage() {
           <FazendaMapaPrincipal
             fazenda={fazenda}
             talhoes={talhoes}
+            pluviometros={pluviometros}
             talhaoSel={talhaoSel}
             operacoes={operacoes}
             custos={custos}
@@ -439,8 +476,8 @@ export function FazendaDetalhePage() {
             setActiveView={setActiveView}
           />
         )}
-        {activeView === 'chuvas' && <InterpolacaoView tipo="chuvas" talhoes={talhoes} total={total} />}
-        {activeView === 'solo' && <InterpolacaoView tipo="solo" talhoes={talhoes} total={total} />}
+        {activeView === 'chuvas' && <InterpolacaoView tipo="chuvas" talhoes={talhoes} total={total} pluviometros={pluviometros} />}
+        {activeView === 'solo' && <InterpolacaoView tipo="solo" talhoes={talhoes} total={total} pluviometros={pluviometros} />}
         {activeView === 'scouting' && <ScoutingView talhoes={talhoes} talhaoSel={talhaoSel} abrirTalhao={abrirTalhao} />}
         {activeView === 'gerencial' && (
           <GerencialView
@@ -450,6 +487,9 @@ export function FazendaDetalhePage() {
             custos={custos}
             total={total}
             totalCusto={totalCusto}
+            fazendaId={id}
+            pluviometros={pluviometros}
+            pluviometrosErro={pluviometrosErro}
             loadOps={loadOps}
             opSel={opSel}
             setOpSel={setOpSel}
@@ -457,6 +497,9 @@ export function FazendaDetalhePage() {
             excluirTalhao={excluirTalhao}
             setShowNovo={abrirCadastroTalhao}
             setShowNovaOp={setShowNovaOp}
+            onCreatePluviometro={salvarPluviometro}
+            onUpdatePluviometro={editarPluviometro}
+            onDeletePluviometro={excluirPluviometro}
             navigate={navigate}
           />
         )}
@@ -490,7 +533,7 @@ export function FazendaDetalhePage() {
   )
 }
 
-function FazendaMapaPrincipal({ fazenda, talhoes, talhaoSel, operacoes, custos, totalCusto, loadOps, alternarTalhao, navigate, setActiveView }) {
+function FazendaMapaPrincipal({ fazenda, talhoes, pluviometros = [], talhaoSel, operacoes, custos, totalCusto, loadOps, alternarTalhao, navigate, setActiveView }) {
   const [timelineMode, setTimelineMode] = useState('timeline')
   const [chuvaInicio, setChuvaInicio] = useState('2026-05-01')
   const [chuvaFim, setChuvaFim] = useState('2026-05-15')
@@ -530,6 +573,7 @@ function FazendaMapaPrincipal({ fazenda, talhoes, talhaoSel, operacoes, custos, 
         fullBleed
         selectedCode={selected?.codigo}
         selectedMode={timelineMode}
+        pluviometros={pluviometros}
         onFeatureClick={handleFeatureClick}
       />
 
@@ -586,16 +630,13 @@ function FazendaMapaPrincipal({ fazenda, talhoes, talhaoSel, operacoes, custos, 
                   Data final
                   <input type="date" value={chuvaFim} onChange={e => setChuvaFim(e.target.value)} style={timelineDateInputStyle} />
                 </label>
-                <button style={timelinePrimaryButtonStyle}>Interpolar periodo</button>
+                <button onClick={() => setActiveView('chuvas')} style={timelinePrimaryButtonStyle}>Abrir mapa interpolado</button>
               </div>
               <div style={timelineRainGridStyle}>
                 <div style={timelineRainMetricStyle}><span>Acumulado no talhao</span><strong>{chuvaAcumulada} mm</strong></div>
                 <div style={timelineRainMetricStyle}><span>Media diaria</span><strong>{chuvaMediaDia} mm</strong></div>
                 <div style={timelineRainMetricStyle}><span>Maior precipitacao</span><strong>{maiorChuva} mm</strong></div>
                 <div style={timelineRainMetricStyle}><span>Menor precipitacao</span><strong>{menorChuva} mm</strong></div>
-              </div>
-              <div style={timelineRainMapStyle}>
-                <span>{selected.codigo}</span>
               </div>
             </div>
           )}
@@ -983,10 +1024,11 @@ function TalhaoInsight({ tone, label, value }) {
   )
 }
 
-function InterpolacaoView({ tipo, talhoes }) {
+function InterpolacaoView({ tipo, talhoes, pluviometros = [] }) {
   const isChuva = tipo === 'chuvas'
   const [dataInicial, setDataInicial] = useState('2026-05-01')
   const [dataFinal, setDataFinal] = useState('2026-05-15')
+  const features = talhoes.map(talhao => ({ talhao, feature: normalizeFeature(talhao.geometria, talhao.codigo) })).filter(item => item.feature)
   const talhaoReferencia = talhoes[0]?.codigo || 'TH01'
   const talhaoMenor = talhoes[1]?.codigo || talhaoReferencia
   const title = isChuva ? 'Mapa interpolado de chuvas' : 'Resultados de solo'
@@ -1049,23 +1091,13 @@ function InterpolacaoView({ tipo, talhoes }) {
           <button style={mapPillStyle}>{isChuva ? 'Pluviometros' : 'Nutrientes'}</button>
         </div>
         {isChuva ? (
-          <div style={interpolationMapStyle}>
-            {talhoes.slice(0, 8).map((talhao, index) => (
-              <div
-                key={talhao.id}
-                style={{
-                  ...plotShapeStyle,
-                  left: `${12 + (index % 4) * 20}%`,
-                  top: `${18 + Math.floor(index / 4) * 31}%`,
-                  width: `${16 + (index % 3) * 3}%`,
-                  height: `${22 + (index % 2) * 8}%`,
-                  background: index % 3 === 0 ? 'rgba(232,90,58,0.72)' : index % 3 === 1 ? 'rgba(232,168,76,0.72)' : 'rgba(61,138,34,0.74)'
-                }}
-              >
-                <strong>{talhao.codigo}</strong>
-                <span>{Number(talhao.area_ha || 0).toFixed(1)} ha</span>
-              </div>
-            ))}
+          <div style={rainMapFrameStyle}>
+            <SimpleFarmMap
+              features={features.map(item => ({ ...item.feature, properties: { ...item.feature.properties, codigo: item.talhao.codigo } }))}
+              height={460}
+              selectedMode="chuvas"
+              pluviometros={pluviometros}
+            />
             <div style={legendStyle}>
               <p style={{ margin: 0, fontSize: 11, fontWeight: 800 }}>Chuva acumulada</p>
               <div style={gradientBarStyle} />
@@ -1073,6 +1105,11 @@ function InterpolacaoView({ tipo, talhoes }) {
                 <span>Baixo</span><span>Medio</span><span>Alto</span>
               </div>
             </div>
+            {pluviometros.length === 0 && (
+              <div style={rainEmptyOverlayStyle}>
+                Cadastre pluviometros na pagina Gerencial para gerar a camada interpolada.
+              </div>
+            )}
           </div>
         ) : (
           <div style={soilResultsShellStyle}>
@@ -1093,10 +1130,10 @@ function InterpolacaoView({ tipo, talhoes }) {
       </div>
 
       <div style={metricGridStyle}>
-        <MetricCard label={isChuva ? 'Mes de maior incidencia' : 'Media do nutriente no talhao'} value={isChuva ? 'Janeiro · 218 mm' : '5,7 pH'} tone={C.greenDp} />
-        <MetricCard label={isChuva ? 'Acumulo medio do mes' : 'Talhao coberto'} value={isChuva ? '142,7 mm' : talhaoReferencia} tone={C.blue} />
-        <MetricCard label={isChuva ? 'Maior precipitacao' : 'Camada analisada'} value={isChuva ? `${talhaoReferencia} · 38,4 mm` : '0-20 cm'} tone={C.amberDk} />
-        <MetricCard label={isChuva ? 'Menor precipitacao' : 'Parametros avaliados'} value={isChuva ? `${talhaoMenor} · 12,6 mm` : soilParams.length} tone={C.soilDk} />
+        <MetricCard label={isChuva ? 'Pluviometros ativos' : 'Media do nutriente no talhao'} value={isChuva ? pluviometros.length : '5,7 pH'} tone={C.greenDp} />
+        <MetricCard label={isChuva ? 'Talhoes no recorte' : 'Talhao coberto'} value={isChuva ? talhoes.length : talhaoReferencia} tone={C.blue} />
+        <MetricCard label={isChuva ? 'Periodo selecionado' : 'Camada analisada'} value={isChuva ? `${dataInicial} a ${dataFinal}` : '0-20 cm'} tone={C.amberDk} />
+        <MetricCard label={isChuva ? 'Camada ativa' : 'Parametros avaliados'} value={isChuva ? 'Mapa principal e clima' : soilParams.length} tone={C.soilDk} />
       </div>
     </section>
   )
@@ -1374,7 +1411,7 @@ function TalhaoGeoModal({ fazendaId, initialMode, sugerirCodigo, talhoes, onClos
   )
 }
 
-function SimpleFarmMap({ features = [], drawPoints = [], onMapClick, onFeatureClick, height = 340, drawing = false, selectedCode = null, selectedMode = 'timeline', fullBleed = false }) {
+function SimpleFarmMap({ features = [], drawPoints = [], onMapClick, onFeatureClick, height = 340, drawing = false, selectedCode = null, selectedMode = 'timeline', fullBleed = false, pluviometros = [], placingPluviometro = false, onMapPoint, onPluviometroClick }) {
   const normalized = features.map((feature, index) => ({ feature: normalizeFeature(feature, feature?.properties?.codigo || `T${index + 1}`), index })).filter(item => item.feature)
   if (drawing || onMapClick) {
     return (
@@ -1399,6 +1436,10 @@ function SimpleFarmMap({ features = [], drawPoints = [], onMapClick, onFeatureCl
       selectedCode={selectedCode}
       selectedMode={selectedMode}
       fullBleed={fullBleed}
+      pluviometros={pluviometros}
+      placingPluviometro={placingPluviometro}
+      onMapPoint={onMapPoint}
+      onPluviometroClick={onPluviometroClick}
     />
   )
 }
@@ -1425,7 +1466,7 @@ function pointInPolygon(point, polygon) {
   return inside
 }
 
-function SatelliteFarmMap({ normalized = [], onFeatureClick, height = 340, selectedCode = null, selectedMode = 'timeline', fullBleed = false }) {
+function SatelliteFarmMap({ normalized = [], onFeatureClick, height = 340, selectedCode = null, selectedMode = 'timeline', fullBleed = false, pluviometros = [], placingPluviometro = false, onMapPoint, onPluviometroClick }) {
   const containerRef = useRef(null)
   const pointersRef = useRef(new Map())
   const gestureRef = useRef(null)
@@ -1437,6 +1478,15 @@ function SatelliteFarmMap({ normalized = [], onFeatureClick, height = 340, selec
     const ring = getFeatureRing(feature) || []
     return `${feature.properties?.codigo || index}:${ring.map(coord => coord.join(',')).join(';')}`
   }).join('|')
+  const activePluviometros = pluviometros
+    .map((item, index) => ({
+      ...item,
+      index,
+      latitude: Number(item.latitude),
+      longitude: Number(item.longitude),
+      nome: item.nome || `Pluviometro ${index + 1}`
+    }))
+    .filter(item => Number.isFinite(item.latitude) && Number.isFinite(item.longitude))
 
   useEffect(() => {
     const node = containerRef.current
@@ -1513,6 +1563,24 @@ function SatelliteFarmMap({ normalized = [], onFeatureClick, height = 340, selec
     }, zoom)
   }
 
+  function screenToCoord(point) {
+    const zoom = tileLayer.zoom || view.zoom
+    const center = lngLatToWorld([view.lng, view.lat], zoom)
+    const world = { x: center.x + point.x - size.width / 2, y: center.y + point.y - size.height / 2 }
+    const [lng, lat] = worldToLngLat(world.x, world.y, zoom)
+    return { lng, lat }
+  }
+
+  function markerScreenPosition(marker) {
+    const world = lngLatToWorld([marker.longitude, marker.latitude], tileLayer.zoom || view.zoom)
+    return { x: world.x - tileLayer.topLeft.x, y: world.y - tileLayer.topLeft.y }
+  }
+
+  function rainIntensity(marker, index) {
+    const seed = String(marker.id || marker.nome || index).split('').reduce((sum, char) => sum + char.charCodeAt(0), 0)
+    return 42 + (seed % 86)
+  }
+
   function handleWheel(e) {
     e.preventDefault()
     const nextZoom = view.zoom + (e.deltaY < 0 ? 1 : -1)
@@ -1538,6 +1606,19 @@ function SatelliteFarmMap({ normalized = [], onFeatureClick, height = 340, selec
       const { feature, index } = normalized[i]
       if (pointInPolygon(point, screenRingForFeature(feature))) {
         onFeatureClick(index, feature)
+        return true
+      }
+    }
+    return false
+  }
+
+  function selectPluviometroAtPoint(point) {
+    if (!onPluviometroClick) return false
+    for (let i = activePluviometros.length - 1; i >= 0; i--) {
+      const marker = activePluviometros[i]
+      const screen = markerScreenPosition(marker)
+      if (distanceBetween(point, screen) <= 18) {
+        onPluviometroClick(marker)
         return true
       }
     }
@@ -1609,6 +1690,17 @@ function SatelliteFarmMap({ normalized = [], onFeatureClick, height = 340, selec
     const shouldSelect = wasSinglePointer && tap?.id === e.pointerId && !tap.moved && !suppressClickRef.current
     pointersRef.current.delete(e.pointerId)
     e.currentTarget.releasePointerCapture?.(e.pointerId)
+    if (shouldSelect && placingPluviometro && onMapPoint) {
+      onMapPoint(screenToCoord(point))
+      tapRef.current = null
+      gestureRef.current = null
+      return
+    }
+    if (shouldSelect && selectPluviometroAtPoint(point)) {
+      tapRef.current = null
+      gestureRef.current = null
+      return
+    }
     if (shouldSelect && selectFeatureAtPoint(point)) {
       tapRef.current = null
       gestureRef.current = null
@@ -1636,7 +1728,7 @@ function SatelliteFarmMap({ normalized = [], onFeatureClick, height = 340, selec
   return (
     <div
       ref={containerRef}
-      style={{ ...(fullBleed ? simpleMapFullStyle : simpleMapStyle), height, cursor: 'grab' }}
+      style={{ ...(fullBleed ? simpleMapFullStyle : simpleMapStyle), height, cursor: placingPluviometro ? 'crosshair' : 'grab' }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
@@ -1657,6 +1749,26 @@ function SatelliteFarmMap({ normalized = [], onFeatureClick, height = 340, selec
         ))}
       </div>
       <div style={satelliteShadeStyle} />
+      {selectedMode === 'chuvas' && activePluviometros.length > 0 && (
+        <div style={rainInterpolationLayerStyle}>
+          {activePluviometros.map((marker, index) => {
+            const pos = markerScreenPosition(marker)
+            const intensity = rainIntensity(marker, index)
+            const color = intensity > 105 ? 'rgba(232,90,58,0.72)' : intensity > 76 ? 'rgba(232,168,76,0.70)' : 'rgba(70,158,205,0.66)'
+            return (
+              <span
+                key={`rain-${marker.id || index}`}
+                style={{
+                  ...rainInterpolationSpotStyle,
+                  left: pos.x,
+                  top: pos.y,
+                  background: `radial-gradient(circle, ${color} 0%, rgba(61,138,34,0.34) 42%, transparent 72%)`
+                }}
+              />
+            )
+          })}
+        </div>
+      )}
       <svg width={size.width || '100%'} height={size.height || '100%'} style={satelliteSvgStyle}>
         {normalized.map(({ feature, index }) => {
           const ring = getFeatureRing(feature) || []
@@ -1688,6 +1800,19 @@ function SatelliteFarmMap({ normalized = [], onFeatureClick, height = 340, selec
                   {feature.properties?.codigo}
                 </text>
               )}
+            </g>
+          )
+        })}
+        {activePluviometros.map((marker, index) => {
+          const pos = markerScreenPosition(marker)
+          const intensity = rainIntensity(marker, index)
+          return (
+            <g key={`pluviometro-${marker.id || index}`} transform={`translate(${pos.x} ${pos.y})`} style={{ cursor: onPluviometroClick ? 'pointer' : 'default' }}>
+              <circle cx="0" cy="0" r="12" fill="rgba(255,255,255,0.94)" stroke={selectedMode === 'chuvas' ? C.blue : C.greenDp} strokeWidth="2" />
+              <path d="M-4 -6 h8 v10 c0 3 -8 3 -8 0z" fill="none" stroke={C.greenDp} strokeWidth="1.6" strokeLinecap="round" />
+              <path d="M0 -11 c3 3 5 5 5 8a5 5 0 0 1-10 0c0-3 2-5 5-8z" fill="rgba(70,158,205,0.82)" />
+              <text x="0" y="24" fill="white" fontSize="9" fontWeight="900" textAnchor="middle" paintOrder="stroke" stroke="rgba(0,0,0,0.62)" strokeWidth="3">{marker.nome}</text>
+              {selectedMode === 'chuvas' && <text x="0" y="36" fill="white" fontSize="8" fontWeight="800" textAnchor="middle" paintOrder="stroke" stroke="rgba(0,0,0,0.62)" strokeWidth="2">{intensity.toFixed(0)} mm</text>}
             </g>
           )
         })}
@@ -1823,7 +1948,148 @@ function normalizeFeature(raw, codigo = 'T1') {
   return { ...feature, properties: { ...(feature.properties || {}), codigo: feature.properties?.codigo || codigo } }
 }
 
-function GerencialView({ talhoes, talhaoSel, operacoes, custos, total, totalCusto, loadOps, opSel, setOpSel, abrirTalhao, excluirTalhao, setShowNovo, setShowNovaOp, navigate }) {
+function PluviometroManager({ fazendaId, talhoes, pluviometros, pluviometrosErro, onCreate, onUpdate, onDelete }) {
+  const features = talhoes.map(talhao => ({ talhao, feature: normalizeFeature(talhao.geometria, talhao.codigo) })).filter(item => item.feature)
+  const [mode, setMode] = useState('idle')
+  const [selectedId, setSelectedId] = useState(null)
+  const [draft, setDraft] = useState({ nome: 'Pluviometro 1', latitude: '', longitude: '' })
+  const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
+  const selected = pluviometros.find(item => item.id === selectedId) || null
+  const placing = mode === 'create' || mode === 'edit-point'
+
+  useEffect(() => {
+    if (!selectedId && pluviometros[0]) setSelectedId(pluviometros[0].id)
+  }, [pluviometros, selectedId])
+
+  function startCreate() {
+    setMode('create')
+    setSelectedId(null)
+    setError('')
+    setDraft({ nome: `Pluviometro ${pluviometros.length + 1}`, latitude: '', longitude: '' })
+  }
+
+  function startRename() {
+    if (!selected) return
+    setMode('rename')
+    setError('')
+    setDraft({ nome: selected.nome, latitude: selected.latitude || '', longitude: selected.longitude || '' })
+  }
+
+  function startEditPoint() {
+    if (!selected) return
+    setMode('edit-point')
+    setError('')
+    setDraft({ nome: selected.nome, latitude: selected.latitude || '', longitude: selected.longitude || '' })
+  }
+
+  function handleMapPoint({ lng, lat }) {
+    setDraft(current => ({ ...current, latitude: lat.toFixed(7), longitude: lng.toFixed(7) }))
+  }
+
+  function selectMarker(marker) {
+    setSelectedId(marker.id)
+    setMode('idle')
+    setError('')
+    setDraft({ nome: marker.nome, latitude: marker.latitude || '', longitude: marker.longitude || '' })
+  }
+
+  async function handleSave(e) {
+    e.preventDefault()
+    setError('')
+    if (!draft.nome.trim()) {
+      setError('Informe o nome do pluviometro.')
+      return
+    }
+    if ((mode === 'create' || mode === 'edit-point') && (!draft.latitude || !draft.longitude)) {
+      setError('Clique no mapa para posicionar o pluviometro.')
+      return
+    }
+    setSaving(true)
+    try {
+      const talhao = draft.longitude && draft.latitude ? findTalhaoForCoord(talhoes, Number(draft.longitude), Number(draft.latitude)) : null
+      if (mode === 'create') {
+        await onCreate({ fazenda_id: fazendaId, nome: draft.nome.trim(), latitude: draft.latitude, longitude: draft.longitude, talhao_id: talhao?.id || null })
+      } else if (selected) {
+        await onUpdate(selected.id, { nome: draft.nome.trim(), latitude: draft.latitude, longitude: draft.longitude, talhao_id: talhao?.id || selected.talhao_id || null })
+      }
+      setMode('idle')
+    } catch (err) {
+      setError(err.message || 'Nao foi possivel salvar o pluviometro.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleDelete() {
+    if (!selected || !confirm('Desativar este pluviometro?')) return
+    setSaving(true)
+    setError('')
+    try {
+      await onDelete(selected.id)
+      setSelectedId(null)
+      setMode('idle')
+    } catch (err) {
+      setError(err.message || 'Nao foi possivel desativar o pluviometro.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div style={pluviometerShellStyle}>
+      <div style={pluviometerHeaderStyle}>
+        <div>
+          <p style={eyebrowStyle}>PLUVIOMETROS</p>
+          <h3 style={panelTitleStyle}>Mapa de pluviometros</h3>
+          <p style={{ margin: '4px 0 0', color: C.textMid, fontSize: 12 }}>Registre o ponto georreferenciado para alimentar o mapa interpolado de chuvas.</p>
+        </div>
+        <span style={mapCounterStyle}>{pluviometros.length} ativos</span>
+      </div>
+      <div style={pluviometerMapStageStyle}>
+        <SimpleFarmMap
+          features={features.map(item => ({ ...item.feature, properties: { ...item.feature.properties, codigo: item.talhao.codigo } }))}
+          height={470}
+          pluviometros={pluviometros}
+          selectedMode="chuvas"
+          placingPluviometro={placing}
+          onMapPoint={handleMapPoint}
+          onPluviometroClick={selectMarker}
+        />
+        <form onSubmit={handleSave} style={pluviometerEditorStyle}>
+          <p style={sidebarEyebrowStyle}>Registrar pluviometro</p>
+          <div style={pluviometerEditorActionsStyle}>
+            <button type="button" onClick={startCreate} style={mode === 'create' ? primaryActionStyle : secondaryActionStyle}>Adicionar pluviometro</button>
+            <button type="button" disabled={!selected} onClick={startRename} style={{ ...secondaryActionStyle, opacity: selected ? 1 : 0.45 }}>Renomear</button>
+            <button type="button" disabled={!selected} onClick={startEditPoint} style={{ ...secondaryActionStyle, opacity: selected ? 1 : 0.45 }}>Editar ponto</button>
+          </div>
+          <label style={dateLabelStyle}>
+            Nome
+            <input value={draft.nome} onChange={e => setDraft(current => ({ ...current, nome: e.target.value }))} style={dateInputStyle} />
+          </label>
+          <div style={pluviometerCoordGridStyle}>
+            <label style={dateLabelStyle}>
+              Latitude
+              <input value={draft.latitude} onChange={e => setDraft(current => ({ ...current, latitude: e.target.value }))} placeholder="-9.0000000" style={dateInputStyle} />
+            </label>
+            <label style={dateLabelStyle}>
+              Longitude
+              <input value={draft.longitude} onChange={e => setDraft(current => ({ ...current, longitude: e.target.value }))} placeholder="-40.0000000" style={dateInputStyle} />
+            </label>
+          </div>
+          <p style={pluviometerHintStyle}>{placing ? 'Clique no mapa para marcar ou reposicionar o pluviometro.' : selected ? `Selecionado: ${selected.nome}` : 'Use adicionar pluviometro para marcar um novo ponto.'}</p>
+          {(error || pluviometrosErro) && <div style={formErrorStyle}>{error || pluviometrosErro}</div>}
+          <div style={pluviometerEditorFooterStyle}>
+            <button type="submit" disabled={saving || mode === 'idle'} style={{ ...primaryActionStyle, opacity: saving || mode === 'idle' ? 0.55 : 1 }}>{saving ? 'Salvando...' : 'Salvar'}</button>
+            <button type="button" disabled={!selected || saving} onClick={handleDelete} style={{ ...dangerGhostButtonStyle, opacity: !selected || saving ? 0.45 : 1 }}>Desativar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+function GerencialView({ fazendaId, talhoes, pluviometros = [], pluviometrosErro = '', talhaoSel, operacoes, custos, total, totalCusto, loadOps, opSel, setOpSel, abrirTalhao, excluirTalhao, setShowNovo, setShowNovaOp, onCreatePluviometro, onUpdatePluviometro, onDeletePluviometro, navigate }) {
   const menu = [
     { title: 'Ordem de Serviço', text: 'Planejar e fechar operações da fazenda', action: () => navigate('/os') },
     { title: 'Estoque', text: 'Saldos, entradas, saídas e estoque mínimo', action: () => navigate('/insumos') },
@@ -1847,6 +2113,16 @@ function GerencialView({ talhoes, talhaoSel, operacoes, custos, total, totalCust
       </div>
 
       <MapaCadastroTalhoes talhoes={talhoes} onOpenCadastro={setShowNovo} onSelectTalhao={abrirTalhao} />
+
+      <PluviometroManager
+        fazendaId={fazendaId}
+        talhoes={talhoes}
+        pluviometros={pluviometros}
+        pluviometrosErro={pluviometrosErro}
+        onCreate={onCreatePluviometro}
+        onUpdate={onUpdatePluviometro}
+        onDelete={onDeletePluviometro}
+      />
 
       <div style={managerGridStyle}>
         {menu.map(item => (
@@ -2332,6 +2608,8 @@ const simpleMapFullStyle = { position: 'relative', borderRadius: 0, overflow: 'h
 const satelliteTileLayerStyle = { position: 'absolute', inset: 0, overflow: 'hidden', background: '#0e1d14' }
 const satelliteTileStyle = { position: 'absolute', width: TILE_SIZE, height: TILE_SIZE, objectFit: 'cover', userSelect: 'none', pointerEvents: 'none', willChange: 'transform' }
 const satelliteShadeStyle = { position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(5,12,8,0.20), rgba(5,12,8,0.34))', pointerEvents: 'none' }
+const rainInterpolationLayerStyle = { position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 1, mixBlendMode: 'screen', opacity: 0.78 }
+const rainInterpolationSpotStyle = { position: 'absolute', width: 260, height: 260, borderRadius: 999, transform: 'translate(-50%, -50%)', filter: 'blur(8px)' }
 const satelliteSvgStyle = { position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'block' }
 const satelliteControlsStyle = { position: 'absolute', right: 14, top: 14, display: 'flex', gap: 8, alignItems: 'center', zIndex: 2 }
 const satelliteControlButtonStyle = { width: 34, height: 34, borderRadius: 10, border: '1px solid rgba(255,255,255,0.24)', background: 'rgba(255,255,255,0.92)', color: C.textDk, fontSize: 18, lineHeight: 1, fontWeight: 900, cursor: 'pointer', boxShadow: '0 8px 20px rgba(0,0,0,0.20)' }
@@ -2339,3 +2617,14 @@ const satelliteFitButtonStyle = { height: 34, borderRadius: 10, border: '1px sol
 const satelliteBadgeStyle = { position: 'absolute', left: 14, bottom: 14, zIndex: 2, background: 'rgba(13,28,17,0.72)', color: 'rgba(255,255,255,0.86)', border: '1px solid rgba(255,255,255,0.18)', borderRadius: 999, padding: '6px 10px', fontSize: 10, fontWeight: 900, letterSpacing: 0, textTransform: 'uppercase', pointerEvents: 'none' }
 const mapDrawHintStyle = { position: 'absolute', left: 12, bottom: 12, background: 'rgba(255,255,255,0.94)', color: C.textDk, borderRadius: 10, padding: '8px 10px', fontSize: 12, fontWeight: 800, boxShadow: '0 4px 16px rgba(0,0,0,0.16)' }
 const mapEmptyHintStyle = { position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', color: 'rgba(255,255,255,0.86)', fontSize: 13, fontWeight: 800, textAlign: 'center', padding: 20 }
+const pluviometerShellStyle = { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 14, padding: 12, display: 'grid', gap: 10 }
+const pluviometerHeaderStyle = { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }
+const pluviometerMapStageStyle = { position: 'relative', minHeight: 470, borderRadius: 12, overflow: 'hidden' }
+const pluviometerEditorStyle = { position: 'absolute', right: 14, top: 14, zIndex: 4, width: 'min(360px, calc(100% - 28px))', display: 'grid', gap: 9, background: 'rgba(255,255,255,0.94)', border: `1px solid ${C.border}`, borderRadius: 12, padding: 12, boxShadow: '0 18px 44px rgba(0,0,0,0.24)', backdropFilter: 'blur(12px)' }
+const pluviometerEditorActionsStyle = { display: 'flex', gap: 7, flexWrap: 'wrap' }
+const pluviometerCoordGridStyle = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }
+const pluviometerHintStyle = { margin: 0, color: C.textMid, fontSize: 11, lineHeight: 1.35 }
+const pluviometerEditorFooterStyle = { display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }
+const dangerGhostButtonStyle = { background: C.bgLight, color: C.redDk, border: `1px solid ${C.red}55`, borderRadius: 10, padding: '10px 14px', fontSize: 12, fontWeight: 900, cursor: 'pointer' }
+const rainMapFrameStyle = { position: 'relative', minHeight: 460, borderRadius: 12, overflow: 'hidden' }
+const rainEmptyOverlayStyle = { position: 'absolute', inset: 'auto 16px 16px 16px', zIndex: 5, background: 'rgba(255,255,255,0.94)', color: C.textDk, border: `1px solid ${C.border}`, borderRadius: 12, padding: '10px 12px', fontSize: 12, fontWeight: 800, boxShadow: '0 12px 28px rgba(0,0,0,0.18)' }
