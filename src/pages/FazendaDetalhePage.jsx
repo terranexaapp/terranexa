@@ -6,6 +6,7 @@ import { criarTalhao } from '../lib/fazendas'
 import { listarPluviometros, criarPluviometro, atualizarPluviometro, desativarPluviometro } from '../lib/pluviometros'
 import { uploadArquivoFazenda } from '../lib/storage'
 import { NovaOperacaoModal } from '../components/NovaOperacaoModal'
+import { Logo } from '../components/Logo'
 import { theme } from '../styles/theme'
 
 const C = theme.normal
@@ -53,6 +54,24 @@ const TILE_SIZE = 256
 const TILE_MIN_ZOOM = 4
 const TILE_MAX_ZOOM = 19
 const SATELLITE_TILE_URL = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile'
+
+function useMediaQuery(query) {
+  const [matches, setMatches] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return window.matchMedia(query).matches
+  })
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined
+    const media = window.matchMedia(query)
+    const update = () => setMatches(media.matches)
+    update()
+    media.addEventListener('change', update)
+    return () => media.removeEventListener('change', update)
+  }, [query])
+
+  return matches
+}
 
 function formatCultura(cultura = '') {
   if (!cultura) return 'Sem cultura'
@@ -368,13 +387,15 @@ export function FazendaDetalhePage() {
   return (
     <div style={{ minHeight: '100vh', background: isMapView ? '#102316' : C.bgSoft, display: 'flex', flexDirection: 'column' }}>
       <header style={floatingHeaderStyle}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: isMapView ? 0 : 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: isMapView ? 0 : 8 }}>
             <button onClick={() => setMenuOpen(open => !open)} style={hamburgerButtonStyle}>☰</button>
+            {!isMapView && (
             <div style={{ flex: 1, minWidth: 0 }}>
               <p style={eyebrowStyle}>FAZENDA</p>
               <h1 style={{ margin: '2px 0 0', fontSize: 20, color: C.textDk, fontWeight: 700, fontFamily: 'Georgia, serif' }}>{fazenda?.nome}</h1>
             </div>
+            )}
           </div>
           <nav style={{ display: 'none', gap: 8, overflowX: 'auto', paddingBottom: 2 }}>
             {NAV_ITEMS.map(item => (
@@ -422,7 +443,19 @@ export function FazendaDetalhePage() {
               </button>
             ))}
             <div style={drawerFooterStyle}>
+              <div style={drawerFarmInfoStyle}>
+                <p style={eyebrowStyle}>FAZENDA</p>
+                <strong style={{ color: C.textDk, fontSize: 15, fontFamily: 'Georgia, serif' }}>{fazenda?.nome}</strong>
+                <span style={{ color: C.textMid, fontSize: 11 }}>{Number(total || 0).toFixed(2)} ha · {talhoes.length} talhoes</span>
+              </div>
               <button onClick={() => { setMenuOpen(false); navigate('/') }} style={drawerReturnButtonStyle}>← Voltar para Fazendas</button>
+              <div style={drawerBrandStyle}>
+                <Logo size={30} />
+                <div>
+                  <p style={{ margin: 0, color: C.greenDp, fontWeight: 900, fontSize: 15, fontFamily: 'Georgia, serif', lineHeight: 1 }}>Terra<span style={{ color: C.amber }}>Nexa</span></p>
+                  <small style={{ color: C.textDim, fontSize: 8, fontFamily: 'monospace', letterSpacing: '1.4px' }}>GESTAO AGRICOLA</small>
+                </div>
+              </div>
             </div>
           </aside>
         </div>
@@ -536,6 +569,7 @@ export function FazendaDetalhePage() {
 }
 
 function FazendaMapaPrincipal({ fazenda, talhoes, pluviometros = [], talhaoSel, operacoes, custos, totalCusto, loadOps, alternarTalhao, navigate, setActiveView }) {
+  const timelineIsDocked = useMediaQuery('(min-width: 900px)')
   const [timelineMode, setTimelineMode] = useState('timeline')
   const [chuvaInicio, setChuvaInicio] = useState('2026-05-01')
   const [chuvaFim, setChuvaFim] = useState('2026-05-15')
@@ -568,10 +602,10 @@ function FazendaMapaPrincipal({ fazenda, talhoes, pluviometros = [], talhaoSel, 
   }
 
   return (
-    <section style={mapMainPageStyle}>
+    <section style={timelineIsDocked ? mapMainPageStyle : mapMainPageMobileStyle}>
       <SimpleFarmMap
         features={features.map(item => ({ ...item.feature, properties: { ...item.feature.properties, codigo: item.talhao.codigo } }))}
-        height="100vh"
+        height={timelineIsDocked || !selected ? '100vh' : '58vh'}
         fullBleed
         selectedCode={selected?.codigo}
         selectedMode={timelineMode}
@@ -594,7 +628,7 @@ function FazendaMapaPrincipal({ fazenda, talhoes, pluviometros = [], talhaoSel, 
       )}
 
       {selected && (
-        <div style={timelineDockStyle}>
+        <div style={timelineIsDocked ? timelineDockStyle : timelineMobileStyle}>
           <div style={timelineHeaderStyle}>
             <div>
               <p style={eyebrowStyle}>LINHA DO TEMPO DO TALHAO</p>
@@ -617,7 +651,7 @@ function FazendaMapaPrincipal({ fazenda, talhoes, pluviometros = [], talhaoSel, 
             <button onClick={() => setTimelineMode('chuvas')} style={{ ...timelineModeButtonStyle, background: C.bg, color: C.textDk, borderColor: timelineMode === 'chuvas' ? C.greenDp : 'rgba(255,255,255,0.72)' }}>Chuvas</button>
           </div>
           {timelineMode === 'timeline' ? (
-            <div style={timelineTableStyle}>
+            <div style={timelineIsDocked ? timelineTableDesktopStyle : timelineTableStyle}>
               {timeline.map((item, index) => (
                 <button key={`${item.data}-${item.titulo}-${index}`} style={timelineCellStyle}>
                   <span>{item.data}</span>
@@ -2501,13 +2535,15 @@ const viewTitleStyle = { margin: '4px 0 0', fontSize: 24, color: C.textDk, fontW
 const viewSubtitleStyle = { margin: '8px 0 0', fontSize: 13, color: C.textMid, maxWidth: 620, lineHeight: 1.45 }
 const panelTitleStyle = { margin: 0, fontSize: 15, color: C.textDk, fontWeight: 800, fontFamily: 'Georgia, serif' }
 const viewStackStyle = { display: 'grid', gap: 14 }
-const floatingHeaderStyle = { position: 'fixed', top: 14, left: 14, zIndex: 40, background: 'rgba(255,255,255,0.94)', border: `1px solid ${C.border}`, borderRadius: 14, padding: 10, boxShadow: '0 10px 30px rgba(0,0,0,0.12)', backdropFilter: 'blur(10px)' }
+const floatingHeaderStyle = { position: 'fixed', top: 14, left: 14, zIndex: 40, background: 'rgba(255,255,255,0.94)', border: `1px solid ${C.border}`, borderRadius: 14, padding: 8, boxShadow: '0 10px 30px rgba(0,0,0,0.12)', backdropFilter: 'blur(10px)' }
 const hamburgerButtonStyle = { background: C.greenDp, color: C.bg, border: 'none', borderRadius: 9, width: 36, height: 36, fontSize: 18, fontWeight: 900, cursor: 'pointer' }
 const drawerBackdropStyle = { position: 'fixed', inset: 0, zIndex: 60, background: 'rgba(0,0,0,0.24)' }
 const drawerStyle = { width: 280, maxWidth: '82vw', height: '100%', background: C.bg, borderRight: `1px solid ${C.border}`, padding: 16, display: 'flex', flexDirection: 'column', gap: 9, boxShadow: '14px 0 40px rgba(0,0,0,0.22)', boxSizing: 'border-box' }
 const drawerNavButtonStyle = { width: '100%', border: '1px solid', borderRadius: 11, padding: '12px 13px', fontSize: 13, fontWeight: 900, textAlign: 'left', cursor: 'pointer' }
 const drawerCloseButtonStyle = { width: 32, height: 32, borderRadius: 9, border: `1px solid ${C.border}`, background: C.bgLight, color: C.textDk, fontSize: 17, fontWeight: 900, cursor: 'pointer' }
-const drawerFooterStyle = { marginTop: 'auto', borderTop: `1px solid ${C.borderSoft}`, paddingTop: 12 }
+const drawerFooterStyle = { marginTop: 'auto', borderTop: `1px solid ${C.borderSoft}`, paddingTop: 12, display: 'grid', gap: 9 }
+const drawerFarmInfoStyle = { background: C.bgLight, border: `1px solid ${C.border}`, borderRadius: 12, padding: 12, display: 'grid', gap: 3, color: C.textDk }
+const drawerBrandStyle = { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, padding: 10, display: 'flex', alignItems: 'center', gap: 9, color: C.textDk }
 const drawerReturnButtonStyle = { width: '100%', border: `1px solid ${C.border}`, borderRadius: 11, padding: '12px 13px', background: C.bgLight, color: C.textDk, fontSize: 12, fontWeight: 900, textAlign: 'left', cursor: 'pointer' }
 const farmLayoutStyle = { display: 'block', alignItems: 'flex-start', gap: 14 }
 const farmSidebarStyle = { display: 'none' }
@@ -2516,12 +2552,15 @@ const sidebarNavButtonStyle = { width: '100%', border: '1px solid', borderRadius
 const heroPanelStyle = { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 14, padding: 16, display: 'flex', justifyContent: 'space-between', gap: 14, alignItems: 'center', flexWrap: 'wrap' }
 const panelStyle = { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 14, padding: 14 }
 const mapMainPageStyle = { position: 'relative', width: '100%', minHeight: '100vh', overflow: 'hidden', background: '#102316' }
+const mapMainPageMobileStyle = { position: 'relative', width: '100%', minHeight: '100vh', overflow: 'auto', background: '#102316' }
 const mapTopInfoStyle = { position: 'absolute', top: 92, left: 18, zIndex: 5, background: 'rgba(5,18,12,0.62)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 14, padding: '12px 14px', backdropFilter: 'blur(8px)', maxWidth: 360 }
 const mapTalhaoChipStyle = { position: 'absolute', top: 92, right: 18, zIndex: 5, background: 'rgba(255,255,255,0.92)', border: `1px solid ${C.border}`, borderRadius: 14, padding: '11px 13px', minWidth: 190, boxShadow: '0 10px 30px rgba(0,0,0,0.16)', display: 'grid', gap: 2 }
-const timelineDockStyle = { position: 'absolute', top: 92, right: 16, bottom: 16, zIndex: 6, width: 'min(430px, calc(100% - 32px))', background: 'rgba(18,73,37,0.68)', border: '1px solid rgba(168,217,143,0.58)', borderRadius: 16, padding: 13, backdropFilter: 'blur(14px)', boxShadow: '0 18px 48px rgba(0,0,0,0.32)', overflowY: 'auto' }
+const timelineDockStyle = { position: 'absolute', top: 92, right: 16, bottom: 16, zIndex: 6, width: 'min(360px, calc(100% - 32px))', background: 'rgba(18,73,37,0.68)', border: '1px solid rgba(168,217,143,0.58)', borderRadius: 16, padding: 13, backdropFilter: 'blur(14px)', boxShadow: '0 18px 48px rgba(0,0,0,0.32)', overflowY: 'auto', display: 'flex', flexDirection: 'column' }
+const timelineMobileStyle = { position: 'relative', zIndex: 6, margin: 12, background: 'rgba(18,73,37,0.78)', border: '1px solid rgba(168,217,143,0.58)', borderRadius: 16, padding: 13, boxShadow: '0 16px 36px rgba(0,0,0,0.26)' }
 const timelineHeaderStyle = { display: 'grid', gap: 8, marginBottom: 10 }
 const timelineStatsStyle = { display: 'flex', gap: 8, flexWrap: 'wrap', color: 'rgba(255,255,255,0.90)', fontSize: 11, fontFamily: 'monospace', fontWeight: 800 }
 const timelineTableStyle = { display: 'grid', gap: 8, paddingBottom: 3 }
+const timelineTableDesktopStyle = { display: 'grid', gap: 8, paddingBottom: 3, flex: 1, gridAutoRows: 'minmax(96px, 1fr)' }
 const timelineCellStyle = { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 10, minHeight: 92, textAlign: 'left', color: C.textDk, display: 'grid', gap: 3, cursor: 'pointer' }
 const timelineActionsStyle = { display: 'flex', gap: 8, flexWrap: 'wrap', margin: '0 0 10px' }
 const timelineActionButtonStyle = { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 9, padding: '8px 11px', color: C.textDk, fontWeight: 900, cursor: 'pointer' }
@@ -2614,7 +2653,7 @@ const satelliteShadeStyle = { position: 'absolute', inset: 0, background: 'linea
 const rainInterpolationLayerStyle = { position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 1, mixBlendMode: 'screen', opacity: 0.78 }
 const rainInterpolationSpotStyle = { position: 'absolute', width: 260, height: 260, borderRadius: 999, transform: 'translate(-50%, -50%)', filter: 'blur(8px)' }
 const satelliteSvgStyle = { position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'block' }
-const satelliteControlsStyle = { position: 'absolute', left: 24, top: 86, display: 'grid', gap: 8, alignItems: 'center', zIndex: 5 }
+const satelliteControlsStyle = { position: 'absolute', left: 24, top: 72, display: 'grid', gap: 8, alignItems: 'center', zIndex: 5 }
 const satelliteControlButtonStyle = { width: 34, height: 34, borderRadius: 10, border: '1px solid rgba(255,255,255,0.24)', background: 'rgba(255,255,255,0.92)', color: C.textDk, fontSize: 18, lineHeight: 1, fontWeight: 900, cursor: 'pointer', boxShadow: '0 8px 20px rgba(0,0,0,0.20)' }
 const satelliteBadgeStyle = { position: 'absolute', left: 14, bottom: 14, zIndex: 2, background: 'rgba(13,28,17,0.72)', color: 'rgba(255,255,255,0.86)', border: '1px solid rgba(255,255,255,0.18)', borderRadius: 999, padding: '6px 10px', fontSize: 10, fontWeight: 900, letterSpacing: 0, textTransform: 'uppercase', pointerEvents: 'none' }
 const mapDrawHintStyle = { position: 'absolute', left: 12, bottom: 12, background: 'rgba(255,255,255,0.94)', color: C.textDk, borderRadius: 10, padding: '8px 10px', fontSize: 12, fontWeight: 800, boxShadow: '0 4px 16px rgba(0,0,0,0.16)' }
