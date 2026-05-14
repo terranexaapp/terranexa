@@ -1,0 +1,1944 @@
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
+import { supabase } from '../lib/supabase'
+import { listarOperacoes, getCategoriaInfo, resumoCustosPorCategoria } from '../lib/operacoes'
+import { criarTalhao } from '../lib/fazendas'
+import { uploadArquivoFazenda } from '../lib/storage'
+import { NovaOperacaoModal } from '../components/NovaOperacaoModal'
+import { theme } from '../styles/theme'
+
+const C = theme.normal
+const FASE_LABELS = {
+  preparo: 'Preparo',
+  plantio: 'Plantio',
+  brotacao: 'Brotacao',
+  vegetativo: 'Vegetativo',
+  floracao: 'Floracao',
+  frutificacao: 'Frutificacao',
+  maturacao: 'Maturacao',
+  colheita: 'Colheita',
+  pos_colheita: 'Pos-colheita',
+  pousio: 'Pousio'
+}
+
+const NAV_ITEMS = [
+  { id: 'mapa', label: 'Mapa' },
+  { id: 'dashboard', label: 'Dashboard' },
+  { id: 'chuvas', label: 'Chuvas' },
+  { id: 'solo', label: 'Solo' },
+  { id: 'scouting', label: 'Scouting' },
+  { id: 'gerencial', label: 'Gerencial' },
+  { id: 'relatorios', label: 'Relatórios' }
+]
+
+const reportTypes = [
+  'Relatório agronômico completo',
+  'Relatório financeiro por talhão e safra',
+  'Relatório de chuva interpolada',
+  'Relatório de fertilidade do solo',
+  'Relatório de scouting e dano econômico',
+  'Relatório de ordens de serviço',
+  'Relatório de estoque e consumo de insumos',
+  'Relatório executivo da fazenda'
+]
+
+const MAP_DEFAULT_BOUNDS = {
+  minLng: -40.545,
+  maxLng: -40.465,
+  minLat: -9.430,
+  maxLat: -9.350
+}
+
+function formatCultura(cultura = '') {
+  if (!cultura) return 'Sem cultura'
+  return cultura.charAt(0).toUpperCase() + cultura.slice(1)
+}
+
+function money(value) {
+  return `R$ ${Number(value || 0).toFixed(2)}`
+}
+
+function calcularAreaGeo(feature) {
+  if (!feature?.geometry?.coordinates?.[0]) return 0
+  try {
+    const ring = feature.geometry.coordinates[0]
+    let area = 0
+    const R = 6371000
+    for (let i = 0; i < ring.length - 1; i++) {
+      const [lon1, lat1] = ring[i]
+      const [lon2, lat2] = ring[i + 1]
+      area += (lon2 - lon1) * Math.PI / 180 * (2 + Math.sin(lat1 * Math.PI / 180) + Math.sin(lat2 * Math.PI / 180))
+    }
+    return Math.round(Math.abs(area * R * R / 2 / 10000) * 100) / 100
+  } catch {
+    return 0
+  }
+}
+
+function parseKmlText(text) {
+  const parser = new DOMParser()
+  const xml = parser.parseFromString(text, 'text/xml')
+  if (xml.querySelector('parsererror')) throw new Error('Arquivo KML inválido')
+  const features = []
+  xml.querySelectorAll('Placemark').forEach((placemark, idx) => {
+    const coordsEl = placemark.querySelector('coordinates')
+    if (!coordsEl) return
+    const name = placemark.querySelector('name')?.textContent || `Talhão ${idx + 1}`
+    const coordinates = coordsEl.textContent.trim().split(/\s+/).map(item => {
+      const [lng, lat] = item.split(',').map(Number)
+      return [lng, lat]
+    }).filter(([lng, lat]) => !Number.isNaN(lng) && !Number.isNaN(lat))
+    if (coordinates.length < 3) return
+    const first = coordinates[0]
+    const last = coordinates[coordinates.length - 1]
+    if (first[0] !== last[0] || first[1] !== last[1]) coordinates.push(first)
+    features.push({ type: 'Feature', properties: { name }, geometry: { type: 'Polygon', coordinates: [coordinates] } })
+  })
+  if (!features.length) throw new Error('KML não contém polígonos válidos')
+  return { type: 'FeatureCollection', features }
+}
+
+function featureName(feature, index = 0) {
+  const props = feature?.properties || {}
+  return props.name || props.nome || props.NOME || props.talhao || props.TALHAO || `Talhão ${index + 1}`
+}
+
+function featureCode(feature, index = 0) {
+  const name = featureName(feature, index)
+  const clean = String(name).replace(/\.[a-z0-9]+$/i, '').replace(/[^a-zA-Z0-9_-]/g, '').toUpperCase()
+  return clean || `T${index + 1}`
+}
+
+function getFeatureRing(feature) {
+  if (!feature?.geometry) return null
+  if (feature.geometry.type === 'Polygon') return feature.geometry.coordinates?.[0] || null
+  if (feature.geometry.type === 'MultiPolygon') return feature.geometry.coordinates?.[0]?.[0] || null
+  return null
+}
+
+function getMapBounds(features) {
+  const coords = features.flatMap(feature => getFeatureRing(feature) || [])
+  if (!coords.length) return MAP_DEFAULT_BOUNDS
+  const lngs = coords.map(([lng]) => lng)
+  const lats = coords.map(([, lat]) => lat)
+  const padLng = Math.max((Math.max(...lngs) - Math.min(...lngs)) * 0.12, 0.01)
+  const padLat = Math.max((Math.max(...lats) - Math.min(...lats)) * 0.12, 0.01)
+  return {
+    minLng: Math.min(...lngs) - padLng,
+    maxLng: Math.max(...lngs) + padLng,
+    minLat: Math.min(...lats) - padLat,
+    maxLat: Math.max(...lats) + padLat
+  }
+}
+
+function projectCoord([lng, lat], bounds) {
+  const x = ((lng - bounds.minLng) / (bounds.maxLng - bounds.minLng)) * 100
+  const y = (1 - ((lat - bounds.minLat) / (bounds.maxLat - bounds.minLat))) * 100
+  return [x, y]
+}
+
+function pointToCoord(point) {
+  const lng = MAP_DEFAULT_BOUNDS.minLng + (point.x / 100) * (MAP_DEFAULT_BOUNDS.maxLng - MAP_DEFAULT_BOUNDS.minLng)
+  const lat = MAP_DEFAULT_BOUNDS.maxLat - (point.y / 100) * (MAP_DEFAULT_BOUNDS.maxLat - MAP_DEFAULT_BOUNDS.minLat)
+  return [lng, lat]
+}
+
+function pointsToFeature(points, codigo = 'Novo talhão') {
+  if (points.length < 3) return null
+  const coordinates = points.map(pointToCoord)
+  coordinates.push(coordinates[0])
+  return { type: 'Feature', properties: { codigo, name: codigo }, geometry: { type: 'Polygon', coordinates: [coordinates] } }
+}
+
+export function FazendaDetalhePage() {
+  const { id } = useParams()
+  const navigate = useNavigate()
+  const [activeView, setActiveView] = useState('mapa')
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [fazenda, setFazenda] = useState(null)
+  const [talhoes, setTalhoes] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [showNovo, setShowNovo] = useState(false)
+  const [novoTalhaoMode, setNovoTalhaoMode] = useState(null)
+  const [form, setForm] = useState({ codigo: 'T1', cultura: 'soja', area_ha: '', fase: 'preparo' })
+  const [salvando, setSalvando] = useState(false)
+  const [erro, setErro] = useState('')
+  const [talhaoSel, setTalhaoSel] = useState(null)
+  const [operacoes, setOperacoes] = useState([])
+  const [custos, setCustos] = useState([])
+  const [loadOps, setLoadOps] = useState(false)
+  const [showNovaOp, setShowNovaOp] = useState(false)
+  const [opSel, setOpSel] = useState(null)
+
+  useEffect(() => { carregar() }, [id])
+
+  async function carregar() {
+    setLoading(true)
+    const [{ data: f }, { data: ts }] = await Promise.all([
+      supabase.from('fazendas').select('*').eq('id', id).single(),
+      supabase.from('talhoes').select('*').eq('fazenda_id', id).eq('ativo', true).order('codigo')
+    ])
+    setFazenda(f)
+    setTalhoes(ts || [])
+    const nums = (ts || []).map(t => parseInt(String(t.codigo).replace(/\D/g, ''), 10)).filter(n => !isNaN(n))
+    setForm(p => ({ ...p, codigo: 'T' + (nums.length === 0 ? 1 : Math.max(...nums) + 1) }))
+    setLoading(false)
+  }
+
+  async function abrirTalhao(talhao) {
+    setTalhaoSel(talhao)
+    setLoadOps(true)
+    const [ops, cs] = await Promise.all([listarOperacoes(talhao.id), resumoCustosPorCategoria(talhao.id)])
+    setOperacoes(ops)
+    setCustos(cs)
+    setLoadOps(false)
+  }
+
+  function fecharTalhao() {
+    setTalhaoSel(null)
+    setOperacoes([])
+    setCustos([])
+    setLoadOps(false)
+  }
+
+  async function alternarTalhao(talhao) {
+    if (!talhao) {
+      fecharTalhao()
+      return
+    }
+    if (talhaoSel?.id === talhao.id) {
+      fecharTalhao()
+      return
+    }
+    await abrirTalhao(talhao)
+  }
+
+  async function salvarTalhao(e) {
+    e.preventDefault()
+    setErro('')
+    setSalvando(true)
+    const { error } = await supabase.from('talhoes').insert({
+      fazenda_id: id,
+      codigo: form.codigo,
+      cultura: form.cultura,
+      area_ha: parseFloat(form.area_ha),
+      fase: form.fase
+    })
+    if (error) {
+      setErro(error.message)
+      setSalvando(false)
+      return
+    }
+    setShowNovo(false)
+    carregar()
+    setSalvando(false)
+  }
+
+  function abrirCadastroTalhao(mode = null) {
+    setNovoTalhaoMode(mode)
+    setShowNovo(true)
+  }
+
+  function fecharCadastroTalhao() {
+    setShowNovo(false)
+    setNovoTalhaoMode(null)
+  }
+
+  async function talhaoCriado() {
+    fecharCadastroTalhao()
+    await carregar()
+  }
+
+  async function excluirTalhao(tid) {
+    if (!confirm('Excluir este talhao?')) return
+    await supabase.from('talhoes').update({ ativo: false }).eq('id', tid)
+    if (talhaoSel?.id === tid) setTalhaoSel(null)
+    carregar()
+  }
+
+  const total = useMemo(() => talhoes.reduce((s, t) => s + Number(t.area_ha || 0), 0), [talhoes])
+  const totalCusto = useMemo(() => custos.reduce((s, c) => s + Number(c.custo_total || 0), 0), [custos])
+  const talhoesSemMonitoramento = Math.max(0, talhoes.length - Math.min(talhoes.length, operacoes.length))
+  const isMapView = activeView === 'mapa'
+
+  if (loading) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: C.bgSoft }}>
+        <p style={{ color: C.textDim, fontFamily: 'monospace' }}>CARREGANDO...</p>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ minHeight: '100vh', background: isMapView ? '#102316' : C.bgSoft, display: 'flex', flexDirection: 'column' }}>
+      <header style={floatingHeaderStyle}>
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button onClick={() => setMenuOpen(open => !open)} style={hamburgerButtonStyle}>☰</button>
+            <button onClick={() => navigate('/')} style={iconButtonStyle}>←</button>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p style={eyebrowStyle}>FAZENDA</p>
+              <h1 style={{ margin: '2px 0 0', fontSize: 20, color: C.textDk, fontWeight: 700, fontFamily: 'Georgia, serif' }}>{fazenda?.nome}</h1>
+            </div>
+          </div>
+          <nav style={{ display: 'none', gap: 8, overflowX: 'auto', paddingBottom: 2 }}>
+            {NAV_ITEMS.map(item => (
+              <button
+                key={item.id}
+                onClick={() => setActiveView(item.id)}
+                style={{
+                  border: `1px solid ${activeView === item.id ? C.greenDp : C.border}`,
+                  background: activeView === item.id ? C.greenDp : C.bgLight,
+                  color: activeView === item.id ? C.bg : C.textDk,
+                  borderRadius: 10,
+                  padding: '9px 14px',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  whiteSpace: 'nowrap',
+                  fontFamily: 'system-ui, -apple-system, Segoe UI, sans-serif'
+                }}
+              >
+                {item.label}
+              </button>
+            ))}
+          </nav>
+        </div>
+      </header>
+
+      {menuOpen && (
+        <div style={drawerBackdropStyle} onClick={() => setMenuOpen(false)}>
+          <aside style={drawerStyle} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+              <p style={sidebarEyebrowStyle}>MENU</p>
+              <button onClick={() => setMenuOpen(false)} style={drawerCloseButtonStyle}>×</button>
+            </div>
+            {NAV_ITEMS.map(item => (
+              <button
+                key={item.id}
+                onClick={() => { setActiveView(item.id); setMenuOpen(false) }}
+                style={{
+                  ...drawerNavButtonStyle,
+                  background: activeView === item.id ? C.greenDp : C.bg,
+                  color: activeView === item.id ? C.bg : C.textDk,
+                  borderColor: activeView === item.id ? C.greenDp : C.border
+                }}
+              >
+                {item.label}
+              </button>
+            ))}
+          </aside>
+        </div>
+      )}
+
+      <main style={{ flex: 1, width: '100%', maxWidth: isMapView ? 'none' : 1320, margin: '0 auto', padding: isMapView ? 0 : 16, paddingTop: isMapView ? 0 : 98 }}>
+        <div style={farmLayoutStyle}>
+          <aside style={farmSidebarStyle}>
+            <p style={sidebarEyebrowStyle}>MENU</p>
+            {NAV_ITEMS.map(item => (
+              <button
+                key={item.id}
+                onClick={() => setActiveView(item.id)}
+                style={{
+                  ...sidebarNavButtonStyle,
+                  background: activeView === item.id ? C.greenDp : C.bg,
+                  color: activeView === item.id ? C.bg : C.textDk,
+                  borderColor: activeView === item.id ? C.greenDp : C.border
+                }}
+              >
+                {item.label}
+              </button>
+            ))}
+          </aside>
+          <section style={{ flex: 1, minWidth: 0 }}>
+        {activeView === 'mapa' && (
+          <FazendaMapaPrincipal
+            fazenda={fazenda}
+            talhoes={talhoes}
+            talhaoSel={talhaoSel}
+            operacoes={operacoes}
+            custos={custos}
+            totalCusto={totalCusto}
+            loadOps={loadOps}
+            alternarTalhao={alternarTalhao}
+            navigate={navigate}
+            setActiveView={setActiveView}
+          />
+        )}
+        {activeView === 'dashboard' && (
+          <DashboardView
+            total={total}
+            talhoes={talhoes}
+            talhaoSel={talhaoSel}
+            operacoes={operacoes}
+            custos={custos}
+            totalCusto={totalCusto}
+            loadOps={loadOps}
+            abrirTalhao={abrirTalhao}
+            talhoesSemMonitoramento={talhoesSemMonitoramento}
+            navigate={navigate}
+            setActiveView={setActiveView}
+          />
+        )}
+        {activeView === 'chuvas' && <InterpolacaoView tipo="chuvas" talhoes={talhoes} total={total} />}
+        {activeView === 'solo' && <InterpolacaoView tipo="solo" talhoes={talhoes} total={total} />}
+        {activeView === 'scouting' && <ScoutingView talhoes={talhoes} talhaoSel={talhaoSel} abrirTalhao={abrirTalhao} />}
+        {activeView === 'gerencial' && (
+          <GerencialView
+            talhoes={talhoes}
+            talhaoSel={talhaoSel}
+            operacoes={operacoes}
+            custos={custos}
+            total={total}
+            totalCusto={totalCusto}
+            loadOps={loadOps}
+            opSel={opSel}
+            setOpSel={setOpSel}
+            abrirTalhao={abrirTalhao}
+            excluirTalhao={excluirTalhao}
+            setShowNovo={abrirCadastroTalhao}
+            setShowNovaOp={setShowNovaOp}
+            navigate={navigate}
+          />
+        )}
+        {activeView === 'relatorios' && <RelatoriosView talhoes={talhoes} total={total} />}
+        {activeView === 'monitoramento' && (
+          <MonitoramentoRegistroView
+            fazenda={fazenda}
+            talhao={talhaoSel}
+            onBack={() => setActiveView('mapa')}
+          />
+        )}
+          </section>
+        </div>
+      </main>
+
+      {showNovo && (
+        <TalhaoGeoModal
+          fazendaId={id}
+          initialMode={novoTalhaoMode}
+          sugerirCodigo={form.codigo}
+          talhoes={talhoes}
+          onClose={fecharCadastroTalhao}
+          onCreated={talhaoCriado}
+        />
+      )}
+
+      {showNovaOp && talhaoSel && (
+        <NovaOperacaoModal talhao={talhaoSel} fazendaId={id} onClose={() => setShowNovaOp(false)} onSaved={async () => { setShowNovaOp(false); await abrirTalhao(talhaoSel) }} />
+      )}
+    </div>
+  )
+}
+
+function FazendaMapaPrincipal({ fazenda, talhoes, talhaoSel, operacoes, custos, totalCusto, loadOps, alternarTalhao, navigate, setActiveView }) {
+  const [timelineMode, setTimelineMode] = useState('timeline')
+  const [chuvaInicio, setChuvaInicio] = useState('2026-05-01')
+  const [chuvaFim, setChuvaFim] = useState('2026-05-15')
+  const features = talhoes.map(talhao => ({ talhao, feature: normalizeFeature(talhao.geometria, talhao.codigo) })).filter(item => item.feature)
+  const selected = talhaoSel || null
+  const custoHa = selected?.area_ha ? totalCusto / Number(selected.area_ha || 1) : 0
+  const chuvaSeed = selected ? String(selected.codigo || '').split('').reduce((sum, char) => sum + char.charCodeAt(0), 0) : 0
+  const chuvaAcumulada = selected ? (82 + (chuvaSeed % 88) + Number(selected.area_ha || 0) % 18).toFixed(1) : '0.0'
+  const chuvaMediaDia = selected ? (Number(chuvaAcumulada) / 15).toFixed(1) : '0.0'
+  const maiorChuva = selected ? (18 + (chuvaSeed % 24)).toFixed(1) : '0.0'
+  const menorChuva = selected ? (2 + (chuvaSeed % 9)).toFixed(1) : '0.0'
+  const timeline = operacoes.length > 0
+    ? operacoes.map(op => ({
+      data: op.data_operacao || 'Sem data',
+      titulo: getCategoriaInfo(op.categoria).label,
+      status: 'Executada',
+      valor: money((op.insumos || []).reduce((s, i) => s + Number(i.custo_total || 0), 0) + Number(op.custo_aplicacao || 0))
+    }))
+    : [
+      { data: 'Hoje', titulo: 'Sem operacoes registradas', status: 'Pendente', valor: 'Adicionar historico' },
+      { data: 'Proximo passo', titulo: 'Monitoramento de campo', status: 'Aberta', valor: 'Scouting' },
+      { data: 'Proximo passo', titulo: 'Ordem de servico', status: 'Aberta', valor: 'Planejar' }
+    ]
+
+  async function handleFeatureClick(index) {
+    const talhao = features[index]?.talhao
+    if (!talhao) return
+    if (talhaoSel?.id !== talhao.id) setTimelineMode('timeline')
+    await alternarTalhao(talhao)
+  }
+
+  return (
+    <section style={mapMainPageStyle}>
+      <SimpleFarmMap
+        features={features.map(item => ({ ...item.feature, properties: { ...item.feature.properties, codigo: item.talhao.codigo } }))}
+        height="100vh"
+        fullBleed
+        selectedCode={selected?.codigo}
+        selectedMode={timelineMode}
+        onFeatureClick={handleFeatureClick}
+      />
+
+      <div style={{ display: 'none', ...mapTopInfoStyle }}>
+        <p style={eyebrowStyle}>MAPA DA FAZENDA</p>
+        <h2 style={{ margin: '3px 0 0', color: C.bg, fontSize: 24, fontFamily: 'Georgia, serif' }}>{fazenda?.nome}</h2>
+        <p style={{ margin: '6px 0 0', color: 'rgba(255,255,255,0.78)', fontSize: 12 }}>{talhoes.length} talhoes · clique no mapa para abrir a linha do tempo</p>
+      </div>
+
+      {false && selected && (
+        <div style={mapTalhaoChipStyle}>
+          <p style={eyebrowStyle}>TALHAO</p>
+          <strong>{selected.codigo}</strong>
+          <span>{Number(selected.area_ha || 0).toFixed(2)} ha · {formatCultura(selected.cultura)}</span>
+        </div>
+      )}
+
+      {selected && (
+        <div style={timelineDockStyle}>
+          <div style={timelineHeaderStyle}>
+            <div>
+              <p style={eyebrowStyle}>LINHA DO TEMPO DO TALHAO</p>
+              <h3 style={{ margin: '4px 0 0', color: C.bg, fontSize: 19, fontFamily: 'Georgia, serif' }}>{selected.codigo} · {formatCultura(selected.cultura)}</h3>
+            </div>
+            <div style={timelineStatsStyle}>
+              <span>Área: {Number(selected.area_ha || 0).toFixed(2)} ha</span>
+              <span>Custo: {loadOps ? 'Carregando' : money(totalCusto)}</span>
+              <span>Custo/ha: {loadOps ? '...' : money(custoHa)}</span>
+            </div>
+          </div>
+          <div style={timelineModeTabsStyle}>
+            <button onClick={() => setTimelineMode('timeline')} style={{ ...timelineModeButtonStyle, background: timelineMode === 'timeline' ? C.bg : 'rgba(255,255,255,0.2)', color: timelineMode === 'timeline' ? C.soilDk : C.bg }}>Linha do tempo</button>
+            <button onClick={() => setTimelineMode('chuvas')} style={{ ...timelineModeButtonStyle, background: timelineMode === 'chuvas' ? C.bg : 'rgba(255,255,255,0.2)', color: timelineMode === 'chuvas' ? C.soilDk : C.bg }}>Chuvas</button>
+          </div>
+          {timelineMode === 'timeline' ? (
+            <div style={timelineTableStyle}>
+              {timeline.map((item, index) => (
+                <button key={`${item.data}-${item.titulo}-${index}`} style={timelineCellStyle}>
+                  <span>{item.data}</span>
+                  <strong>{item.titulo}</strong>
+                  <em>{item.status}</em>
+                  <small>{item.valor}</small>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div style={timelineRainLayoutStyle}>
+              <div style={timelineDateGridStyle}>
+                <label style={timelineDateLabelStyle}>
+                  Data inicial
+                  <input type="date" value={chuvaInicio} onChange={e => setChuvaInicio(e.target.value)} style={timelineDateInputStyle} />
+                </label>
+                <label style={timelineDateLabelStyle}>
+                  Data final
+                  <input type="date" value={chuvaFim} onChange={e => setChuvaFim(e.target.value)} style={timelineDateInputStyle} />
+                </label>
+                <button style={timelinePrimaryButtonStyle}>Interpolar periodo</button>
+              </div>
+              <div style={timelineRainGridStyle}>
+                <div style={timelineRainMetricStyle}><span>Acumulado no talhao</span><strong>{chuvaAcumulada} mm</strong></div>
+                <div style={timelineRainMetricStyle}><span>Media diaria</span><strong>{chuvaMediaDia} mm</strong></div>
+                <div style={timelineRainMetricStyle}><span>Maior precipitacao</span><strong>{maiorChuva} mm</strong></div>
+                <div style={timelineRainMetricStyle}><span>Menor precipitacao</span><strong>{menorChuva} mm</strong></div>
+              </div>
+              <div style={timelineRainMapStyle}>
+                <span>{selected.codigo}</span>
+              </div>
+            </div>
+          )}
+          <div style={timelineActionsStyle}>
+            <button onClick={() => setActiveView('monitoramento')} style={timelineActionButtonStyle}>Monitorar</button>
+            <button onClick={() => navigate('/os')} style={timelineActionButtonStyle}>Criar ordem</button>
+            <button onClick={() => setActiveView('solo')} style={timelineActionButtonStyle}>Solo</button>
+            <button onClick={() => setTimelineMode('chuvas')} style={timelineActionButtonStyle}>Chuvas</button>
+          </div>
+        </div>
+      )}
+    </section>
+  )
+}
+
+function MonitoramentoRegistroView({ fazenda, talhao, onBack }) {
+  const [points, setPoints] = useState([])
+  const [tracking, setTracking] = useState(false)
+  const [gpsStatus, setGpsStatus] = useState('Aguardando GPS')
+  const watchRef = useRef(null)
+
+  useEffect(() => {
+    return () => {
+      if (watchRef.current) navigator.geolocation.clearWatch(watchRef.current)
+    }
+  }, [])
+
+  function addPosition(position, tipo) {
+    const coords = position.coords || {}
+    setPoints(current => [
+      ...current,
+      {
+        tipo,
+        lat: coords.latitude,
+        lng: coords.longitude,
+        precisao: coords.accuracy,
+        hora: new Date().toLocaleString('pt-BR')
+      }
+    ])
+    setGpsStatus('Ponto registrado')
+  }
+
+  function capturarPonto(tipo = 'Ponto de scouting') {
+    if (!navigator.geolocation) {
+      setGpsStatus('GPS indisponivel neste navegador')
+      return
+    }
+    setGpsStatus('Buscando sinal GPS...')
+    navigator.geolocation.getCurrentPosition(
+      position => addPosition(position, tipo),
+      error => setGpsStatus(error.message || 'Nao foi possivel capturar o GPS'),
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 }
+    )
+  }
+
+  function iniciarCaminhamento() {
+    if (!navigator.geolocation) {
+      setGpsStatus('GPS indisponivel neste navegador')
+      return
+    }
+    if (watchRef.current) return
+    setTracking(true)
+    setGpsStatus('Caminhamento em andamento')
+    watchRef.current = navigator.geolocation.watchPosition(
+      position => addPosition(position, 'Caminhamento'),
+      error => setGpsStatus(error.message || 'Erro no caminhamento GPS'),
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 3000 }
+    )
+  }
+
+  function finalizarCaminhamento() {
+    if (watchRef.current) {
+      navigator.geolocation.clearWatch(watchRef.current)
+      watchRef.current = null
+    }
+    setTracking(false)
+    setGpsStatus('Caminhamento finalizado')
+  }
+
+  return (
+    <section style={viewStackStyle}>
+      <div style={heroPanelStyle}>
+        <div>
+          <p style={eyebrowStyle}>SCOUTING GEOREFERENCIADO</p>
+          <h2 style={viewTitleStyle}>Registrar monitoramento</h2>
+          <p style={viewSubtitleStyle}>{fazenda?.nome} {talhao ? `· talhao ${talhao.codigo}` : '· selecione um talhao no mapa para registrar em campo'}</p>
+        </div>
+        <button onClick={onBack} style={secondaryActionStyle}>Voltar ao mapa</button>
+      </div>
+
+      <div style={monitoringGridStyle}>
+        <div style={panelStyle}>
+          <p style={eyebrowStyle}>TALHAO</p>
+          <h3 style={{ margin: '5px 0 0', color: C.textDk, fontSize: 24, fontFamily: 'Georgia, serif' }}>{talhao?.codigo || 'Nenhum selecionado'}</h3>
+          <p style={{ margin: '6px 0 0', color: C.textMid, fontSize: 13 }}>{talhao ? `${Number(talhao.area_ha || 0).toFixed(2)} ha · ${formatCultura(talhao.cultura)}` : 'Abra o mapa e clique em um talhao antes de iniciar.'}</p>
+
+          <div style={monitoringActionGridStyle}>
+            <button onClick={() => capturarPonto('Ponto de scouting')} disabled={!talhao} style={{ ...primaryActionStyle, opacity: talhao ? 1 : 0.5 }}>Registrar ponto</button>
+            <button onClick={tracking ? finalizarCaminhamento : iniciarCaminhamento} disabled={!talhao} style={{ ...secondaryActionStyle, opacity: talhao ? 1 : 0.5 }}>{tracking ? 'Finalizar caminhamento' : 'Iniciar caminhamento'}</button>
+            <button onClick={() => capturarPonto('Armadilha')} disabled={!talhao} style={{ ...secondaryActionStyle, opacity: talhao ? 1 : 0.5 }}>Marcar armadilha</button>
+            <button onClick={() => capturarPonto('Ocorrencia')} disabled={!talhao} style={{ ...secondaryActionStyle, opacity: talhao ? 1 : 0.5 }}>Marcar ocorrencia</button>
+          </div>
+
+          <div style={gpsStatusStyle}>
+            <strong>{gpsStatus}</strong>
+            <span>{points.length} registros coletados nesta visita</span>
+          </div>
+        </div>
+
+        <div style={panelStyle}>
+          <p style={eyebrowStyle}>MAPA DA VISITA</p>
+          <div style={gpsCanvasStyle}>
+            <div style={gpsPathLineStyle} />
+            {points.map((point, index) => (
+              <span
+                key={`${point.hora}-${index}`}
+                title={`${point.tipo}: ${point.lat?.toFixed(6)}, ${point.lng?.toFixed(6)}`}
+                style={{
+                  ...gpsPointStyle,
+                  left: `${14 + ((index * 17) % 72)}%`,
+                  top: `${18 + ((index * 23) % 58)}%`,
+                  background: point.tipo === 'Caminhamento' ? C.greenDp : C.amberDk
+                }}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div style={panelStyle}>
+        <p style={eyebrowStyle}>PONTOS E CAMINHAMENTO</p>
+        <div style={gpsTableStyle}>
+          {points.length === 0 ? (
+            <p style={{ margin: 0, color: C.textMid, fontSize: 13 }}>Nenhum ponto registrado ainda.</p>
+          ) : points.map((point, index) => (
+            <div key={`${point.hora}-${index}`} style={gpsRowStyle}>
+              <strong>{point.tipo}</strong>
+              <span>{point.hora}</span>
+              <span>{point.lat?.toFixed(6)}, {point.lng?.toFixed(6)}</span>
+              <span>{Math.round(point.precisao || 0)} m</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function DashboardView({ total, talhoes, talhaoSel, operacoes, custos, totalCusto, loadOps, abrirTalhao, talhoesSemMonitoramento, navigate, setActiveView }) {
+  const cards = [
+    { label: 'Area monitorada', value: `${total.toFixed(2)} ha`, tone: C.greenDp },
+    { label: 'Talhoes ativos', value: talhoes.length, tone: C.soilDk },
+    { label: 'Alertas de monitoramento', value: talhoesSemMonitoramento, tone: talhoesSemMonitoramento > 0 ? C.redDk : C.greenDp }
+  ]
+  const talhaoReferencia = talhoes[0]?.codigo || 'TH01'
+  const areaMedia = talhoes.length > 0 ? total / talhoes.length : 0
+  const smartCards = [
+    {
+      title: 'Gastos agricolas',
+      status: 'financeiro',
+      actionLabel: 'Abrir gerencial',
+      onAction: () => setActiveView('gerencial'),
+      insights: [
+        { label: 'Custo por hectare', value: 'Aguardando operacoes fechadas', tone: 'neutral' },
+        { label: 'Area media por talhao', value: `${areaMedia.toFixed(1)} ha`, tone: areaMedia > 0 ? 'ok' : 'neutral' },
+        { label: 'Planejado x realizado', value: 'Conectar ordens de servico', tone: 'attention' }
+      ]
+    },
+    {
+      title: 'Alertas de monitoramento',
+      status: talhoesSemMonitoramento > 0 ? 'atencao' : 'estavel',
+      actionLabel: 'Ver scouting',
+      onAction: () => setActiveView('scouting'),
+      insights: [
+        { label: 'Talhoes sem visita recente', value: `${talhoesSemMonitoramento}`, tone: talhoesSemMonitoramento > 0 ? 'danger' : 'ok' },
+        { label: 'Nivel de dano', value: 'Sem dano economico critico', tone: 'ok' },
+        { label: 'Armadilhas', value: 'Tendencia a configurar', tone: 'attention' }
+      ]
+    },
+    {
+      title: 'Clima e solo',
+      status: 'agronomico',
+      actionLabel: 'Abrir chuvas',
+      onAction: () => setActiveView('chuvas'),
+      insights: [
+        { label: 'Chuva do periodo', value: '142,7 mm acumulados', tone: 'ok' },
+        { label: 'Maior precipitacao', value: `${talhaoReferencia} · 38,4 mm`, tone: 'attention' },
+        { label: 'Solo', value: '16 parametros prontos para leitura', tone: 'ok' }
+      ]
+    },
+    {
+      title: 'Gestao da fazenda',
+      status: 'operacional',
+      actionLabel: 'Abrir ordem',
+      onAction: () => navigate('/os'),
+      insights: [
+        { label: 'Estoque minimo', value: 'Conectar saldo de insumos', tone: 'attention' },
+        { label: 'Equipe e permissoes', value: 'Controle por nivel de usuario', tone: 'neutral' },
+        { label: 'Cadastros pendentes', value: talhoes.length > 0 ? 'Talhoes cadastrados' : 'Cadastrar primeiro talhao', tone: talhoes.length > 0 ? 'ok' : 'danger' }
+      ]
+    }
+  ]
+
+  return (
+    <section style={viewStackStyle}>
+      <div style={heroPanelStyle}>
+        <div>
+          <p style={eyebrowStyle}>CENTRO DE DECISAO</p>
+          <h2 style={viewTitleStyle}>Central dos talhões</h2>
+          <p style={viewSubtitleStyle}>Mapa operacional da fazenda para selecionar talhões, abrir diagnósticos e acionar chuva, solo, scouting e ordens.</p>
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button onClick={() => navigate('/os')} style={primaryActionStyle}>Criar Ordem de Serviço</button>
+          <button onClick={() => setActiveView('relatorios')} style={secondaryActionStyle}>Gerar Relatório</button>
+        </div>
+      </div>
+
+      {false && <TalhoesCommandCenter
+        talhoes={talhoes}
+        talhaoSel={talhaoSel}
+        operacoes={operacoes}
+        custos={custos}
+        totalCusto={totalCusto}
+        loadOps={loadOps}
+        abrirTalhao={abrirTalhao}
+        navigate={navigate}
+        setActiveView={setActiveView}
+      />}
+
+      <div style={metricGridStyle}>
+        {cards.map(card => <MetricCard key={card.label} {...card} />)}
+        <CustoPizzaCard />
+      </div>
+
+      <div style={dashboardGridStyle}>
+        {smartCards.map(card => <SmartInsightCard key={card.title} {...card} />)}
+        <div style={{ display: 'none' }}>
+        <InsightPanel
+          title="Gastos agricolas"
+          items={[
+            'Custo por talhão, safra, cultura e natureza agrícola',
+            'Comparativo planejado x realizado das ordens de servico',
+            'Consumo de insumos por hectare e por operacao'
+          ]}
+        />
+        <InsightPanel
+          title="Alertas de monitoramento"
+          items={[
+            'Talhoes sem scouting recente',
+            'Ocorrências em nível de controle ou dano econômico',
+            'Armadilhas com tendencia de aumento'
+          ]}
+        />
+        <InsightPanel
+          title="Clima e solo"
+          items={[
+            'Chuva acumulada por período e pluviômetro',
+            'Mapas interpolados por data definida',
+            'Fertilidade por camada, atributo e talhão'
+          ]}
+        />
+        <InsightPanel
+          title="Gestao da fazenda"
+          items={[
+            'Estoque minimo e insumos a comprar',
+            'Equipe, permissoes e auditoria de edicoes',
+            'Cadastro de máquinas, fornecedores e centros de custo'
+          ]}
+        />
+      </div>
+      </div>
+    </section>
+  )
+}
+
+function TalhoesCommandCenter({ talhoes, talhaoSel, operacoes, custos, totalCusto, loadOps, abrirTalhao, navigate, setActiveView }) {
+  const talhoesComGeometria = talhoes.map(talhao => ({ talhao, feature: normalizeFeature(talhao.geometria, talhao.codigo) })).filter(item => item.feature)
+  const selected = talhaoSel || talhoes[0] || null
+  const custoHa = selected?.area_ha ? totalCusto / Number(selected.area_ha || 1) : 0
+  const custoCategorias = custos.slice().sort((a, b) => Number(b.custo_total || 0) - Number(a.custo_total || 0)).slice(0, 3)
+
+  return (
+    <div style={talhaoHubStyle}>
+      <div style={talhaoMapColumnStyle}>
+        <div style={talhaoMapHeaderStyle}>
+          <div>
+            <p style={eyebrowStyle}>MAPA DOS TALHOES</p>
+            <h3 style={panelTitleStyle}>Selecione um talhao para decidir a proxima acao</h3>
+          </div>
+          <span style={mapCounterStyle}>{talhoesComGeometria.length} talhoes no mapa</span>
+        </div>
+        <SimpleFarmMap
+          features={talhoesComGeometria.map(item => ({ ...item.feature, properties: { ...item.feature.properties, codigo: item.talhao.codigo } }))}
+          height={520}
+          selectedCode={selected?.codigo}
+          onFeatureClick={(index) => abrirTalhao(talhoesComGeometria[index].talhao)}
+        />
+      </div>
+
+      <aside style={talhaoDecisionPanelStyle}>
+        {!selected ? (
+          <div style={emptyTalhaoPanelStyle}>
+            <h3 style={panelTitleStyle}>Nenhum talhao selecionado</h3>
+            <p style={{ margin: '8px 0 0', color: C.textMid, fontSize: 13 }}>Clique em um talhao no mapa para abrir o painel de decisao.</p>
+          </div>
+        ) : (
+          <>
+            <p style={eyebrowStyle}>TALHAO SELECIONADO</p>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', marginTop: 6 }}>
+              <div>
+                <h3 style={{ margin: 0, color: C.textDk, fontSize: 28, fontFamily: 'Georgia, serif' }}>{selected.codigo}</h3>
+                <p style={{ margin: '3px 0 0', color: C.textMid, fontSize: 13 }}>{formatCultura(selected.cultura)} · {(FASE_LABELS[selected.fase] || selected.fase || 'fase nao definida')}</p>
+              </div>
+              <span style={talhaoStatusBadgeStyle}>Ativo</span>
+            </div>
+
+            <div style={talhaoKpiGridStyle}>
+              <TalhaoMiniKpi label="Area" value={`${Number(selected.area_ha || 0).toFixed(2)} ha`} />
+              <TalhaoMiniKpi label="Custo total" value={loadOps ? 'Carregando' : money(totalCusto)} />
+              <TalhaoMiniKpi label="Custo/ha" value={loadOps ? '...' : money(custoHa)} />
+              <TalhaoMiniKpi label="Operacoes" value={loadOps ? '...' : operacoes.length} />
+            </div>
+
+            <div style={talhaoActionGridStyle}>
+              <button onClick={() => setActiveView('scouting')} style={primaryActionStyle}>Monitorar</button>
+              <button onClick={() => navigate('/os')} style={secondaryActionStyle}>Criar ordem</button>
+              <button onClick={() => setActiveView('solo')} style={secondaryActionStyle}>Ver solo</button>
+              <button onClick={() => setActiveView('chuvas')} style={secondaryActionStyle}>Ver chuvas</button>
+            </div>
+
+            <div style={talhaoInsightBoxStyle}>
+              <p style={eyebrowStyle}>LEITURA RAPIDA</p>
+              <div style={{ display: 'grid', gap: 8, marginTop: 10 }}>
+                <TalhaoInsight tone="ok" label="Geometria" value={selected.geometria ? 'Talhao georreferenciado' : 'Sem geometria'} />
+                <TalhaoInsight tone={operacoes.length > 0 ? 'ok' : 'attention'} label="Historico" value={operacoes.length > 0 ? `${operacoes.length} operacoes registradas` : 'Sem operacoes registradas'} />
+                <TalhaoInsight tone="attention" label="Scouting" value="Conectar ultimo monitoramento" />
+                <TalhaoInsight tone="neutral" label="Solo e chuva" value="Pronto para cruzar com camadas interpoladas" />
+              </div>
+            </div>
+
+            <div style={talhaoInsightBoxStyle}>
+              <p style={eyebrowStyle}>CUSTOS POR CATEGORIA</p>
+              {custoCategorias.length === 0 ? (
+                <p style={{ margin: '10px 0 0', color: C.textMid, fontSize: 12 }}>Sem custos categorizados para este talhao.</p>
+              ) : (
+                <div style={{ display: 'grid', gap: 8, marginTop: 10 }}>
+                  {custoCategorias.map(categoria => {
+                    const info = getCategoriaInfo(categoria.categoria)
+                    return (
+                      <div key={categoria.categoria} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 12 }}>
+                        <span style={{ color: C.textMid }}>{info.label}</span>
+                        <strong style={{ color: info.cor, fontFamily: 'monospace' }}>{money(categoria.custo_total)}</strong>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          </>
+        )}
+      </aside>
+    </div>
+  )
+}
+
+function TalhaoMiniKpi({ label, value }) {
+  return (
+    <div style={talhaoMiniKpiStyle}>
+      <p style={eyebrowStyle}>{label.toUpperCase()}</p>
+      <strong style={{ display: 'block', marginTop: 5, color: C.textDk, fontSize: 14, fontFamily: 'Georgia, serif' }}>{value}</strong>
+    </div>
+  )
+}
+
+function TalhaoInsight({ tone, label, value }) {
+  const color = tone === 'ok' ? C.greenDp : tone === 'attention' ? C.amberDk : tone === 'danger' ? C.redDk : C.textDim
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '9px 1fr', gap: 8, alignItems: 'start' }}>
+      <span style={{ width: 8, height: 8, borderRadius: 99, background: color, marginTop: 4 }} />
+      <div>
+        <p style={{ margin: 0, color: C.textDk, fontSize: 12, fontWeight: 800 }}>{label}</p>
+        <p style={{ margin: '2px 0 0', color: C.textMid, fontSize: 12, lineHeight: 1.35 }}>{value}</p>
+      </div>
+    </div>
+  )
+}
+
+function InterpolacaoView({ tipo, talhoes }) {
+  const isChuva = tipo === 'chuvas'
+  const [dataInicial, setDataInicial] = useState('2026-05-01')
+  const [dataFinal, setDataFinal] = useState('2026-05-15')
+  const talhaoReferencia = talhoes[0]?.codigo || 'TH01'
+  const talhaoMenor = talhoes[1]?.codigo || talhaoReferencia
+  const title = isChuva ? 'Mapa interpolado de chuvas' : 'Resultados de solo'
+  const subtitle = isChuva
+    ? 'Selecione a data inicial e final para interpolar os pluviometros georreferenciados no periodo.'
+    : 'Resultados por nutriente, talhao e camada amostrada, com leitura vertical parametro a parametro.'
+
+  const soilParams = [
+    ['pH CaCl2', '5,7', '0-20 cm', talhaoReferencia],
+    ['Materia organica', '32,4 g/dm3', '0-20 cm', talhaoReferencia],
+    ['Fosforo', '18,6 mg/dm3', '0-20 cm', talhaoReferencia],
+    ['Potassio', '0,42 cmolc/dm3', '0-20 cm', talhaoReferencia],
+    ['Calcio', '4,1 cmolc/dm3', '0-20 cm', talhaoReferencia],
+    ['Magnesio', '1,2 cmolc/dm3', '0-20 cm', talhaoReferencia],
+    ['Aluminio', '0,1 cmolc/dm3', '20-40 cm', talhaoReferencia],
+    ['H + Al', '3,8 cmolc/dm3', '20-40 cm', talhaoReferencia],
+    ['CTC', '9,4 cmolc/dm3', '0-20 cm', talhaoReferencia],
+    ['V%', '62%', '0-20 cm', talhaoReferencia],
+    ['Enxofre', '8,2 mg/dm3', '20-40 cm', talhaoReferencia],
+    ['Boro', '0,42 mg/dm3', '0-20 cm', talhaoReferencia],
+    ['Cobre', '1,1 mg/dm3', '0-20 cm', talhaoReferencia],
+    ['Manganes', '28 mg/dm3', '0-20 cm', talhaoReferencia],
+    ['Zinco', '3,5 mg/dm3', '0-20 cm', talhaoReferencia],
+    ['Argila', '42%', '0-20 cm', talhaoReferencia]
+  ]
+
+  return (
+    <section style={viewStackStyle}>
+      <div style={heroPanelStyle}>
+        <div>
+          <p style={eyebrowStyle}>{isChuva ? 'PLUVIOMETROS' : 'ANALISE DE SOLO'}</p>
+          <h2 style={viewTitleStyle}>{title}</h2>
+          <p style={viewSubtitleStyle}>{subtitle}</p>
+        </div>
+        {isChuva ? (
+          <div style={dateFilterGroupStyle}>
+            <label style={dateLabelStyle}>
+              Data inicial
+              <input type="date" value={dataInicial} onChange={e => setDataInicial(e.target.value)} style={dateInputStyle} />
+            </label>
+            <label style={dateLabelStyle}>
+              Data final
+              <input type="date" value={dataFinal} onChange={e => setDataFinal(e.target.value)} style={dateInputStyle} />
+            </label>
+            <button style={primaryActionStyle}>Interpolar</button>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+            {['Todos parametros', '0-20 cm', '20-40 cm', talhaoReferencia].map((filter, index) => (
+              <button key={filter} style={index === 0 ? primaryActionStyle : secondaryActionStyle}>{filter}</button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div style={mapShellStyle}>
+        <div style={mapToolbarStyle}>
+          <button style={mapPillActiveStyle}>{isChuva ? 'Chuva interpolada' : 'Resultados de solo'}</button>
+          <button style={mapPillStyle}>{dataInicial} - {dataFinal}</button>
+          <button style={mapPillStyle}>{isChuva ? 'Pluviometros' : 'Nutrientes'}</button>
+        </div>
+        {isChuva ? (
+          <div style={interpolationMapStyle}>
+            {talhoes.slice(0, 8).map((talhao, index) => (
+              <div
+                key={talhao.id}
+                style={{
+                  ...plotShapeStyle,
+                  left: `${12 + (index % 4) * 20}%`,
+                  top: `${18 + Math.floor(index / 4) * 31}%`,
+                  width: `${16 + (index % 3) * 3}%`,
+                  height: `${22 + (index % 2) * 8}%`,
+                  background: index % 3 === 0 ? 'rgba(232,90,58,0.72)' : index % 3 === 1 ? 'rgba(232,168,76,0.72)' : 'rgba(61,138,34,0.74)'
+                }}
+              >
+                <strong>{talhao.codigo}</strong>
+                <span>{Number(talhao.area_ha || 0).toFixed(1)} ha</span>
+              </div>
+            ))}
+            <div style={legendStyle}>
+              <p style={{ margin: 0, fontSize: 11, fontWeight: 800 }}>Chuva acumulada</p>
+              <div style={gradientBarStyle} />
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'rgba(255,255,255,0.8)' }}>
+                <span>Baixo</span><span>Medio</span><span>Alto</span>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div style={soilResultsShellStyle}>
+            {soilParams.map(([nutriente, media, camada, talhao], index) => (
+              <div key={nutriente} style={soilNutrientRowStyle}>
+                <div>
+                  <p style={{ margin: 0, color: C.textDk, fontWeight: 900, fontSize: 14 }}>{nutriente}</p>
+                  <p style={{ margin: '3px 0 0', color: C.textMid, fontSize: 11 }}>Talhao {talhao} · camada {camada}</p>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <p style={{ margin: 0, color: index % 3 === 0 ? C.greenDp : index % 3 === 1 ? C.amberDk : C.blue, fontWeight: 900, fontSize: 16 }}>{media}</p>
+                  <p style={{ margin: '3px 0 0', color: C.textDim, fontSize: 9, fontFamily: 'monospace' }}>MEDIA DO NUTRIENTE</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div style={metricGridStyle}>
+        <MetricCard label={isChuva ? 'Mes de maior incidencia' : 'Media do nutriente no talhao'} value={isChuva ? 'Janeiro · 218 mm' : '5,7 pH'} tone={C.greenDp} />
+        <MetricCard label={isChuva ? 'Acumulo medio do mes' : 'Talhao coberto'} value={isChuva ? '142,7 mm' : talhaoReferencia} tone={C.blue} />
+        <MetricCard label={isChuva ? 'Maior precipitacao' : 'Camada analisada'} value={isChuva ? `${talhaoReferencia} · 38,4 mm` : '0-20 cm'} tone={C.amberDk} />
+        <MetricCard label={isChuva ? 'Menor precipitacao' : 'Parametros avaliados'} value={isChuva ? `${talhaoMenor} · 12,6 mm` : soilParams.length} tone={C.soilDk} />
+      </div>
+    </section>
+  )
+}
+
+function ScoutingView({ talhoes, talhaoSel, abrirTalhao }) {
+  const timeline = [
+    { data: 'Hoje · 08:30', titulo: 'Visita em andamento', talhao: talhaoSel?.codigo || 'T04', dano: 'Controle', cor: C.amberDk },
+    { data: 'Ontem · 16:40', titulo: 'Visita realizada', talhao: 'T02', dano: 'Sem dano econômico', cor: C.greenDp },
+    { data: '13 de maio · 10:20', titulo: 'Visita realizada', talhao: 'T07', dano: 'Dano econômico', cor: C.redDk }
+  ]
+
+  return (
+    <section style={viewStackStyle}>
+      <div style={heroPanelStyle}>
+        <div>
+          <p style={eyebrowStyle}>MONITORAMENTO</p>
+          <h2 style={viewTitleStyle}>Scouting dos talhoes</h2>
+          <p style={viewSubtitleStyle}>Mapa da fazenda com filtros por último monitoramento, dano e histórico por talhão.</p>
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {['Último monitoramento', 'Sem dano econômico', 'Controle', 'Dano econômico'].map((item, index) => (
+            <button key={item} style={index === 0 ? primaryActionStyle : secondaryActionStyle}>{item}</button>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 330px', gap: 14 }}>
+        <div style={mapShellStyle}>
+          <div style={scoutingMapStyle}>
+            {talhoes.slice(0, 9).map((talhao, index) => (
+              <button
+                key={talhao.id}
+                onClick={() => abrirTalhao(talhao)}
+                style={{
+                  ...plotShapeStyle,
+                  borderColor: talhaoSel?.id === talhao.id ? C.bg : 'rgba(255,255,255,0.78)',
+                  left: `${10 + (index % 3) * 27}%`,
+                  top: `${13 + Math.floor(index / 3) * 27}%`,
+                  width: `${20 + (index % 2) * 5}%`,
+                  height: `${22 + (index % 3) * 4}%`,
+                  background: index % 4 === 0 ? 'rgba(232,90,58,0.78)' : index % 3 === 0 ? 'rgba(232,168,76,0.78)' : 'rgba(61,138,34,0.78)'
+                }}
+              >
+                <strong>{talhao.codigo}</strong>
+                <span>{Number(talhao.area_ha || 0).toFixed(1)} ha</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <aside style={panelStyle}>
+          <p style={eyebrowStyle}>LINHA DO TEMPO</p>
+          <h3 style={panelTitleStyle}>{talhaoSel ? `Talhão ${talhaoSel.codigo}` : 'Últimos monitoramentos'}</h3>
+          <div style={{ display: 'grid', gap: 10, marginTop: 14 }}>
+            {timeline.map(item => (
+              <div key={`${item.data}-${item.titulo}`} style={{ display: 'grid', gridTemplateColumns: '12px 1fr', gap: 10 }}>
+                <div style={{ width: 8, height: 8, borderRadius: 99, background: item.cor, marginTop: 4 }} />
+                <div>
+                  <p style={{ margin: 0, fontSize: 11, color: C.textDim, fontFamily: 'monospace' }}>{item.data}</p>
+                  <p style={{ margin: '2px 0 0', color: C.textDk, fontWeight: 800, fontSize: 13 }}>{item.titulo}</p>
+                  <p style={{ margin: '3px 0 0', color: C.textMid, fontSize: 12 }}>Talhão {item.talhao} · {item.dano}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </aside>
+      </div>
+    </section>
+  )
+}
+
+function MapaCadastroTalhoes({ talhoes, onOpenCadastro, onSelectTalhao }) {
+  const features = talhoes.map(talhao => ({ talhao, feature: normalizeFeature(talhao.geometria, talhao.codigo) })).filter(item => item.feature)
+
+  return (
+    <div style={mapManagerShellStyle}>
+      <div style={mapSideMenuStyle}>
+        <p style={sidebarEyebrowStyle}>MAPA</p>
+        <button onClick={() => onOpenCadastro('draw')} style={mapToolButtonStyle}>Desenhar talhão</button>
+        <button onClick={() => onOpenCadastro('kml')} style={mapToolButtonStyle}>Importar KML</button>
+        <button onClick={() => onOpenCadastro()} style={mapToolButtonStyle}>Cadastro completo</button>
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', marginBottom: 10 }}>
+          <div>
+            <p style={eyebrowStyle}>TALHÕES GEOREFERENCIADOS</p>
+            <h3 style={panelTitleStyle}>Mapa da fazenda</h3>
+          </div>
+          <span style={mapCounterStyle}>{features.length} com geometria</span>
+        </div>
+        <SimpleFarmMap
+          features={features.map(item => ({ ...item.feature, properties: { ...item.feature.properties, codigo: item.talhao.codigo } }))}
+          height={360}
+          onFeatureClick={(index) => onSelectTalhao(features[index].talhao)}
+        />
+      </div>
+    </div>
+  )
+}
+
+function TalhaoGeoModal({ fazendaId, initialMode, sugerirCodigo, talhoes, onClose, onCreated }) {
+  const [mode, setMode] = useState(initialMode)
+  const [codigo, setCodigo] = useState(sugerirCodigo || 'T1')
+  const [nome, setNome] = useState('')
+  const [cultura, setCultura] = useState('soja')
+  const [fase, setFase] = useState('preparo')
+  const [drawPoints, setDrawPoints] = useState([])
+  const [geojson, setGeojson] = useState(null)
+  const [importFeatures, setImportFeatures] = useState([])
+  const [sourceFile, setSourceFile] = useState(null)
+  const [error, setError] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const existingFeatures = talhoes.map(talhao => normalizeFeature(talhao.geometria, talhao.codigo)).filter(Boolean)
+  const drawFeature = pointsToFeature(drawPoints, codigo)
+  const featuresToSave = importFeatures.length > 0 ? importFeatures : [geojson || drawFeature].filter(Boolean)
+  const selectedFeature = featuresToSave[0] || null
+  const area = featuresToSave.reduce((sum, feature) => sum + calcularAreaGeo(feature), 0)
+
+  function chooseMode(nextMode) {
+    setMode(nextMode)
+    setError('')
+    setGeojson(null)
+    setImportFeatures([])
+    setSourceFile(null)
+    setDrawPoints([])
+  }
+
+  async function handleKml(file) {
+    setError('')
+    try {
+      const text = await file.text()
+      const fc = parseKmlText(text)
+      const features = fc.features
+      const feature = features[0]
+      setSourceFile(file)
+      setImportFeatures(features)
+      setGeojson(feature)
+      setCodigo(featureCode(feature, 0))
+      setNome(features.length === 1 ? featureName(feature, 0) : `${features.length} talhões importados`)
+      setMode('kml')
+    } catch (err) {
+      setError(err.message || 'Erro ao processar KML')
+    }
+  }
+
+  async function handleSave(e) {
+    e.preventDefault()
+    setError('')
+    if (featuresToSave.length === 0) {
+      setError('Desenhe o talhão ou importe um KML antes de salvar.')
+      return
+    }
+    if (featuresToSave.some(feature => calcularAreaGeo(feature) <= 0)) {
+      setError('A geometria precisa ter área válida para criar o talhão.')
+      return
+    }
+    setSaving(true)
+    try {
+      const origem = sourceFile
+        ? await uploadArquivoFazenda({ fazendaId, file: sourceFile, bucket: 'mapas', folder: 'talhoes' })
+        : null
+      for (let index = 0; index < featuresToSave.length; index++) {
+        const feature = featuresToSave[index]
+        const multi = featuresToSave.length > 1
+        const itemCodigo = multi ? featureCode(feature, index) : codigo
+        await criarTalhao({
+          fazenda_id: fazendaId,
+          codigo: itemCodigo,
+          nome: multi ? featureName(feature, index) : (nome || null),
+          cultura,
+          fase,
+          area_ha: calcularAreaGeo(feature),
+          geometria: { ...feature, properties: { ...(feature.properties || {}), codigo: itemCodigo } },
+          arquivo_origem_bucket: origem?.bucket,
+          arquivo_origem_path: origem?.path,
+          arquivo_origem_nome: origem?.nome
+        })
+      }
+      await onCreated()
+    } catch (err) {
+      setError(err.message || 'Erro ao salvar talhão')
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div onClick={onClose} style={modalOverlayStyle}>
+      <div onClick={e => e.stopPropagation()} style={geoModalStyle}>
+        <div style={geoModalHeaderStyle}>
+          <div>
+            <p style={eyebrowStyle}>CADASTRO DE TALHÃO</p>
+            <h2 style={viewTitleStyle}>Geometria obrigatória</h2>
+          </div>
+          <button onClick={onClose} style={iconButtonStyle}>×</button>
+        </div>
+
+        <div style={geoModalBodyStyle}>
+          <aside style={geoModeMenuStyle}>
+            <button onClick={() => chooseMode('draw')} style={mode === 'draw' ? geoModeButtonActiveStyle : geoModeButtonStyle}>Desenhar no mapa</button>
+            <button onClick={() => chooseMode('kml')} style={mode === 'kml' ? geoModeButtonActiveStyle : geoModeButtonStyle}>Importar KML</button>
+            <div style={geoRuleBoxStyle}>Para criar um talhão, o contorno precisa vir de um desenho no mapa ou de um arquivo KML.</div>
+          </aside>
+
+          <div style={{ flex: 1, minWidth: 0 }}>
+            {!mode && (
+              <div style={emptyGeoStateStyle}>
+                <h3 style={panelTitleStyle}>Escolha uma forma de cadastrar</h3>
+                <p style={{ margin: '8px 0 0', color: C.textMid, fontSize: 13 }}>Use o menu lateral para desenhar o contorno ou importar um KML.</p>
+              </div>
+            )}
+
+            {mode === 'draw' && (
+              <>
+                <SimpleFarmMap
+                  features={[...existingFeatures, drawFeature].filter(Boolean)}
+                  drawPoints={drawPoints}
+                  onMapClick={(point) => setDrawPoints(points => [...points, point])}
+                  height={360}
+                  drawing
+                />
+                <div style={drawToolsStyle}>
+                  <button onClick={() => setDrawPoints(points => points.slice(0, -1))} style={secondaryActionStyle} disabled={drawPoints.length === 0}>Desfazer ponto</button>
+                  <button onClick={() => setDrawPoints([])} style={secondaryActionStyle}>Limpar desenho</button>
+                  <span style={{ color: C.textMid, fontSize: 12 }}>{drawPoints.length} pontos marcados</span>
+                </div>
+              </>
+            )}
+
+            {mode === 'kml' && (
+              <>
+                <label style={kmlDropStyle}>
+                  <input type="file" accept=".kml" hidden onChange={e => e.target.files?.[0] && handleKml(e.target.files[0])} />
+                  <strong>Selecionar arquivo KML</strong>
+                  <span>O sistema vai ler um ou vários polígonos e calcular as áreas automaticamente.</span>
+                </label>
+                <SimpleFarmMap features={[...existingFeatures, ...featuresToSave].filter(Boolean)} height={300} />
+              </>
+            )}
+
+            <form onSubmit={handleSave} style={geoFormStyle}>
+              <div style={{ display: 'grid', gridTemplateColumns: '120px minmax(0, 1fr)', gap: 10 }}>
+                <Field label="CÓDIGO">
+                  <input required disabled={featuresToSave.length > 1} value={featuresToSave.length > 1 ? `${featuresToSave.length} códigos do KML` : codigo} onChange={e => setCodigo(e.target.value.toUpperCase())} style={{ ...inputStyle, color: featuresToSave.length > 1 ? C.textDim : C.textDk }} />
+                </Field>
+                <Field label="NOME">
+                  <input disabled={featuresToSave.length > 1} value={nome} onChange={e => setNome(e.target.value)} placeholder="Nome opcional" style={{ ...inputStyle, color: featuresToSave.length > 1 ? C.textDim : C.textDk }} />
+                </Field>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 150px', gap: 10 }}>
+                <Field label="CULTURA">
+                  <select value={cultura} onChange={e => setCultura(e.target.value)} style={inputStyle}>
+                    {['soja', 'milho', 'algodao', 'feijao', 'sorgo', 'cana', 'cafe', 'outro'].map(item => <option key={item} value={item}>{formatCultura(item)}</option>)}
+                  </select>
+                </Field>
+                <Field label="FASE">
+                  <select value={fase} onChange={e => setFase(e.target.value)} style={inputStyle}>
+                    {Object.entries(FASE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                  </select>
+                </Field>
+                <Field label="ÁREA">
+                  <div style={{ ...inputStyle, color: area > 0 ? C.greenDp : C.textDim, fontWeight: 900 }}>{area.toFixed(2)} ha</div>
+                </Field>
+              </div>
+              {error && <div style={formErrorStyle}>{error}</div>}
+              <button type="submit" disabled={saving || featuresToSave.length === 0 || area <= 0} style={{ ...primaryActionStyle, width: '100%', opacity: saving || featuresToSave.length === 0 || area <= 0 ? 0.55 : 1 }}>
+                {saving ? 'Salvando...' : `Criar ${featuresToSave.length > 1 ? `${featuresToSave.length} talhões` : 'talhão'} com geometria`}
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function SimpleFarmMap({ features = [], drawPoints = [], onMapClick, onFeatureClick, height = 340, drawing = false, selectedCode = null, selectedMode = 'timeline', fullBleed = false }) {
+  const normalized = features.map((feature, index) => ({ feature: normalizeFeature(feature, feature?.properties?.codigo || `T${index + 1}`), index })).filter(item => item.feature)
+  const bounds = getMapBounds(normalized.map(item => item.feature))
+  const [viewTransform, setViewTransform] = useState({ x: 0, y: 0, scale: 1 })
+  const dragRef = useRef(null)
+  const suppressClickRef = useRef(false)
+  const canPan = fullBleed && !drawing
+
+  function handleClick(e) {
+    if (suppressClickRef.current) {
+      suppressClickRef.current = false
+      return
+    }
+    if (!onMapClick) return
+    const rect = e.currentTarget.getBoundingClientRect()
+    onMapClick({ x: ((e.clientX - rect.left) / rect.width) * 100, y: ((e.clientY - rect.top) / rect.height) * 100 })
+  }
+
+  function handlePointerDown(e) {
+    if (!canPan || e.button !== 0) return
+    dragRef.current = { x: e.clientX, y: e.clientY }
+    e.currentTarget.setPointerCapture?.(e.pointerId)
+  }
+
+  function handlePointerMove(e) {
+    if (!canPan || !dragRef.current) return
+    const rect = e.currentTarget.getBoundingClientRect()
+    const dxPx = e.clientX - dragRef.current.x
+    const dyPx = e.clientY - dragRef.current.y
+    if (Math.abs(dxPx) + Math.abs(dyPx) > 2) suppressClickRef.current = true
+    setViewTransform(current => ({
+      ...current,
+      x: current.x + (dxPx / rect.width) * 100,
+      y: current.y + (dyPx / rect.height) * 100
+    }))
+    dragRef.current = { x: e.clientX, y: e.clientY }
+  }
+
+  function handlePointerUp(e) {
+    if (!dragRef.current) return
+    dragRef.current = null
+    e.currentTarget.releasePointerCapture?.(e.pointerId)
+  }
+
+  function handleWheel(e) {
+    if (!canPan) return
+    e.preventDefault()
+    setViewTransform(current => ({
+      ...current,
+      scale: Math.min(3.2, Math.max(0.75, current.scale * (e.deltaY > 0 ? 0.92 : 1.08)))
+    }))
+  }
+
+  return (
+    <div
+      style={{ ...(fullBleed ? simpleMapFullStyle : simpleMapStyle), height, cursor: canPan ? 'grab' : 'default' }}
+      onClick={handleClick}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
+      onWheel={handleWheel}
+    >
+      <svg viewBox="0 0 100 100" preserveAspectRatio="none" style={{ width: '100%', height: '100%', display: 'block' }}>
+        <defs>
+          <radialGradient id="farmGlowA" cx="35%" cy="35%" r="42%">
+            <stop offset="0%" stopColor="rgba(78,132,72,0.95)" />
+            <stop offset="100%" stopColor="rgba(18,58,36,0.18)" />
+          </radialGradient>
+          <radialGradient id="farmGlowB" cx="72%" cy="66%" r="44%">
+            <stop offset="0%" stopColor="rgba(200,136,28,0.78)" />
+            <stop offset="100%" stopColor="rgba(18,58,36,0.12)" />
+          </radialGradient>
+        </defs>
+        <rect x="0" y="0" width="100" height="100" fill="#18281a" />
+        <rect x="0" y="0" width="100" height="100" fill="url(#farmGlowA)" />
+        <rect x="0" y="0" width="100" height="100" fill="url(#farmGlowB)" />
+        <rect x="0" y="0" width="100" height="100" fill="rgba(0,0,0,0.18)" />
+        <g transform={`translate(${viewTransform.x} ${viewTransform.y}) scale(${viewTransform.scale})`}>
+          {Array.from({ length: 11 }).map((_, i) => <line key={`v-${i}`} x1={i * 10} y1="0" x2={i * 10 + 18} y2="100" stroke="rgba(255,255,255,0.08)" strokeWidth="0.2" />)}
+          {Array.from({ length: 8 }).map((_, i) => <line key={`h-${i}`} x1="0" y1={i * 14} x2="100" y2={i * 14 + 8} stroke="rgba(255,255,255,0.07)" strokeWidth="0.2" />)}
+          {normalized.map(({ feature, index }) => {
+            const ring = getFeatureRing(feature) || []
+            const points = ring.map(coord => projectCoord(coord, bounds).join(',')).join(' ')
+            const center = ring.length ? projectCoord(ring[Math.floor(ring.length / 2)], bounds) : [50, 50]
+            const selected = selectedCode && feature.properties?.codigo === selectedCode
+            const selectedFill = selectedMode === 'chuvas' ? 'rgba(70,158,205,0.52)' : 'rgba(232,168,76,0.46)'
+            return (
+              <g key={`${feature.properties?.codigo || index}-${index}`} onClick={e => { e.stopPropagation(); if (suppressClickRef.current) { suppressClickRef.current = false; return }; onFeatureClick?.(index, feature) }} style={{ cursor: onFeatureClick ? 'pointer' : 'default' }}>
+                <polygon points={points} fill={selected ? selectedFill : 'rgba(61,138,34,0.34)'} stroke={selected ? 'rgba(255,255,255,0.98)' : 'rgba(255,255,255,0.74)'} strokeWidth={selected ? '1.6' : '0.7'} vectorEffect="non-scaling-stroke" />
+                <text x={center[0]} y={center[1]} fill="white" fontSize="4" fontWeight="800" textAnchor="middle" dominantBaseline="middle" style={{ textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>{feature.properties?.codigo}</text>
+              </g>
+            )
+          })}
+          {drawPoints.length > 0 && (
+            <>
+              <polyline points={drawPoints.map(point => `${point.x},${point.y}`).join(' ')} fill="none" stroke="white" strokeWidth="0.8" vectorEffect="non-scaling-stroke" />
+              {drawPoints.map((point, index) => <circle key={`${point.x}-${point.y}-${index}`} cx={point.x} cy={point.y} r="1.5" fill="white" />)}
+            </>
+          )}
+        </g>
+      </svg>
+      {drawing && <div style={mapDrawHintStyle}>Clique no mapa para marcar os vértices do talhão</div>}
+      {normalized.length === 0 && !drawing && <div style={mapEmptyHintStyle}>Nenhum talhão com geometria cadastrada</div>}
+    </div>
+  )
+}
+
+function normalizeFeature(raw, codigo = 'T1') {
+  if (!raw) return null
+  let feature = raw
+  if (typeof raw === 'string') {
+    try { feature = JSON.parse(raw) } catch { return null }
+  }
+  if (feature.type === 'FeatureCollection') feature = feature.features?.[0]
+  if (feature.type !== 'Feature' && feature.type) feature = { type: 'Feature', properties: {}, geometry: feature }
+  if (!feature?.geometry) return null
+  return { ...feature, properties: { ...(feature.properties || {}), codigo: feature.properties?.codigo || codigo } }
+}
+
+function GerencialView({ talhoes, talhaoSel, operacoes, custos, total, totalCusto, loadOps, opSel, setOpSel, abrirTalhao, excluirTalhao, setShowNovo, setShowNovaOp, navigate }) {
+  const menu = [
+    { title: 'Ordem de Serviço', text: 'Planejar e fechar operações da fazenda', action: () => navigate('/os') },
+    { title: 'Estoque', text: 'Saldos, entradas, saídas e estoque mínimo', action: () => navigate('/insumos') },
+    { title: 'Equipe', text: 'Técnicos, operadores e responsáveis por visita' },
+    { title: 'Cadastro de Talhão', text: 'Áreas, culturas, fases e limites dos talhões', action: () => setShowNovo() },
+    { title: 'Insumos', text: 'Produtos, doses, custo medio e fornecedores', action: () => navigate('/insumos') },
+    { title: 'Gerência de Contas', text: 'Usuários, níveis de acesso e permissões' },
+    { title: 'Safras e Culturas', text: 'Ciclo agrícola, variedades e metas por talhão' },
+    { title: 'Máquinas e Implementos', text: 'Frota, capacidade operacional e custo hora' },
+    { title: 'Centros de Custo', text: 'Agrupar custos por fazenda, safra e atividade' }
+  ]
+
+  return (
+    <section style={viewStackStyle}>
+      <div style={heroPanelStyle}>
+        <div>
+          <p style={eyebrowStyle}>GESTAO OPERACIONAL</p>
+          <h2 style={viewTitleStyle}>Gerencial da fazenda</h2>
+          <p style={viewSubtitleStyle}>Menus administrativos, cadastros, estoque, equipe, contas e histórico dos talhões.</p>
+        </div>
+      </div>
+
+      <MapaCadastroTalhoes talhoes={talhoes} onOpenCadastro={setShowNovo} onSelectTalhao={abrirTalhao} />
+
+      <div style={managerGridStyle}>
+        {menu.map(item => (
+          <button key={item.title} onClick={item.action} style={managerCardStyle}>
+            <strong>{item.title}</strong>
+            <span>{item.text}</span>
+          </button>
+        ))}
+      </div>
+
+      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+        <TalhoesPanel talhoes={talhoes} total={total} talhaoSel={talhaoSel} abrirTalhao={abrirTalhao} excluirTalhao={excluirTalhao} setShowNovo={setShowNovo} />
+        <HistoricoPanel talhaoSel={talhaoSel} operacoes={operacoes} custos={custos} totalCusto={totalCusto} loadOps={loadOps} opSel={opSel} setOpSel={setOpSel} setShowNovaOp={setShowNovaOp} />
+      </div>
+    </section>
+  )
+}
+
+function RelatoriosView({ talhoes, total }) {
+  return (
+    <section style={viewStackStyle}>
+      <div style={heroPanelStyle}>
+        <div>
+          <p style={eyebrowStyle}>RELATORIOS</p>
+          <h2 style={viewTitleStyle}>Construtor de relatórios agrícolas</h2>
+          <p style={viewSubtitleStyle}>Modelos executivos, técnicos e financeiros usando dados de operações, solo, chuva, scouting e estoque.</p>
+        </div>
+        <button style={primaryActionStyle}>Exportar PDF</button>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(260px, 360px) minmax(0, 1fr)', gap: 14 }}>
+        <div style={panelStyle}>
+          <p style={eyebrowStyle}>MODELOS</p>
+          <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
+            {reportTypes.map((report, index) => (
+              <button key={report} style={reportButtonStyle}>
+                <span>{String(index + 1).padStart(2, '0')}</span>
+                <strong>{report}</strong>
+              </button>
+            ))}
+          </div>
+        </div>
+        <div style={reportPreviewStyle}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start' }}>
+            <div>
+              <p style={{ margin: 0, color: C.greenDp, fontWeight: 900, fontSize: 15 }}>TerraNexa</p>
+              <h3 style={{ margin: '10px 0 6px', color: C.textDk, fontSize: 24, fontFamily: 'Georgia, serif' }}>Relatório Agronômico Completo</h3>
+              <p style={{ margin: 0, color: C.textMid, fontSize: 13 }}>Área total {total.toFixed(2)} ha · {talhoes.length} talhões · Safra atual</p>
+            </div>
+            <div style={reportCoverArtStyle} />
+          </div>
+          <div style={metricGridStyle}>
+            <MetricCard label="Talhoes" value={talhoes.length} tone={C.greenDp} />
+            <MetricCard label="Area" value={`${total.toFixed(1)} ha`} tone={C.soilDk} />
+            <MetricCard label="Modulos" value="8" tone={C.blue} />
+            <MetricCard label="Status" value="Pronto" tone={C.amberDk} />
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function TalhoesPanel({ talhoes, total, talhaoSel, abrirTalhao, excluirTalhao, setShowNovo }) {
+  return (
+    <div style={{ width: 320, flexShrink: 0 }}>
+      <div style={{ background: `linear-gradient(135deg, ${C.greenLight}, ${C.amberLight})`, borderRadius: 14, padding: '12px 14px', marginBottom: 12, border: `1px solid ${C.border}`, display: 'flex', justifyContent: 'space-between' }}>
+        <div>
+          <p style={eyebrowStyle}>AREA TOTAL</p>
+          <p style={{ margin: '3px 0 0', fontSize: 22, fontWeight: 700, color: C.textDk, fontFamily: 'Georgia, serif', lineHeight: 1 }}>{total.toFixed(2)} ha</p>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <p style={eyebrowStyle}>TALHOES</p>
+          <p style={{ margin: '3px 0 0', fontSize: 22, fontWeight: 700, color: C.greenDp, fontFamily: 'Georgia, serif', lineHeight: 1 }}>{talhoes.length}</p>
+        </div>
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+        <p style={eyebrowStyle}>CADASTRO DE TALHOES</p>
+        <button onClick={() => setShowNovo()} style={smallButtonStyle}>+ Novo</button>
+      </div>
+      {talhoes.length === 0 ? (
+        <div style={{ background: C.bg, borderRadius: 12, padding: '24px 16px', border: `1px dashed ${C.border}`, textAlign: 'center' }}>
+          <p style={{ margin: '0 0 12px', fontSize: 12, color: C.textMid }}>Nenhum talhão cadastrado.</p>
+          <button onClick={() => setShowNovo()} style={smallButtonStyle}>Cadastrar</button>
+        </div>
+      ) : talhoes.map(t => (
+        <div key={t.id} onClick={() => abrirTalhao(t)} style={{ background: C.bg, borderRadius: 10, padding: '10px 12px', border: `1.5px solid ${talhaoSel?.id === t.id ? C.greenDp : C.border}`, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, marginBottom: 5, transition: 'all 0.15s' }}>
+          <div style={{ width: 34, height: 34, borderRadius: 8, background: C.greenLight, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: C.greenDp, fontFamily: 'Georgia, serif', flexShrink: 0 }}>{t.codigo}</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: C.textDk }}>{t.codigo} - {formatCultura(t.cultura)}</p>
+            <p style={{ margin: 0, fontSize: 10, color: C.textMid, fontFamily: 'monospace' }}>{Number(t.area_ha).toFixed(2)} HA · {(FASE_LABELS[t.fase] || t.fase).toUpperCase()}</p>
+          </div>
+          <button onClick={e => { e.stopPropagation(); excluirTalhao(t.id) }} style={{ background: 'none', border: 'none', color: C.textDim, fontSize: 16, cursor: 'pointer', padding: 2 }}>×</button>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function HistoricoPanel({ talhaoSel, operacoes, custos, totalCusto, loadOps, opSel, setOpSel, setShowNovaOp }) {
+  return (
+    <div style={{ flex: 1, minWidth: 280 }}>
+      {!talhaoSel ? (
+        <div style={{ background: C.bg, borderRadius: 14, padding: '48px 20px', textAlign: 'center', border: `1px dashed ${C.border}` }}>
+          <p style={{ margin: '8px 0 4px', fontSize: 15, fontWeight: 700, color: C.textDk, fontFamily: 'Georgia, serif' }}>Selecione um talhão</p>
+          <p style={{ margin: 0, fontSize: 12, color: C.textMid }}>Clique em um talhão para ver o histórico de operações.</p>
+        </div>
+      ) : loadOps ? (
+        <div style={{ background: C.bg, borderRadius: 14, padding: '48px 20px', textAlign: 'center' }}><p style={{ color: C.textDim, fontFamily: 'monospace', fontSize: 11 }}>CARREGANDO...</p></div>
+      ) : (
+        <div>
+          <div style={{ background: C.bg, borderRadius: 14, padding: '12px 14px', marginBottom: 12, border: `1px solid ${C.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+            <div>
+              <p style={eyebrowStyle}>HISTORICO</p>
+              <h2 style={{ margin: '2px 0 0', fontSize: 16, color: C.textDk, fontWeight: 700, fontFamily: 'Georgia, serif' }}>{talhaoSel.codigo} - {formatCultura(talhaoSel.cultura)} · {Number(talhaoSel.area_ha).toFixed(2)} ha</h2>
+            </div>
+            <button onClick={() => setShowNovaOp(true)} style={primaryActionStyle}>Registrar</button>
+          </div>
+
+          {custos.length > 0 && <CustosPanel custos={custos} totalCusto={totalCusto} />}
+
+          {operacoes.length === 0 ? (
+            <div style={{ background: C.bg, borderRadius: 14, padding: '32px 20px', border: `1px dashed ${C.border}`, textAlign: 'center' }}>
+              <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: C.textDk }}>Nenhuma operacao registrada</p>
+              <p style={{ margin: '6px 0 14px', fontSize: 12, color: C.textMid }}>Registre a primeira operação deste talhão.</p>
+              <button onClick={() => setShowNovaOp(true)} style={primaryActionStyle}>Registrar</button>
+            </div>
+          ) : operacoes.map(op => (
+            <OperacaoCard key={op.id} op={op} open={opSel === op.id} onToggle={() => setOpSel(opSel === op.id ? null : op.id)} />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function CustosPanel({ custos, totalCusto }) {
+  return (
+    <div style={{ background: C.bg, borderRadius: 14, padding: '12px 14px', marginBottom: 12, border: `1px solid ${C.border}` }}>
+      <p style={{ ...eyebrowStyle, marginBottom: 10 }}>CUSTO POR CATEGORIA</p>
+      {custos.sort((a, b) => b.custo_total - a.custo_total).map(c => {
+        const info = getCategoriaInfo(c.categoria)
+        const perc = totalCusto > 0 ? (c.custo_total / totalCusto * 100) : 0
+        return (
+          <div key={c.categoria} style={{ marginBottom: 8 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3, gap: 8 }}>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                <div style={{ width: 8, height: 8, borderRadius: 2, background: info.cor }} />
+                <span style={{ fontSize: 11, color: C.textDk }}>{info.label}</span>
+                <span style={{ fontSize: 9, color: C.textDim, fontFamily: 'monospace' }}>{c.qtd_operacoes} op.</span>
+              </div>
+              <div>
+                <span style={{ fontSize: 11, fontWeight: 700, color: info.cor, fontFamily: 'monospace' }}>{money(c.custo_total)}</span>
+                <span style={{ fontSize: 9, color: C.textDim, fontFamily: 'monospace', marginLeft: 6 }}>{perc.toFixed(0)}%</span>
+              </div>
+            </div>
+            <div style={{ background: C.border, borderRadius: 99, height: 5, overflow: 'hidden' }}>
+              <div style={{ width: perc + '%', height: 5, borderRadius: 99, background: info.cor }} />
+            </div>
+          </div>
+        )
+      })}
+      <div style={{ paddingTop: 8, borderTop: `1px solid ${C.borderSoft}`, display: 'flex', justifyContent: 'space-between' }}>
+        <span style={{ fontSize: 11, fontWeight: 700, color: C.textDk }}>Total</span>
+        <span style={{ fontSize: 13, fontWeight: 700, color: C.greenDp, fontFamily: 'monospace' }}>{money(totalCusto)}</span>
+      </div>
+    </div>
+  )
+}
+
+function OperacaoCard({ op, open, onToggle }) {
+  const info = getCategoriaInfo(op.categoria)
+  const totalInsumos = (op.insumos || []).reduce((s, i) => s + Number(i.custo_total || 0), 0)
+  const totalOp = totalInsumos + Number(op.custo_aplicacao || 0)
+
+  return (
+    <div style={{ background: C.bg, borderRadius: 12, border: `1px solid ${open ? info.cor : C.border}`, overflow: 'hidden', marginBottom: 6, transition: 'border 0.2s' }}>
+      <button onClick={onToggle} style={{ width: '100%', background: 'none', border: 'none', padding: '11px 14px', display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', textAlign: 'left' }}>
+        <div style={{ width: 8, height: 32, borderRadius: 4, background: info.cor, flexShrink: 0 }} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: C.textDk }}>{info.label}</p>
+          <p style={{ margin: 0, fontSize: 10, color: C.textMid, fontFamily: 'monospace' }}>{op.data_operacao} · {op.insumos?.length || 0} insumo{(op.insumos?.length || 0) !== 1 ? 's' : ''}</p>
+        </div>
+        <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: info.cor, fontFamily: 'monospace', flexShrink: 0 }}>{money(totalOp)}</p>
+        <span style={{ color: C.textMid, transform: open ? 'rotate(90deg)' : 'none', transition: 'transform 0.2s', fontSize: 14 }}>›</span>
+      </button>
+      {open && (
+        <div style={{ padding: '0 14px 12px', borderTop: `1px solid ${C.borderSoft}`, background: C.bgSoft }}>
+          <div style={{ display: 'flex', gap: 8, marginTop: 10, marginBottom: 8 }}>
+            {[{ l: 'INSUMOS', v: totalInsumos, c: C.greenDp }, { l: 'APLICACAO', v: Number(op.custo_aplicacao || 0), c: C.amberDk }].map(x => (
+              <div key={x.l} style={{ flex: 1, background: C.bg, borderRadius: 8, padding: '7px 9px', border: `1px solid ${C.border}` }}>
+                <p style={{ margin: 0, fontSize: 7, color: C.textDim, fontFamily: 'monospace', letterSpacing: '1px' }}>{x.l}</p>
+                <p style={{ margin: '2px 0 0', fontSize: 12, fontWeight: 700, color: x.c, fontFamily: 'monospace' }}>{money(x.v)}</p>
+              </div>
+            ))}
+          </div>
+          {op.insumos?.length > 0 && (
+            <>
+              <p style={{ margin: '0 0 5px', fontSize: 8, color: C.textDim, fontFamily: 'monospace', letterSpacing: '2px' }}>INSUMOS</p>
+              {op.insumos.map(i => (
+                <div key={i.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 9px', background: C.bg, borderRadius: 7, marginBottom: 4, border: `1px solid ${C.borderSoft}` }}>
+                  <div style={{ width: 4, height: 28, borderRadius: 2, background: info.cor, flexShrink: 0 }} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ margin: 0, fontSize: 11, fontWeight: 600, color: C.textDk }}>{i.insumo?.nome}</p>
+                    <p style={{ margin: 0, fontSize: 9, color: C.textMid, fontFamily: 'monospace' }}>{i.dose} {i.dose_unidade} · {i.quantidade_total} {i.insumo?.unidade} total</p>
+                  </div>
+                  <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: info.cor, fontFamily: 'monospace' }}>{money(i.custo_total)}</p>
+                </div>
+              ))}
+            </>
+          )}
+          {op.receituario_agronomo && (
+            <div style={{ marginTop: 8, padding: '7px 9px', background: C.amberLight, borderRadius: 7, border: `1px solid ${C.amber}44` }}>
+              <p style={{ margin: 0, fontSize: 8, color: C.amberDk, fontFamily: 'monospace', letterSpacing: '1px', fontWeight: 700 }}>RECEITUARIO</p>
+              <p style={{ margin: '2px 0 0', fontSize: 11, color: C.textDk }}>{op.receituario_agronomo} - {op.receituario_crea}</p>
+            </div>
+          )}
+          {op.observacoes && (
+            <div style={{ marginTop: 8, padding: '7px 9px', background: C.bg, borderRadius: 7, border: `1px solid ${C.borderSoft}` }}>
+              <p style={{ margin: 0, fontSize: 8, color: C.textDim, fontFamily: 'monospace', letterSpacing: '1px' }}>OBSERVACOES</p>
+              <p style={{ margin: '2px 0 0', fontSize: 11, color: C.textMid, lineHeight: 1.4 }}>{op.observacoes}</p>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function NovoTalhaoModal({ form, erro, salvando, setForm, onClose, onSubmit }) {
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: C.bg, borderRadius: 18, padding: '24px 22px', width: '100%', maxWidth: 420 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+          <h2 style={{ margin: 0, fontSize: 18, color: C.textDk, fontWeight: 700, fontFamily: 'Georgia, serif' }}>Novo Talhao</h2>
+          <button onClick={onClose} style={iconButtonStyle}>×</button>
+        </div>
+        <form onSubmit={onSubmit}>
+          {[['CODIGO *', 'codigo', 'T1', 'text'], ['AREA (ha) *', 'area_ha', '28.5', 'number']].map(([l, k, ph, t]) => (
+            <div key={k} style={{ marginBottom: 12 }}>
+              <label style={formLabelStyle}>{l}</label>
+              <input required type={t} step={t === 'number' ? '0.01' : undefined} value={form[k]} onChange={e => setForm(p => ({ ...p, [k]: e.target.value }))} placeholder={ph} style={inputStyle} />
+            </div>
+          ))}
+          <div style={{ marginBottom: 12 }}>
+            <label style={formLabelStyle}>CULTURA</label>
+            <select value={form.cultura} onChange={e => setForm(p => ({ ...p, cultura: e.target.value }))} style={inputStyle}>
+              {[['soja', 'Soja'], ['milho', 'Milho'], ['algodao', 'Algodao'], ['feijao', 'Feijao'], ['sorgo', 'Sorgo'], ['cana', 'Cana'], ['cafe', 'Cafe'], ['outro', 'Outro']].map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+            </select>
+          </div>
+          <div style={{ marginBottom: 14 }}>
+            <label style={formLabelStyle}>FASE</label>
+            <select value={form.fase} onChange={e => setForm(p => ({ ...p, fase: e.target.value }))} style={inputStyle}>
+              {Object.entries(FASE_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+            </select>
+          </div>
+          {erro && <div style={{ background: C.redLight, color: C.redDk, borderRadius: 10, padding: '10px 12px', marginBottom: 12, fontSize: 12 }}>{erro}</div>}
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button type="button" onClick={onClose} style={{ ...secondaryActionStyle, flex: 1 }}>Cancelar</button>
+            <button type="submit" disabled={salvando} style={{ ...primaryActionStyle, flex: 2, opacity: salvando ? 0.65 : 1 }}>{salvando ? 'Salvando...' : 'Salvar'}</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+function MetricCard({ label, value, tone }) {
+  return (
+    <div style={metricCardStyle}>
+      <p style={eyebrowStyle}>{label.toUpperCase()}</p>
+      <strong style={{ display: 'block', marginTop: 6, color: tone, fontSize: 21, fontFamily: 'Georgia, serif' }}>{value}</strong>
+    </div>
+  )
+}
+
+function Field({ label, children }) {
+  return (
+    <div style={{ minWidth: 0 }}>
+      <label style={formLabelStyle}>{label}</label>
+      {children}
+    </div>
+  )
+}
+
+function CustoPizzaCard() {
+  const fatias = [
+    { nome: 'Insumos', cor: C.greenDp, valor: 46 },
+    { nome: 'Aplicacao', cor: C.amberDk, valor: 28 },
+    { nome: 'Maquinas', cor: C.blue, valor: 16 },
+    { nome: 'Equipe', cor: C.soil, valor: 10 }
+  ]
+
+  return (
+    <div style={{ ...metricCardStyle, display: 'grid', gridTemplateColumns: '88px 1fr', gap: 12, alignItems: 'center' }}>
+      <div style={pieChartStyle}>
+        <div style={pieHoleStyle} />
+      </div>
+      <div>
+        <p style={eyebrowStyle}>CUSTO TOTAL DA FAZENDA</p>
+        <strong style={{ display: 'block', marginTop: 5, color: C.greenDp, fontSize: 20, fontFamily: 'Georgia, serif' }}>R$ 0,00</strong>
+        <div style={{ display: 'grid', gap: 3, marginTop: 8 }}>
+          {fatias.map(fatia => (
+            <div key={fatia.nome} style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 10, color: C.textMid }}>
+              <span style={{ width: 7, height: 7, borderRadius: 99, background: fatia.cor }} />
+              <span>{fatia.nome}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function SmartInsightCard({ title, status, actionLabel, onAction, insights }) {
+  const statusMap = {
+    financeiro: { label: 'Financeiro', color: C.greenDp, bg: C.greenLight },
+    atencao: { label: 'Atenção', color: C.amberDk, bg: C.amberLight },
+    estavel: { label: 'Estável', color: C.greenDp, bg: C.greenLight },
+    agronomico: { label: 'Agronômico', color: C.blue, bg: C.blueLight },
+    operacional: { label: 'Operacional', color: C.soilDk, bg: C.soilLight }
+  }
+  const cfg = statusMap[status] || statusMap.estavel
+
+  return (
+    <div style={smartCardStyle}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+        <h3 style={panelTitleStyle}>{title}</h3>
+        <span style={{ ...smartBadgeStyle, background: cfg.bg, color: cfg.color }}>{cfg.label}</span>
+      </div>
+      <div style={{ display: 'grid', gap: 8, marginTop: 13 }}>
+        {insights.map(item => {
+          const tone = insightToneStyle(item.tone)
+          return (
+            <div key={`${item.label}-${item.value}`} style={smartInsightRowStyle}>
+              <span style={{ ...smartDotStyle, background: tone.color }} />
+              <div style={{ minWidth: 0 }}>
+                <p style={{ margin: 0, color: C.textDk, fontSize: 12, fontWeight: 800 }}>{item.label}</p>
+                <p style={{ margin: '2px 0 0', color: C.textMid, fontSize: 12, lineHeight: 1.35 }}>{item.value}</p>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+      <button onClick={onAction} style={smartActionStyle}>{actionLabel}</button>
+    </div>
+  )
+}
+
+function insightToneStyle(tone) {
+  if (tone === 'danger') return { color: C.redDk }
+  if (tone === 'attention') return { color: C.amberDk }
+  if (tone === 'ok') return { color: C.greenDp }
+  return { color: C.textDim }
+}
+
+function InsightPanel({ title, items }) {
+  return (
+    <div style={panelStyle}>
+      <h3 style={panelTitleStyle}>{title}</h3>
+      <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
+        {items.map(item => (
+          <div key={item} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+            <span style={{ width: 7, height: 7, borderRadius: 99, background: C.greenDp, marginTop: 5, flexShrink: 0 }} />
+            <p style={{ margin: 0, color: C.textMid, fontSize: 12, lineHeight: 1.45 }}>{item}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+const eyebrowStyle = { margin: 0, fontSize: 9, color: C.textDim, fontFamily: 'monospace', letterSpacing: '1.4px', fontWeight: 800 }
+const viewTitleStyle = { margin: '4px 0 0', fontSize: 24, color: C.textDk, fontWeight: 800, fontFamily: 'Georgia, serif' }
+const viewSubtitleStyle = { margin: '8px 0 0', fontSize: 13, color: C.textMid, maxWidth: 620, lineHeight: 1.45 }
+const panelTitleStyle = { margin: 0, fontSize: 15, color: C.textDk, fontWeight: 800, fontFamily: 'Georgia, serif' }
+const viewStackStyle = { display: 'grid', gap: 14 }
+const floatingHeaderStyle = { position: 'fixed', top: 14, left: 14, zIndex: 40, background: 'rgba(255,255,255,0.94)', border: `1px solid ${C.border}`, borderRadius: 14, padding: 10, boxShadow: '0 10px 30px rgba(0,0,0,0.12)', backdropFilter: 'blur(10px)' }
+const hamburgerButtonStyle = { background: C.greenDp, color: C.bg, border: 'none', borderRadius: 9, width: 36, height: 36, fontSize: 18, fontWeight: 900, cursor: 'pointer' }
+const drawerBackdropStyle = { position: 'fixed', inset: 0, zIndex: 60, background: 'rgba(0,0,0,0.24)' }
+const drawerStyle = { width: 280, maxWidth: '82vw', height: '100%', background: C.bg, borderRight: `1px solid ${C.border}`, padding: 16, display: 'grid', alignContent: 'start', gap: 9, boxShadow: '14px 0 40px rgba(0,0,0,0.22)' }
+const drawerNavButtonStyle = { width: '100%', border: '1px solid', borderRadius: 11, padding: '12px 13px', fontSize: 13, fontWeight: 900, textAlign: 'left', cursor: 'pointer' }
+const drawerCloseButtonStyle = { width: 32, height: 32, borderRadius: 9, border: `1px solid ${C.border}`, background: C.bgLight, color: C.textDk, fontSize: 17, fontWeight: 900, cursor: 'pointer' }
+const farmLayoutStyle = { display: 'block', alignItems: 'flex-start', gap: 14 }
+const farmSidebarStyle = { display: 'none' }
+const sidebarEyebrowStyle = { margin: '2px 4px 5px', fontSize: 9, color: C.textDim, fontFamily: 'monospace', letterSpacing: '1.4px', fontWeight: 900 }
+const sidebarNavButtonStyle = { width: '100%', border: '1px solid', borderRadius: 10, padding: '10px 11px', fontSize: 12, fontWeight: 800, textAlign: 'left', cursor: 'pointer' }
+const heroPanelStyle = { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 14, padding: 16, display: 'flex', justifyContent: 'space-between', gap: 14, alignItems: 'center', flexWrap: 'wrap' }
+const panelStyle = { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 14, padding: 14 }
+const mapMainPageStyle = { position: 'relative', width: '100%', minHeight: '100vh', overflow: 'hidden', background: '#102316' }
+const mapTopInfoStyle = { position: 'absolute', top: 92, left: 18, zIndex: 5, background: 'rgba(5,18,12,0.62)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 14, padding: '12px 14px', backdropFilter: 'blur(8px)', maxWidth: 360 }
+const mapTalhaoChipStyle = { position: 'absolute', top: 92, right: 18, zIndex: 5, background: 'rgba(255,255,255,0.92)', border: `1px solid ${C.border}`, borderRadius: 14, padding: '11px 13px', minWidth: 190, boxShadow: '0 10px 30px rgba(0,0,0,0.16)', display: 'grid', gap: 2 }
+const timelineDockStyle = { position: 'absolute', left: 18, right: 18, bottom: 18, zIndex: 6, background: 'rgba(232,168,76,0.42)', border: '1px solid rgba(255,206,130,0.52)', borderRadius: 16, padding: 13, backdropFilter: 'blur(14px)', boxShadow: '0 16px 44px rgba(0,0,0,0.28)' }
+const timelineHeaderStyle = { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 10 }
+const timelineStatsStyle = { display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end', color: 'rgba(255,255,255,0.86)', fontSize: 11, fontFamily: 'monospace', fontWeight: 800 }
+const timelineTableStyle = { display: 'grid', gridAutoFlow: 'column', gridAutoColumns: 'minmax(180px, 1fr)', gap: 8, overflowX: 'auto', paddingBottom: 3 }
+const timelineCellStyle = { background: 'rgba(255,255,255,0.9)', border: '1px solid rgba(255,255,255,0.55)', borderRadius: 10, padding: 10, minHeight: 92, textAlign: 'left', color: C.textDk, display: 'grid', gap: 3, cursor: 'pointer' }
+const timelineActionsStyle = { display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }
+const timelineActionButtonStyle = { background: 'rgba(255,255,255,0.94)', border: '1px solid rgba(255,255,255,0.55)', borderRadius: 9, padding: '8px 11px', color: C.soilDk, fontWeight: 900, cursor: 'pointer' }
+const timelineModeTabsStyle = { display: 'flex', gap: 7, flexWrap: 'wrap', margin: '0 0 9px' }
+const timelineModeButtonStyle = { border: '1px solid rgba(255,255,255,0.45)', borderRadius: 999, padding: '7px 11px', fontSize: 11, fontWeight: 900, cursor: 'pointer' }
+const timelineRainLayoutStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 8, alignItems: 'stretch' }
+const timelineDateGridStyle = { background: 'rgba(255,255,255,0.9)', border: '1px solid rgba(255,255,255,0.5)', borderRadius: 10, padding: 10, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 8, alignItems: 'end' }
+const timelineDateLabelStyle = { display: 'grid', gap: 5, color: C.textDim, fontSize: 9, fontFamily: 'monospace', letterSpacing: '1px', fontWeight: 900 }
+const timelineDateInputStyle = { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: '8px 9px', color: C.textDk, fontSize: 12, fontWeight: 800, minWidth: 0 }
+const timelinePrimaryButtonStyle = { background: C.greenDp, color: C.bg, border: 'none', borderRadius: 8, padding: '9px 10px', fontSize: 11, fontWeight: 900, cursor: 'pointer' }
+const timelineRainGridStyle = { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(120px, 1fr))', gap: 8 }
+const timelineRainMetricStyle = { background: 'rgba(255,255,255,0.9)', border: '1px solid rgba(255,255,255,0.5)', borderRadius: 10, padding: 10, color: C.textDk, display: 'grid', gap: 4 }
+const timelineRainMapStyle = { minHeight: 96, borderRadius: 10, border: '1px solid rgba(255,255,255,0.48)', background: 'radial-gradient(circle at 28% 45%, rgba(70,158,205,0.88), transparent 24%), radial-gradient(circle at 72% 48%, rgba(232,168,76,0.82), transparent 28%), linear-gradient(135deg, rgba(61,138,34,0.82), rgba(18,73,37,0.92))', color: C.bg, display: 'grid', placeItems: 'center', fontSize: 22, fontWeight: 900, fontFamily: 'Georgia, serif', textShadow: '0 2px 10px rgba(0,0,0,0.38)' }
+const talhaoHubStyle = { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 16, padding: 12, display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'stretch' }
+const talhaoMapColumnStyle = { flex: '999 1 560px', minWidth: 0 }
+const talhaoMapHeaderStyle = { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', marginBottom: 10 }
+const talhaoDecisionPanelStyle = { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 14, padding: 14, minHeight: 520, flex: '1 1 320px', maxWidth: 380, minWidth: 300, display: 'flex', flexDirection: 'column', gap: 12 }
+const emptyTalhaoPanelStyle = { minHeight: 420, display: 'grid', placeContent: 'center', textAlign: 'center', padding: 20 }
+const talhaoStatusBadgeStyle = { background: C.greenLight, color: C.greenDp, border: `1px solid ${C.greenDp}33`, borderRadius: 999, padding: '5px 9px', fontSize: 10, fontFamily: 'monospace', fontWeight: 900 }
+const talhaoKpiGridStyle = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }
+const talhaoMiniKpiStyle = { background: C.bgSoft, border: `1px solid ${C.border}`, borderRadius: 10, padding: 10, minHeight: 74 }
+const talhaoActionGridStyle = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }
+const talhaoInsightBoxStyle = { background: C.bg, border: `1px solid ${C.borderSoft}`, borderRadius: 12, padding: 12 }
+const metricGridStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }
+const dashboardGridStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12 }
+const metricCardStyle = { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 14, padding: 14, minHeight: 92 }
+const smartCardStyle = { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 14, padding: 14, minHeight: 220, display: 'flex', flexDirection: 'column' }
+const smartBadgeStyle = { borderRadius: 999, padding: '4px 8px', fontSize: 9, fontFamily: 'monospace', fontWeight: 900, letterSpacing: '0.8px', whiteSpace: 'nowrap' }
+const smartInsightRowStyle = { display: 'grid', gridTemplateColumns: '9px 1fr', gap: 8, alignItems: 'flex-start', padding: '8px 0', borderBottom: `1px solid ${C.borderSoft}` }
+const smartDotStyle = { width: 8, height: 8, borderRadius: 99, marginTop: 4 }
+const smartActionStyle = { marginTop: 'auto', alignSelf: 'flex-start', background: C.bg, color: C.greenDp, border: `1px solid ${C.greenDp}55`, borderRadius: 9, padding: '8px 11px', fontSize: 11, fontWeight: 900, cursor: 'pointer' }
+const monitoringGridStyle = { display: 'grid', gridTemplateColumns: 'minmax(280px, 420px) minmax(0, 1fr)', gap: 14, alignItems: 'stretch' }
+const monitoringActionGridStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8, marginTop: 16 }
+const gpsStatusStyle = { marginTop: 14, background: C.bgSoft, border: `1px solid ${C.border}`, borderRadius: 10, padding: 11, display: 'grid', gap: 3, color: C.textDk, fontSize: 12 }
+const gpsCanvasStyle = { position: 'relative', minHeight: 260, borderRadius: 12, overflow: 'hidden', background: 'linear-gradient(135deg, rgba(9,42,26,0.98), rgba(47,102,50,0.9)), repeating-linear-gradient(30deg, rgba(255,255,255,0.08) 0 1px, transparent 1px 44px)' }
+const gpsPathLineStyle = { position: 'absolute', left: '12%', right: '12%', top: '48%', height: 2, background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.74), transparent)', transform: 'rotate(-8deg)' }
+const gpsPointStyle = { position: 'absolute', width: 15, height: 15, borderRadius: 99, border: '2px solid white', transform: 'translate(-50%, -50%)', boxShadow: '0 5px 16px rgba(0,0,0,0.25)' }
+const gpsTableStyle = { display: 'grid', gap: 8, marginTop: 10 }
+const gpsRowStyle = { display: 'grid', gridTemplateColumns: '1.2fr 1fr 1.2fr 70px', gap: 10, alignItems: 'center', background: C.bgSoft, border: `1px solid ${C.border}`, borderRadius: 10, padding: '9px 10px', color: C.textMid, fontSize: 12 }
+const pieChartStyle = { width: 82, height: 82, borderRadius: '50%', background: `conic-gradient(${C.greenDp} 0 46%, ${C.amberDk} 46% 74%, ${C.blue} 74% 90%, ${C.soil} 90% 100%)`, position: 'relative', boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.04)' }
+const pieHoleStyle = { position: 'absolute', inset: 21, borderRadius: '50%', background: C.bg, border: `1px solid ${C.border}` }
+const primaryActionStyle = { background: C.greenDp, color: C.bg, border: 'none', borderRadius: 10, padding: '10px 14px', fontSize: 12, fontWeight: 800, cursor: 'pointer' }
+const secondaryActionStyle = { background: C.bgLight, color: C.textDk, border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 14px', fontSize: 12, fontWeight: 800, cursor: 'pointer' }
+const primaryHeaderButtonStyle = { ...primaryActionStyle, padding: '9px 13px' }
+const smallButtonStyle = { background: C.greenDp, color: C.bg, border: 'none', borderRadius: 8, padding: '6px 11px', fontSize: 11, fontWeight: 800, cursor: 'pointer' }
+const iconButtonStyle = { background: C.bgLight, border: `1px solid ${C.border}`, borderRadius: 8, width: 36, height: 36, fontSize: 16, cursor: 'pointer', color: C.textDk }
+const inputStyle = { width: '100%', padding: '10px 12px', background: C.bgSoft, border: `1px solid ${C.border}`, borderRadius: 10, fontSize: 13, color: C.textDk, outline: 'none', boxSizing: 'border-box' }
+const formLabelStyle = { display: 'block', fontSize: 9, fontFamily: 'monospace', letterSpacing: '2px', color: C.textDim, marginBottom: 5, fontWeight: 700 }
+const dateFilterGroupStyle = { display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'end', justifyContent: 'flex-end' }
+const dateLabelStyle = { display: 'grid', gap: 5, color: C.textDim, fontSize: 9, fontFamily: 'monospace', letterSpacing: '1px', fontWeight: 800 }
+const dateInputStyle = { background: C.bgLight, border: `1px solid ${C.border}`, borderRadius: 10, padding: '9px 10px', color: C.textDk, fontSize: 12, fontWeight: 800, minWidth: 150 }
+const mapShellStyle = { background: '#07130f', borderRadius: 16, padding: 12, border: `1px solid ${C.border}`, minHeight: 430, overflow: 'hidden' }
+const mapToolbarStyle = { position: 'relative', zIndex: 2, display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }
+const mapPillActiveStyle = { background: C.greenDp, color: C.bg, border: 'none', borderRadius: 8, padding: '8px 12px', fontSize: 11, fontWeight: 800 }
+const mapPillStyle = { background: 'rgba(8,18,15,0.86)', color: C.bg, border: '1px solid rgba(255,255,255,0.16)', borderRadius: 8, padding: '8px 12px', fontSize: 11, fontWeight: 800 }
+const interpolationMapStyle = { position: 'relative', minHeight: 360, borderRadius: 12, overflow: 'hidden', background: 'radial-gradient(circle at 30% 42%, rgba(232,90,58,0.82), transparent 20%), radial-gradient(circle at 67% 56%, rgba(232,90,58,0.74), transparent 18%), radial-gradient(circle at 54% 20%, rgba(232,168,76,0.82), transparent 18%), linear-gradient(135deg, rgba(61,138,34,0.8), rgba(18,73,37,0.9)), repeating-linear-gradient(35deg, rgba(255,255,255,0.05) 0 1px, transparent 1px 56px)' }
+const soilResultsShellStyle = { maxHeight: 380, overflowY: 'auto', borderRadius: 12, background: C.bgSoft, padding: 10, display: 'grid', gap: 8 }
+const soilNutrientRowStyle = { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: '11px 12px', display: 'flex', justifyContent: 'space-between', gap: 14, alignItems: 'center' }
+const scoutingMapStyle = { position: 'relative', minHeight: 430, borderRadius: 12, overflow: 'hidden', background: 'linear-gradient(135deg, rgba(10,35,24,0.98), rgba(56,82,45,0.95)), repeating-linear-gradient(28deg, rgba(255,255,255,0.05) 0 1px, transparent 1px 64px)' }
+const plotShapeStyle = { position: 'absolute', border: '2px solid rgba(255,255,255,0.85)', borderRadius: '34% 22% 31% 18%', color: C.bg, textShadow: '0 1px 4px rgba(0,0,0,0.55)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2, fontSize: 12, fontWeight: 800, cursor: 'pointer' }
+const legendStyle = { position: 'absolute', left: 14, bottom: 14, background: 'rgba(5,14,11,0.86)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 10, color: C.bg, padding: 12, width: 190 }
+const gradientBarStyle = { height: 10, borderRadius: 99, margin: '8px 0 5px', background: 'linear-gradient(90deg, #2fb15f, #e8c84c, #ef4d39)' }
+const managerGridStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10 }
+const managerCardStyle = { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, padding: 14, minHeight: 92, display: 'flex', flexDirection: 'column', gap: 6, textAlign: 'left', color: C.textDk }
+const reportButtonStyle = { background: C.bgSoft, border: `1px solid ${C.border}`, borderRadius: 10, padding: 11, display: 'grid', gridTemplateColumns: '34px 1fr', gap: 9, textAlign: 'left', alignItems: 'center', color: C.textDk }
+const reportPreviewStyle = { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 14, padding: 18, minHeight: 460 }
+const reportCoverArtStyle = { width: 180, height: 120, borderRadius: 12, background: 'linear-gradient(135deg, rgba(61,138,34,0.95), rgba(232,168,76,0.72)), repeating-linear-gradient(30deg, rgba(255,255,255,0.35) 0 2px, transparent 2px 18px)' }
+const mapManagerShellStyle = { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 14, padding: 12, display: 'flex', gap: 12, alignItems: 'stretch' }
+const mapSideMenuStyle = { width: 170, flexShrink: 0, borderRight: `1px solid ${C.borderSoft}`, paddingRight: 10, display: 'grid', alignContent: 'start', gap: 8 }
+const mapToolButtonStyle = { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 11px', color: C.textDk, fontSize: 12, fontWeight: 800, textAlign: 'left', cursor: 'pointer' }
+const mapCounterStyle = { background: C.greenLight, color: C.greenDp, border: `1px solid ${C.greenDp}33`, borderRadius: 999, padding: '5px 9px', fontSize: 10, fontFamily: 'monospace', fontWeight: 900 }
+const modalOverlayStyle = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.58)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 14 }
+const geoModalStyle = { background: C.bg, borderRadius: 18, width: '100%', maxWidth: 1060, maxHeight: '94vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }
+const geoModalHeaderStyle = { padding: '16px 18px', borderBottom: `1px solid ${C.border}`, display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }
+const geoModalBodyStyle = { flex: 1, overflowY: 'auto', display: 'flex', gap: 14, padding: 14 }
+const geoModeMenuStyle = { width: 190, flexShrink: 0, display: 'grid', alignContent: 'start', gap: 8 }
+const geoModeButtonStyle = { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: '11px 12px', color: C.textDk, textAlign: 'left', fontWeight: 900, cursor: 'pointer' }
+const geoModeButtonActiveStyle = { ...geoModeButtonStyle, background: C.greenDp, borderColor: C.greenDp, color: C.bg }
+const geoRuleBoxStyle = { background: C.bgSoft, border: `1px dashed ${C.border}`, borderRadius: 10, padding: 11, color: C.textMid, fontSize: 12, lineHeight: 1.45 }
+const emptyGeoStateStyle = { minHeight: 360, border: `1px dashed ${C.border}`, borderRadius: 14, display: 'grid', placeContent: 'center', textAlign: 'center', padding: 20 }
+const drawToolsStyle = { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 10 }
+const kmlDropStyle = { display: 'grid', gap: 5, placeContent: 'center', textAlign: 'center', minHeight: 96, border: `1.5px dashed ${C.greenDp}`, borderRadius: 14, background: C.greenLight, color: C.textDk, cursor: 'pointer', marginBottom: 10 }
+const geoFormStyle = { display: 'grid', gap: 10, marginTop: 12, borderTop: `1px solid ${C.borderSoft}`, paddingTop: 12 }
+const formErrorStyle = { background: C.redLight, color: C.redDk, borderRadius: 10, padding: '10px 12px', fontSize: 12, border: `1px solid ${C.red}33` }
+const simpleMapStyle = { position: 'relative', borderRadius: 14, overflow: 'hidden', border: `1px solid ${C.border}`, background: '#12351f', minHeight: 240 }
+const simpleMapFullStyle = { position: 'relative', borderRadius: 0, overflow: 'hidden', border: 'none', background: '#12351f', minHeight: '100vh', touchAction: 'none' }
+const mapDrawHintStyle = { position: 'absolute', left: 12, bottom: 12, background: 'rgba(255,255,255,0.94)', color: C.textDk, borderRadius: 10, padding: '8px 10px', fontSize: 12, fontWeight: 800, boxShadow: '0 4px 16px rgba(0,0,0,0.16)' }
+const mapEmptyHintStyle = { position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', color: 'rgba(255,255,255,0.86)', fontSize: 13, fontWeight: 800, textAlign: 'center', padding: 20 }
