@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { listarOperacoes, getCategoriaInfo, resumoCustosPorCategoria } from '../lib/operacoes'
 import { criarTalhao } from '../lib/fazendas'
 import { listarPluviometros, criarPluviometro, atualizarPluviometro, desativarPluviometro } from '../lib/pluviometros'
+import { listarUltimosMonitoramentos, criarMonitoramento, criarMonitoramentoPonto } from '../lib/monitoramentos'
 import { uploadArquivoFazenda } from '../lib/storage'
 import { NovaOperacaoModal } from '../components/NovaOperacaoModal'
 import { Logo } from '../components/Logo'
@@ -75,6 +76,13 @@ function useMediaQuery(query) {
 
 const MONITORING_STORAGE_KEY = 'terranexa:monitoramento-offline'
 
+const MONITORAMENTO_LEGEND = [
+  { key: 'recent', title: 'Recente', range: '<= 5 dias', color: C.greenDp, fill: 'rgba(61,138,34,0.50)', stroke: 'rgba(185,235,160,0.86)' },
+  { key: 'attention', title: 'Atencao', range: '6 a 10 dias', color: C.amberDk, fill: 'rgba(232,168,76,0.54)', stroke: 'rgba(255,225,150,0.90)' },
+  { key: 'late', title: 'Atrasado', range: '> 10 dias', color: C.redDk, fill: 'rgba(232,90,58,0.56)', stroke: 'rgba(255,180,160,0.88)' },
+  { key: 'never', title: 'Nunca', range: 'Sem visita', color: '#8A9070', fill: 'rgba(138,144,112,0.52)', stroke: 'rgba(230,230,215,0.74)' }
+]
+
 async function requestOfflineStorage() {
   if (typeof navigator === 'undefined') return { ok: false, message: 'Armazenamento offline indisponivel' }
   try {
@@ -142,6 +150,59 @@ function formatShortDate(value) {
   const [year, month, day] = String(value).split('-')
   if (year && month && day) return `${day}/${month}/${year}`
   return String(value)
+}
+
+function formatMonitoramentoDate(value) {
+  if (!value) return 'Sem data'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return formatShortDate(value)
+  return date.toLocaleDateString('pt-BR')
+}
+
+function daysSinceDate(value) {
+  if (!value) return null
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return null
+  const today = new Date()
+  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+  const dateStart = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+  return Math.max(0, Math.floor((todayStart - dateStart) / 86400000))
+}
+
+function getMonitoramentoMeta(registro) {
+  if (!registro?.visitado_em) {
+    const tone = MONITORAMENTO_LEGEND.find(item => item.key === 'never')
+    return {
+      ...tone,
+      status: 'never',
+      days: null,
+      title: 'Nunca monitorado',
+      detail: 'Sem visita registrada',
+      shortLabel: 'Nunca'
+    }
+  }
+
+  const days = daysSinceDate(registro.visitado_em)
+  if (days === null) return getMonitoramentoMeta(null)
+  const key = days <= 5 ? 'recent' : days <= 10 ? 'attention' : 'late'
+  const tone = MONITORAMENTO_LEGEND.find(item => item.key === key) || MONITORAMENTO_LEGEND[3]
+  const dayText = days === 0 ? 'Monitorado hoje' : days === 1 ? '1 dia sem monitoramento' : `${days} dias sem monitoramento`
+
+  return {
+    ...tone,
+    status: key,
+    days,
+    title: dayText,
+    detail: `Ultima visita: ${formatMonitoramentoDate(registro.visitado_em)}`,
+    shortLabel: days === 0 ? 'Hoje' : `${days}d`
+  }
+}
+
+function indexMonitoramentosByTalhao(items = []) {
+  return (items || []).reduce((acc, item) => {
+    if (item?.talhao_id) acc[item.talhao_id] = item
+    return acc
+  }, {})
 }
 
 function calcularAreaGeo(feature) {
@@ -322,6 +383,7 @@ export function FazendaDetalhePage() {
   const [custos, setCustos] = useState([])
   const [pluviometros, setPluviometros] = useState([])
   const [pluviometrosErro, setPluviometrosErro] = useState('')
+  const [monitoramentosResumo, setMonitoramentosResumo] = useState({})
   const [loadOps, setLoadOps] = useState(false)
   const [showNovaOp, setShowNovaOp] = useState(false)
   const [opSel, setOpSel] = useState(null)
@@ -342,6 +404,12 @@ export function FazendaDetalhePage() {
     setFazenda(f)
     setTalhoes(ts || [])
     setPluviometros(pluviometrosData || [])
+    try {
+      const monitoramentosData = await listarUltimosMonitoramentos((ts || []).map(t => t.id))
+      setMonitoramentosResumo(indexMonitoramentosByTalhao(monitoramentosData))
+    } catch {
+      setMonitoramentosResumo({})
+    }
     const nums = (ts || []).map(t => parseInt(String(t.codigo).replace(/\D/g, ''), 10)).filter(n => !isNaN(n))
     setForm(p => ({ ...p, codigo: 'T' + (nums.length === 0 ? 1 : Math.max(...nums) + 1) }))
     setLoading(false)
@@ -435,7 +503,10 @@ export function FazendaDetalhePage() {
 
   const total = useMemo(() => talhoes.reduce((s, t) => s + Number(t.area_ha || 0), 0), [talhoes])
   const totalCusto = useMemo(() => custos.reduce((s, c) => s + Number(c.custo_total || 0), 0), [custos])
-  const talhoesSemMonitoramento = Math.max(0, talhoes.length - Math.min(talhoes.length, operacoes.length))
+  const talhoesSemMonitoramento = talhoes.filter(talhao => {
+    const status = getMonitoramentoMeta(monitoramentosResumo[talhao.id]).status
+    return status === 'late' || status === 'never'
+  }).length
   const isMapView = activeView === 'mapa'
 
   if (loading) {
@@ -548,6 +619,7 @@ export function FazendaDetalhePage() {
             fazenda={fazenda}
             talhoes={talhoes}
             pluviometros={pluviometros}
+            monitoramentosResumo={monitoramentosResumo}
             talhaoSel={talhaoSel}
             operacoes={operacoes}
             custos={custos}
@@ -608,7 +680,7 @@ export function FazendaDetalhePage() {
             fazenda={fazenda}
             fazendaId={id}
             talhao={talhaoSel}
-            onBack={() => setActiveView('mapa')}
+            onBack={async () => { try { await carregar() } finally { setActiveView('mapa') } }}
           />
         )}
           </section>
@@ -633,7 +705,7 @@ export function FazendaDetalhePage() {
   )
 }
 
-function FazendaMapaPrincipal({ fazenda, talhoes, pluviometros = [], talhaoSel, operacoes, custos, totalCusto, loadOps, alternarTalhao, navigate, setActiveView, setShowNovaOp }) {
+function FazendaMapaPrincipal({ fazenda, talhoes, pluviometros = [], monitoramentosResumo = {}, talhaoSel, operacoes, custos, totalCusto, loadOps, alternarTalhao, navigate, setActiveView, setShowNovaOp }) {
   const timelineIsDocked = useMediaQuery('(min-width: 900px)')
   const devicePosition = useDevicePosition(!timelineIsDocked)
   const [timelineMode, setTimelineMode] = useState('resumo')
@@ -641,6 +713,18 @@ function FazendaMapaPrincipal({ fazenda, talhoes, pluviometros = [], talhaoSel, 
   const [chuvaFim, setChuvaFim] = useState('2026-05-15')
   const features = talhoes.map(talhao => ({ talhao, feature: normalizeFeature(talhao.geometria, talhao.codigo) })).filter(item => item.feature)
   const selected = talhaoSel || null
+  const selectedMonitoring = getMonitoramentoMeta(selected ? monitoramentosResumo[selected.id] : null)
+  const mapFeatures = features.map(item => {
+    const monitoramento = getMonitoramentoMeta(monitoramentosResumo[item.talhao.id])
+    return {
+      ...item.feature,
+      properties: {
+        ...item.feature.properties,
+        codigo: item.talhao.codigo,
+        monitoramento
+      }
+    }
+  })
   const chuvaSeed = selected ? String(selected.codigo || '').split('').reduce((sum, char) => sum + char.charCodeAt(0), 0) : 0
   const chuvaAcumulada = selected ? (82 + (chuvaSeed % 88) + Number(selected.area_ha || 0) % 18).toFixed(1) : '0.0'
   const chuvaMediaDia = selected ? (Number(chuvaAcumulada) / 15).toFixed(1) : '0.0'
@@ -671,7 +755,7 @@ function FazendaMapaPrincipal({ fazenda, talhoes, pluviometros = [], talhaoSel, 
   async function handleFeatureClick(index) {
     const talhao = features[index]?.talhao
     if (!talhao) return
-    if (talhaoSel?.id !== talhao.id) setTimelineMode(timelineIsDocked ? 'resumo' : 'historico')
+    if (talhaoSel?.id !== talhao.id && timelineMode !== 'monitoramento') setTimelineMode(timelineIsDocked ? 'resumo' : 'historico')
     await alternarTalhao(talhao)
   }
 
@@ -683,11 +767,11 @@ function FazendaMapaPrincipal({ fazenda, talhoes, pluviometros = [], talhaoSel, 
   return (
     <section style={timelineIsDocked ? mapMainPageStyle : mapMainPageMobileStyle}>
       <SimpleFarmMap
-        features={features.map(item => ({ ...item.feature, properties: { ...item.feature.properties, codigo: item.talhao.codigo } }))}
+        features={mapFeatures}
         height={timelineIsDocked ? '100vh' : '100dvh'}
         fullBleed
         selectedCode={selected?.codigo}
-        selectedMode={timelineMode === 'chuvas' ? 'chuvas' : 'timeline'}
+        selectedMode={timelineMode === 'chuvas' ? 'chuvas' : timelineMode === 'monitoramento' ? 'monitoramento' : 'timeline'}
         pluviometros={[]}
         devicePosition={devicePosition}
         onFeatureClick={handleFeatureClick}
@@ -723,6 +807,7 @@ function FazendaMapaPrincipal({ fazenda, talhoes, pluviometros = [], talhaoSel, 
           <div style={timelineIsDocked ? timelineModeTabsStyle : timelineModeTabsMobileStyle}>
             {[
               ['resumo', 'Resumo'],
+              ['monitoramento', 'Monitoramento'],
               ['historico', 'Historico'],
               ['chuvas', 'Chuvas'],
               ['solo', 'Solo']
@@ -764,6 +849,45 @@ function FazendaMapaPrincipal({ fazenda, talhoes, pluviometros = [], talhaoSel, 
                   </div>
                 ))}
                 <button onClick={() => setShowNovaOp(true)} style={timelineCtaHorizontalStyle}>{operacoes.length ? 'Nova operacao' : 'Adicionar registro'}</button>
+                <div aria-hidden="true" style={timelineScrollEndStyle} />
+              </div>
+            )
+          )}
+          {timelineMode === 'monitoramento' && (
+            timelineIsDocked ? (
+              <div style={timelineSummaryCardStyle}>
+                <h4 style={timelineCardTitleStyle}>Dias sem monitoramento</h4>
+                <div style={{ ...timelineMonitoringStatusStyle, borderColor: selectedMonitoring.color }}>
+                  <span style={timelineSummaryLabelStyle}>Talhao selecionado</span>
+                  <strong style={{ ...timelineSummaryValueStyle, fontSize: 16, color: selectedMonitoring.color }}>{selectedMonitoring.title}</strong>
+                  <small style={{ color: C.textMid, fontWeight: 800 }}>{selectedMonitoring.detail}</small>
+                </div>
+                <div style={timelineLegendGridStyle}>
+                  {MONITORAMENTO_LEGEND.map(item => (
+                    <div key={item.key} style={timelineLegendItemStyle}>
+                      <span style={{ ...timelineLegendDotStyle, background: item.color }} />
+                      <strong>{item.title}</strong>
+                      <small style={timelineLegendRangeStyle}>{item.range}</small>
+                    </div>
+                  ))}
+                </div>
+                <button onClick={abrirMonitoramento} style={timelineTextButtonStyle}>Registrar monitoramento</button>
+              </div>
+            ) : (
+              <div style={timelineTableHorizontalStyle}>
+                <div style={{ ...timelineMonitoringHorizontalCardStyle, borderColor: selectedMonitoring.color }}>
+                  <span>Talhao selecionado</span>
+                  <strong style={{ color: selectedMonitoring.color }}>{selectedMonitoring.title}</strong>
+                  <small>{selectedMonitoring.detail}</small>
+                </div>
+                {MONITORAMENTO_LEGEND.map(item => (
+                  <div key={item.key} style={timelineLegendHorizontalCardStyle}>
+                    <span style={{ ...timelineLegendDotStyle, background: item.color }} />
+                    <strong>{item.title}</strong>
+                    <small style={timelineLegendRangeStyle}>{item.range}</small>
+                  </div>
+                ))}
+                <button onClick={abrirMonitoramento} style={timelineCtaHorizontalStyle}>Registrar visita</button>
                 <div aria-hidden="true" style={timelineScrollEndStyle} />
               </div>
             )
@@ -854,12 +978,20 @@ function MonitoramentoRegistroView({ fazenda, fazendaId, talhao, onBack }) {
   const [gpsStatus, setGpsStatus] = useState('Aguardando GPS')
   const [storageStatus, setStorageStatus] = useState('Preparando modo offline')
   const watchRef = useRef(null)
+  const monitoramentoIdRef = useRef(null)
+  const monitoramentoCreateRef = useRef(null)
 
   useEffect(() => {
     return () => {
       if (watchRef.current) navigator.geolocation.clearWatch(watchRef.current)
     }
   }, [])
+
+  useEffect(() => {
+    monitoramentoIdRef.current = null
+    monitoramentoCreateRef.current = null
+    setPoints([])
+  }, [talhao?.id])
 
   useEffect(() => {
     let active = true
@@ -879,12 +1011,31 @@ function MonitoramentoRegistroView({ fazenda, fazendaId, talhao, onBack }) {
     return () => { active = false }
   }, [talhao?.id])
 
-  function addPosition(position, tipo) {
+  async function ensureRemoteMonitoring() {
+    if (!talhao?.id) return null
+    if (monitoramentoIdRef.current) return monitoramentoIdRef.current
+    if (!monitoramentoCreateRef.current) {
+      monitoramentoCreateRef.current = criarMonitoramento({
+        talhao_id: talhao.id,
+        observacoes: 'Monitoramento georreferenciado pelo app TerraNexa'
+      }).then(registro => {
+        monitoramentoIdRef.current = registro.id
+        return registro.id
+      }).finally(() => {
+        monitoramentoCreateRef.current = null
+      })
+    }
+    return monitoramentoCreateRef.current
+  }
+
+  async function addPosition(position, tipo) {
     const coords = position.coords || {}
+    const lat = Number(coords.latitude)
+    const lng = Number(coords.longitude)
     const registro = {
       tipo,
-      lat: coords.latitude,
-      lng: coords.longitude,
+      lat,
+      lng,
       precisao: coords.accuracy,
       hora: new Date().toLocaleString('pt-BR')
     }
@@ -896,6 +1047,22 @@ function MonitoramentoRegistroView({ fazenda, fazendaId, talhao, onBack }) {
     })
     setPoints(current => [...current, registro])
     setGpsStatus('Ponto registrado')
+    if (!talhao?.id || !Number.isFinite(lat) || !Number.isFinite(lng)) return
+    try {
+      const monitoramentoId = await ensureRemoteMonitoring()
+      if (monitoramentoId) {
+        await criarMonitoramentoPonto({
+          monitoramento_id: monitoramentoId,
+          tipo,
+          latitude: lat,
+          longitude: lng,
+          precisao_m: coords.accuracy
+        })
+        setStorageStatus('Ponto sincronizado com a fazenda')
+      }
+    } catch {
+      setStorageStatus('Ponto salvo offline; sincronizacao pendente')
+    }
   }
 
   function capturarPonto(tipo = 'Ponto de scouting') {
@@ -2059,11 +2226,16 @@ function SatelliteFarmMap({ normalized = [], onFeatureClick, height = 340, selec
           const labelCoord = getRingLabelCoord(ring)
           const labelWorld = labelCoord ? coordScreenPosition(labelCoord) : null
           const selected = selectedCode && feature.properties?.codigo === selectedCode
-          const selectedFill = selectedMode === 'chuvas' ? 'rgba(55,145,210,0.42)' : 'rgba(232,168,76,0.40)'
+          const monitoramento = feature.properties?.monitoramento || getMonitoramentoMeta(null)
+          const monitoringFill = monitoramento.fill || 'rgba(138,144,112,0.52)'
+          const monitoringStroke = monitoramento.stroke || 'rgba(230,230,215,0.74)'
+          const selectedFill = selectedMode === 'chuvas' ? 'rgba(55,145,210,0.42)' : selectedMode === 'monitoramento' ? monitoringFill : 'rgba(232,168,76,0.40)'
+          const baseFill = selectedMode === 'monitoramento' ? monitoringFill : 'rgba(46,124,42,0.26)'
+          const baseStroke = selectedMode === 'monitoramento' ? monitoringStroke : 'rgba(255,255,255,0.70)'
           const labelSize = selected ? (fullBleed ? 11 : 10) : (fullBleed ? 9 : 8)
           return (
             <g key={`${feature.properties?.codigo || index}-${index}`} style={{ cursor: onFeatureClick ? 'pointer' : 'default' }}>
-              <polygon points={points} fill={selected ? selectedFill : 'rgba(46,124,42,0.26)'} stroke={selected ? 'rgba(255,255,255,0.96)' : 'rgba(255,255,255,0.70)'} strokeWidth={selected ? 1.4 : 0.8} />
+              <polygon points={points} fill={selected ? selectedFill : baseFill} stroke={selected ? 'rgba(255,255,255,0.96)' : baseStroke} strokeWidth={selected ? 1.4 : 0.8} />
               {labelWorld && (
                 <text
                   x={labelWorld.x}
@@ -2208,10 +2380,15 @@ function VectorFarmMap({ normalized = [], drawPoints = [], onMapClick, onFeature
             const centerCoord = getRingLabelCoord(ring)
             const center = centerCoord ? projectCoord(centerCoord, bounds) : [50, 50]
             const selected = selectedCode && feature.properties?.codigo === selectedCode
-            const selectedFill = selectedMode === 'chuvas' ? 'rgba(70,158,205,0.52)' : 'rgba(232,168,76,0.46)'
+            const monitoramento = feature.properties?.monitoramento || getMonitoramentoMeta(null)
+            const monitoringFill = monitoramento.fill || 'rgba(138,144,112,0.52)'
+            const monitoringStroke = monitoramento.stroke || 'rgba(230,230,215,0.74)'
+            const selectedFill = selectedMode === 'chuvas' ? 'rgba(70,158,205,0.52)' : selectedMode === 'monitoramento' ? monitoringFill : 'rgba(232,168,76,0.46)'
+            const baseFill = selectedMode === 'monitoramento' ? monitoringFill : 'rgba(61,138,34,0.34)'
+            const baseStroke = selectedMode === 'monitoramento' ? monitoringStroke : 'rgba(255,255,255,0.74)'
             return (
               <g key={`${feature.properties?.codigo || index}-${index}`} onClick={e => { e.stopPropagation(); if (suppressClickRef.current) { suppressClickRef.current = false; return }; onFeatureClick?.(index, feature) }} style={{ cursor: onFeatureClick ? 'pointer' : 'default' }}>
-                <polygon points={points} fill={selected ? selectedFill : 'rgba(61,138,34,0.34)'} stroke={selected ? 'rgba(255,255,255,0.98)' : 'rgba(255,255,255,0.74)'} strokeWidth={selected ? '1.4' : '0.7'} vectorEffect="non-scaling-stroke" />
+                <polygon points={points} fill={selected ? selectedFill : baseFill} stroke={selected ? 'rgba(255,255,255,0.98)' : baseStroke} strokeWidth={selected ? '1.4' : '0.7'} vectorEffect="non-scaling-stroke" />
                 <text x={center[0]} y={center[1]} fill="white" fontSize="2.25" fontWeight="800" textAnchor="middle" dominantBaseline="middle" paintOrder="stroke" stroke="rgba(0,0,0,0.58)" strokeWidth="0.55">{feature.properties?.codigo}</text>
               </g>
             )
@@ -2910,6 +3087,13 @@ const timelineMetricHorizontalCardStyle = { ...timelineInfoHorizontalCardStyle, 
 const timelineInputHorizontalCardStyle = { ...timelineInfoHorizontalCardStyle, minWidth: 190, maxWidth: 190, fontSize: 10, color: C.textDim, fontFamily: 'monospace', letterSpacing: '0.8px', fontWeight: 900 }
 const timelineCtaHorizontalStyle = { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, padding: 11, minWidth: 152, maxWidth: 152, minHeight: 92, color: C.greenDp, display: 'grid', placeItems: 'center', textAlign: 'center', fontSize: 13, fontWeight: 900, cursor: 'pointer', scrollSnapAlign: 'start' }
 const timelineScrollEndStyle = { minWidth: 2, flex: '0 0 2px' }
+const timelineMonitoringStatusStyle = { background: C.bgSoft, border: '1px solid', borderRadius: 12, padding: 11, display: 'grid', gap: 4 }
+const timelineLegendGridStyle = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }
+const timelineLegendItemStyle = { background: C.bgSoft, border: `1px solid ${C.border}`, borderRadius: 10, padding: 9, display: 'grid', gridTemplateColumns: '12px 1fr', columnGap: 7, rowGap: 2, color: C.textDk, fontSize: 11, alignItems: 'center' }
+const timelineLegendDotStyle = { width: 11, height: 11, borderRadius: 99, boxShadow: '0 0 0 2px rgba(255,255,255,0.75)' }
+const timelineLegendRangeStyle = { gridColumn: '2', color: C.textMid, fontSize: 10, fontWeight: 800 }
+const timelineMonitoringHorizontalCardStyle = { ...timelineInfoHorizontalCardStyle, minWidth: 210, maxWidth: 210, border: '1.5px solid', minHeight: 100 }
+const timelineLegendHorizontalCardStyle = { ...timelineInfoHorizontalCardStyle, minWidth: 128, maxWidth: 128, minHeight: 100, gridTemplateColumns: '16px 1fr', columnGap: 8, rowGap: 3, alignItems: 'center' }
 const timelineActionsStyle = { display: 'flex', gap: 8, flexWrap: 'wrap', margin: '0 0 10px' }
 const timelineActionButtonStyle = { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 9, padding: '8px 11px', color: C.textDk, fontWeight: 900, cursor: 'pointer' }
 const timelineMobileActionButtonStyle = { ...timelineActionButtonStyle, borderRadius: 10, padding: '9px 13px', fontSize: 13 }
