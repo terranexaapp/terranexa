@@ -684,7 +684,7 @@ function FazendaMapaPrincipal({ fazenda, talhoes, pluviometros = [], talhaoSel, 
     <section style={timelineIsDocked ? mapMainPageStyle : mapMainPageMobileStyle}>
       <SimpleFarmMap
         features={features.map(item => ({ ...item.feature, properties: { ...item.feature.properties, codigo: item.talhao.codigo } }))}
-        height="100vh"
+        height={timelineIsDocked ? '100vh' : '100dvh'}
         fullBleed
         selectedCode={selected?.codigo}
         selectedMode={timelineMode === 'chuvas' ? 'chuvas' : 'timeline'}
@@ -1709,6 +1709,7 @@ function SatelliteFarmMap({ normalized = [], onFeatureClick, height = 340, selec
   const suppressClickRef = useRef(false)
   const [size, setSize] = useState({ width: 0, height: 0 })
   const [view, setView] = useState(() => getSatelliteInitialView(normalized.map(item => item.feature), { width: 0, height: 0 }, fullBleed))
+  const controlsOnRight = useMediaQuery('(max-width: 899px)')
   const featureSignature = normalized.map(({ feature, index }) => {
     const ring = getFeatureRing(feature) || []
     return `${feature.properties?.codigo || index}:${ring.map(coord => coord.join(',')).join(';')}`
@@ -1749,14 +1750,16 @@ function SatelliteFarmMap({ normalized = [], onFeatureClick, height = 340, selec
   }, [featureSignature, size.width, size.height, fullBleed])
 
   const tileLayer = useMemo(() => {
-    if (!size.width || !size.height) return { tiles: [], topLeft: { x: 0, y: 0 }, zoom: view.zoom }
-    const zoom = clamp(Math.round(view.zoom), TILE_MIN_ZOOM, TILE_MAX_ZOOM)
+    if (!size.width || !size.height) return { tiles: [], topLeft: { x: 0, y: 0 }, zoom: view.zoom, scale: 1 }
+    const displayZoom = clamp(view.zoom, TILE_MIN_ZOOM, TILE_MAX_ZOOM)
+    const zoom = clamp(Math.floor(displayZoom), TILE_MIN_ZOOM, TILE_MAX_ZOOM)
+    const scale = 2 ** (displayZoom - zoom)
     const center = lngLatToWorld([view.lng, view.lat], zoom)
-    const topLeft = { x: center.x - size.width / 2, y: center.y - size.height / 2 }
+    const topLeft = { x: center.x - size.width / (2 * scale), y: center.y - size.height / (2 * scale) }
     const minX = Math.floor(topLeft.x / TILE_SIZE) - 1
-    const maxX = Math.floor((topLeft.x + size.width) / TILE_SIZE) + 1
+    const maxX = Math.floor((topLeft.x + size.width / scale) / TILE_SIZE) + 1
     const minY = Math.floor(topLeft.y / TILE_SIZE) - 1
-    const maxY = Math.floor((topLeft.y + size.height) / TILE_SIZE) + 1
+    const maxY = Math.floor((topLeft.y + size.height / scale) / TILE_SIZE) + 1
     const tileCount = 2 ** zoom
     const tiles = []
     for (let x = minX; x <= maxX; x++) {
@@ -1766,12 +1769,13 @@ function SatelliteFarmMap({ normalized = [], onFeatureClick, height = 340, selec
         tiles.push({
           key: `${zoom}-${x}-${y}`,
           src: `${SATELLITE_TILE_URL}/${zoom}/${y}/${wrappedX}`,
-          left: x * TILE_SIZE - topLeft.x,
-          top: y * TILE_SIZE - topLeft.y
+          left: (x * TILE_SIZE - topLeft.x) * scale,
+          top: (y * TILE_SIZE - topLeft.y) * scale,
+          size: TILE_SIZE * scale
         })
       }
     }
-    return { tiles, topLeft, zoom }
+    return { tiles, topLeft, zoom, scale }
   }, [size.width, size.height, view.lng, view.lat, view.zoom])
 
   function pointFromEvent(e) {
@@ -1802,16 +1806,21 @@ function SatelliteFarmMap({ normalized = [], onFeatureClick, height = 340, selec
   }
 
   function screenToCoord(point) {
-    const zoom = tileLayer.zoom || view.zoom
-    const center = lngLatToWorld([view.lng, view.lat], zoom)
-    const world = { x: center.x + point.x - size.width / 2, y: center.y + point.y - size.height / 2 }
-    const [lng, lat] = worldToLngLat(world.x, world.y, zoom)
+    const world = screenToWorld(point, view)
+    const [lng, lat] = worldToLngLat(world.x, world.y, view.zoom)
     return { lng, lat }
   }
 
+  function coordScreenPosition(coord) {
+    const world = lngLatToWorld(coord, tileLayer.zoom || view.zoom)
+    return {
+      x: (world.x - tileLayer.topLeft.x) * (tileLayer.scale || 1),
+      y: (world.y - tileLayer.topLeft.y) * (tileLayer.scale || 1)
+    }
+  }
+
   function markerScreenPosition(marker) {
-    const world = lngLatToWorld([marker.longitude, marker.latitude], tileLayer.zoom || view.zoom)
-    return { x: world.x - tileLayer.topLeft.x, y: world.y - tileLayer.topLeft.y }
+    return coordScreenPosition([marker.longitude, marker.latitude])
   }
 
   function rainIntensity(marker, index) {
@@ -1821,7 +1830,7 @@ function SatelliteFarmMap({ normalized = [], onFeatureClick, height = 340, selec
 
   function handleWheel(e) {
     e.preventDefault()
-    const nextZoom = view.zoom + (e.deltaY < 0 ? 1 : -1)
+    const nextZoom = view.zoom - e.deltaY * 0.003
     zoomAt(pointFromEvent(e), nextZoom)
   }
 
@@ -1831,11 +1840,7 @@ function SatelliteFarmMap({ normalized = [], onFeatureClick, height = 340, selec
   }
 
   function screenRingForFeature(feature) {
-    const zoom = tileLayer.zoom || view.zoom
-    return (getFeatureRing(feature) || []).map(coord => {
-      const world = lngLatToWorld(coord, zoom)
-      return { x: world.x - tileLayer.topLeft.x, y: world.y - tileLayer.topLeft.y }
-    })
+    return (getFeatureRing(feature) || []).map(coordScreenPosition)
   }
 
   function selectFeatureAtPoint(point) {
@@ -1896,7 +1901,7 @@ function SatelliteFarmMap({ normalized = [], onFeatureClick, height = 340, selec
         : { type: 'pinch', startDistance: Math.max(1, distanceBetween(a, b)), startMidpoint: currentMidpoint, startView: view }
       gestureRef.current = gesture
       const ratio = distanceBetween(a, b) / gesture.startDistance
-      const nextZoom = clamp(Math.round(gesture.startView.zoom + Math.log2(Math.max(0.35, ratio))), TILE_MIN_ZOOM, TILE_MAX_ZOOM)
+      const nextZoom = clamp(gesture.startView.zoom + Math.log2(Math.max(0.35, ratio)), TILE_MIN_ZOOM, TILE_MAX_ZOOM)
       const startFocusWorld = screenToWorld(gesture.startMidpoint, gesture.startView)
       const startFocusCoord = worldToLngLat(startFocusWorld.x, startFocusWorld.y, gesture.startView.zoom)
       const focusAtNextZoom = lngLatToWorld(startFocusCoord, nextZoom)
@@ -1982,7 +1987,7 @@ function SatelliteFarmMap({ normalized = [], onFeatureClick, height = 340, selec
             src={tile.src}
             draggable={false}
             decoding="async"
-            style={{ ...satelliteTileStyle, transform: `translate3d(${tile.left}px, ${tile.top}px, 0)` }}
+            style={{ ...satelliteTileStyle, width: tile.size, height: tile.size, transform: `translate3d(${tile.left}px, ${tile.top}px, 0)` }}
           />
         ))}
       </div>
@@ -2011,11 +2016,11 @@ function SatelliteFarmMap({ normalized = [], onFeatureClick, height = 340, selec
         {normalized.map(({ feature, index }) => {
           const ring = getFeatureRing(feature) || []
           const points = ring.map(coord => {
-            const world = lngLatToWorld(coord, tileLayer.zoom || view.zoom)
-            return `${world.x - tileLayer.topLeft.x},${world.y - tileLayer.topLeft.y}`
+            const screen = coordScreenPosition(coord)
+            return `${screen.x},${screen.y}`
           }).join(' ')
           const labelCoord = getRingLabelCoord(ring)
-          const labelWorld = labelCoord ? lngLatToWorld(labelCoord, tileLayer.zoom || view.zoom) : null
+          const labelWorld = labelCoord ? coordScreenPosition(labelCoord) : null
           const selected = selectedCode && feature.properties?.codigo === selectedCode
           const selectedFill = selectedMode === 'chuvas' ? 'rgba(55,145,210,0.42)' : 'rgba(232,168,76,0.40)'
           const labelSize = selected ? (fullBleed ? 11 : 10) : (fullBleed ? 9 : 8)
@@ -2024,8 +2029,8 @@ function SatelliteFarmMap({ normalized = [], onFeatureClick, height = 340, selec
               <polygon points={points} fill={selected ? selectedFill : 'rgba(46,124,42,0.26)'} stroke={selected ? 'rgba(255,255,255,0.96)' : 'rgba(255,255,255,0.70)'} strokeWidth={selected ? 1.4 : 0.8} />
               {labelWorld && (
                 <text
-                  x={labelWorld.x - tileLayer.topLeft.x}
-                  y={labelWorld.y - tileLayer.topLeft.y}
+                  x={labelWorld.x}
+                  y={labelWorld.y}
                   fill="white"
                   fontSize={labelSize}
                   fontWeight="800"
@@ -2065,7 +2070,7 @@ function SatelliteFarmMap({ normalized = [], onFeatureClick, height = 340, selec
           )
         })()}
       </svg>
-      <div style={satelliteControlsStyle} onPointerDown={e => e.stopPropagation()} onWheel={e => e.stopPropagation()} onDoubleClick={e => e.stopPropagation()}>
+      <div style={controlsOnRight ? satelliteControlsMobileStyle : satelliteControlsStyle} onPointerDown={e => e.stopPropagation()} onWheel={e => e.stopPropagation()} onDoubleClick={e => e.stopPropagation()}>
         <button type="button" aria-label="Aproximar mapa" onClick={e => changeZoom(e, 1)} style={satelliteControlButtonStyle}>+</button>
         <button type="button" aria-label="Afastar mapa" onClick={e => changeZoom(e, -1)} style={satelliteControlButtonStyle}>-</button>
       </div>
@@ -2835,17 +2840,17 @@ const sidebarNavButtonStyle = { width: '100%', border: '1px solid', borderRadius
 const heroPanelStyle = { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 14, padding: 16, display: 'flex', justifyContent: 'space-between', gap: 14, alignItems: 'center', flexWrap: 'wrap' }
 const panelStyle = { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 14, padding: 14 }
 const mapMainPageStyle = { position: 'relative', width: '100%', minHeight: '100vh', overflow: 'hidden', background: '#102316' }
-const mapMainPageMobileStyle = { position: 'relative', width: '100%', height: '100vh', minHeight: '100vh', overflow: 'hidden', background: '#102316' }
+const mapMainPageMobileStyle = { position: 'relative', width: '100%', height: '100dvh', minHeight: '100dvh', maxHeight: '100dvh', overflow: 'hidden', overscrollBehavior: 'none', background: '#102316' }
 const mapTopInfoStyle = { position: 'absolute', top: 92, left: 18, zIndex: 5, background: 'rgba(5,18,12,0.62)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 14, padding: '12px 14px', backdropFilter: 'blur(8px)', maxWidth: 360 }
 const mapTalhaoChipStyle = { position: 'absolute', top: 92, right: 18, zIndex: 5, background: 'rgba(255,255,255,0.92)', border: `1px solid ${C.border}`, borderRadius: 14, padding: '11px 13px', minWidth: 190, boxShadow: '0 10px 30px rgba(0,0,0,0.16)', display: 'grid', gap: 2 }
 const timelineDockStyle = { position: 'absolute', top: 92, right: 16, bottom: 16, zIndex: 6, width: 'min(360px, calc(100% - 32px))', background: 'rgba(18,73,37,0.68)', border: '1px solid rgba(168,217,143,0.58)', borderRadius: 16, padding: 13, backdropFilter: 'blur(14px)', boxShadow: '0 18px 48px rgba(0,0,0,0.32)', overflowY: 'auto', display: 'flex', flexDirection: 'column' }
-const timelineMobileStyle = { position: 'absolute', left: 9, right: 9, bottom: 10, zIndex: 6, background: 'rgba(18,73,37,0.58)', border: '1px solid rgba(168,217,143,0.42)', borderRadius: 13, padding: 9, boxShadow: '0 12px 28px rgba(0,0,0,0.24)', backdropFilter: 'blur(12px)', overflow: 'hidden' }
+const timelineMobileStyle = { position: 'absolute', left: 8, right: 8, bottom: 12, zIndex: 6, background: 'rgba(18,73,37,0.66)', border: '1px solid rgba(168,217,143,0.48)', borderRadius: 16, padding: 12, boxShadow: '0 14px 34px rgba(0,0,0,0.28)', backdropFilter: 'blur(12px)', overflow: 'hidden' }
 const timelineHeaderStyle = { display: 'grid', gap: 8, marginBottom: 10 }
-const timelineHeaderMobileStyle = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 7 }
-const timelineMobileEyebrowStyle = { margin: 0, fontSize: 8, color: 'rgba(255,255,255,0.62)', fontFamily: 'monospace', letterSpacing: '1.1px', fontWeight: 900 }
+const timelineHeaderMobileStyle = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 9 }
+const timelineMobileEyebrowStyle = { margin: 0, fontSize: 9, color: 'rgba(255,255,255,0.7)', fontFamily: 'monospace', letterSpacing: '1.1px', fontWeight: 900 }
 const timelineTitleStyle = { margin: '4px 0 0', color: C.bg, fontSize: 20, fontFamily: 'Georgia, serif' }
-const timelineMobileTitleStyle = { margin: '2px 0 0', color: C.bg, fontSize: 16, fontFamily: 'Georgia, serif', lineHeight: 1.05 }
-const timelineAreaPillStyle = { justifySelf: 'flex-start', alignSelf: 'center', background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.24)', borderRadius: 999, padding: '4px 8px', color: C.bg, fontSize: 10, fontFamily: 'monospace', fontWeight: 900, whiteSpace: 'nowrap' }
+const timelineMobileTitleStyle = { margin: '2px 0 0', color: C.bg, fontSize: 20, fontFamily: 'Georgia, serif', lineHeight: 1.05 }
+const timelineAreaPillStyle = { justifySelf: 'flex-start', alignSelf: 'center', background: 'rgba(255,255,255,0.15)', border: '1px solid rgba(255,255,255,0.28)', borderRadius: 999, padding: '5px 10px', color: C.bg, fontSize: 12, fontFamily: 'monospace', fontWeight: 900, whiteSpace: 'nowrap' }
 const timelineSummaryCardStyle = { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, padding: 12, color: C.textDk, display: 'grid', gap: 11 }
 const timelineCardTitleStyle = { margin: 0, color: C.textDk, fontSize: 15, fontFamily: 'Georgia, serif', fontWeight: 900 }
 const timelineSummaryRowsStyle = { display: 'grid', gap: 9 }
@@ -2856,20 +2861,20 @@ const timelineTextButtonStyle = { justifySelf: 'flex-start', background: 'transp
 const timelineTableStyle = { display: 'grid', gap: 8, paddingBottom: 3 }
 const timelineTableDesktopStyle = { display: 'grid', gap: 8, paddingBottom: 3, flex: 1, gridAutoRows: 'minmax(96px, 1fr)' }
 const timelineCellStyle = { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 10, minHeight: 92, textAlign: 'left', color: C.textDk, display: 'grid', gap: 3, cursor: 'pointer' }
-const timelineTableHorizontalStyle = { display: 'flex', gap: 8, overflowX: 'auto', padding: '1px 2px 7px', marginRight: -10, scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch' }
-const timelineCellHorizontalStyle = { ...timelineCellStyle, minWidth: 148, maxWidth: 148, minHeight: 82, padding: 9, gap: 2, scrollSnapAlign: 'start', fontSize: 11, lineHeight: 1.25 }
-const timelineInfoHorizontalCardStyle = { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 9, minWidth: 158, maxWidth: 158, minHeight: 76, color: C.textDk, display: 'grid', alignContent: 'start', gap: 5, scrollSnapAlign: 'start', fontSize: 11, lineHeight: 1.25 }
-const timelineMetricHorizontalCardStyle = { ...timelineInfoHorizontalCardStyle, minWidth: 128, maxWidth: 128 }
-const timelineInputHorizontalCardStyle = { ...timelineInfoHorizontalCardStyle, minWidth: 164, maxWidth: 164, fontSize: 9, color: C.textDim, fontFamily: 'monospace', letterSpacing: '0.8px', fontWeight: 900 }
-const timelineCtaHorizontalStyle = { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 9, minWidth: 126, maxWidth: 126, minHeight: 76, color: C.greenDp, display: 'grid', placeItems: 'center', textAlign: 'center', fontSize: 12, fontWeight: 900, cursor: 'pointer', scrollSnapAlign: 'start' }
+const timelineTableHorizontalStyle = { display: 'flex', gap: 10, overflowX: 'auto', padding: '1px 2px 8px', marginRight: -12, scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch' }
+const timelineCellHorizontalStyle = { ...timelineCellStyle, minWidth: 176, maxWidth: 176, minHeight: 94, padding: 11, gap: 3, scrollSnapAlign: 'start', fontSize: 13, lineHeight: 1.28 }
+const timelineInfoHorizontalCardStyle = { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, padding: 11, minWidth: 188, maxWidth: 188, minHeight: 92, color: C.textDk, display: 'grid', alignContent: 'start', gap: 6, scrollSnapAlign: 'start', fontSize: 13, lineHeight: 1.28 }
+const timelineMetricHorizontalCardStyle = { ...timelineInfoHorizontalCardStyle, minWidth: 150, maxWidth: 150 }
+const timelineInputHorizontalCardStyle = { ...timelineInfoHorizontalCardStyle, minWidth: 190, maxWidth: 190, fontSize: 10, color: C.textDim, fontFamily: 'monospace', letterSpacing: '0.8px', fontWeight: 900 }
+const timelineCtaHorizontalStyle = { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, padding: 11, minWidth: 152, maxWidth: 152, minHeight: 92, color: C.greenDp, display: 'grid', placeItems: 'center', textAlign: 'center', fontSize: 13, fontWeight: 900, cursor: 'pointer', scrollSnapAlign: 'start' }
 const timelineScrollEndStyle = { minWidth: 2, flex: '0 0 2px' }
 const timelineActionsStyle = { display: 'flex', gap: 8, flexWrap: 'wrap', margin: '0 0 10px' }
 const timelineActionButtonStyle = { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 9, padding: '8px 11px', color: C.textDk, fontWeight: 900, cursor: 'pointer' }
-const timelineMobileActionButtonStyle = { ...timelineActionButtonStyle, borderRadius: 8, padding: '7px 10px', fontSize: 11 }
+const timelineMobileActionButtonStyle = { ...timelineActionButtonStyle, borderRadius: 10, padding: '9px 13px', fontSize: 13 }
 const timelineModeTabsStyle = { display: 'flex', gap: 7, flexWrap: 'wrap', margin: '0 0 9px' }
 const timelineModeButtonStyle = { border: '1px solid rgba(255,255,255,0.72)', borderRadius: 999, padding: '7px 11px', fontSize: 11, fontWeight: 900, cursor: 'pointer' }
-const timelineModeTabsMobileStyle = { display: 'flex', gap: 6, flexWrap: 'nowrap', overflowX: 'auto', margin: '0 0 8px', paddingBottom: 1 }
-const timelineMobileModeButtonStyle = { ...timelineModeButtonStyle, padding: '6px 9px', fontSize: 10, flex: '0 0 auto' }
+const timelineModeTabsMobileStyle = { display: 'flex', gap: 7, flexWrap: 'nowrap', overflowX: 'auto', margin: '0 0 9px', paddingBottom: 1 }
+const timelineMobileModeButtonStyle = { ...timelineModeButtonStyle, padding: '8px 12px', fontSize: 12, flex: '0 0 auto' }
 const timelineRainLayoutStyle = { display: 'grid', gap: 8, alignItems: 'stretch' }
 const timelineDateGridStyle = { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 10, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 8, alignItems: 'end' }
 const timelineDateLabelStyle = { display: 'grid', gap: 5, color: C.textDim, fontSize: 9, fontFamily: 'monospace', letterSpacing: '1px', fontWeight: 900 }
@@ -2961,7 +2966,7 @@ const kmlDropStyle = { display: 'grid', gap: 5, placeContent: 'center', textAlig
 const geoFormStyle = { display: 'grid', gap: 10, marginTop: 12, borderTop: `1px solid ${C.borderSoft}`, paddingTop: 12 }
 const formErrorStyle = { background: C.redLight, color: C.redDk, borderRadius: 10, padding: '10px 12px', fontSize: 12, border: `1px solid ${C.red}33` }
 const simpleMapStyle = { position: 'relative', borderRadius: 14, overflow: 'hidden', border: `1px solid ${C.border}`, background: '#0e1d14', minHeight: 240, touchAction: 'none', overscrollBehavior: 'contain' }
-const simpleMapFullStyle = { position: 'relative', borderRadius: 0, overflow: 'hidden', border: 'none', background: '#0e1d14', minHeight: '100vh', touchAction: 'none', overscrollBehavior: 'contain' }
+const simpleMapFullStyle = { position: 'relative', borderRadius: 0, overflow: 'hidden', border: 'none', background: '#0e1d14', minHeight: '100dvh', touchAction: 'none', overscrollBehavior: 'none' }
 const satelliteTileLayerStyle = { position: 'absolute', inset: 0, overflow: 'hidden', background: '#0e1d14' }
 const satelliteTileStyle = { position: 'absolute', width: TILE_SIZE, height: TILE_SIZE, objectFit: 'cover', userSelect: 'none', pointerEvents: 'none', willChange: 'transform' }
 const satelliteShadeStyle = { position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(5,12,8,0.20), rgba(5,12,8,0.34))', pointerEvents: 'none' }
@@ -2969,6 +2974,7 @@ const rainInterpolationLayerStyle = { position: 'absolute', inset: 0, pointerEve
 const rainInterpolationSpotStyle = { position: 'absolute', width: 260, height: 260, borderRadius: 999, transform: 'translate(-50%, -50%)', filter: 'blur(8px)' }
 const satelliteSvgStyle = { position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'block' }
 const satelliteControlsStyle = { position: 'absolute', left: 24, top: 72, display: 'grid', gap: 8, alignItems: 'center', zIndex: 5 }
+const satelliteControlsMobileStyle = { position: 'absolute', right: 12, top: 18, display: 'grid', gap: 8, alignItems: 'center', zIndex: 5 }
 const satelliteControlButtonStyle = { width: 34, height: 34, borderRadius: 10, border: '1px solid rgba(255,255,255,0.24)', background: 'rgba(255,255,255,0.92)', color: C.textDk, fontSize: 18, lineHeight: 1, fontWeight: 900, cursor: 'pointer', boxShadow: '0 8px 20px rgba(0,0,0,0.20)' }
 const satelliteBadgeStyle = { position: 'absolute', left: 14, bottom: 14, zIndex: 2, background: 'rgba(13,28,17,0.72)', color: 'rgba(255,255,255,0.86)', border: '1px solid rgba(255,255,255,0.18)', borderRadius: 999, padding: '6px 10px', fontSize: 10, fontWeight: 900, letterSpacing: 0, textTransform: 'uppercase', pointerEvents: 'none' }
 const mapDrawHintStyle = { position: 'absolute', left: 12, bottom: 12, background: 'rgba(255,255,255,0.94)', color: C.textDk, borderRadius: 10, padding: '8px 10px', fontSize: 12, fontWeight: 800, boxShadow: '0 4px 16px rgba(0,0,0,0.16)' }
