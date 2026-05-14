@@ -48,6 +48,10 @@ const MAP_DEFAULT_BOUNDS = {
   minLat: -9.430,
   maxLat: -9.350
 }
+const TILE_SIZE = 256
+const TILE_MIN_ZOOM = 4
+const TILE_MAX_ZOOM = 19
+const SATELLITE_TILE_URL = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile'
 
 function formatCultura(cultura = '') {
   if (!cultura) return 'Sem cultura'
@@ -135,6 +139,62 @@ function projectCoord([lng, lat], bounds) {
   const x = ((lng - bounds.minLng) / (bounds.maxLng - bounds.minLng)) * 100
   const y = (1 - ((lat - bounds.minLat) / (bounds.maxLat - bounds.minLat))) * 100
   return [x, y]
+}
+
+function clamp(value, min, max) {
+  return Math.min(max, Math.max(min, value))
+}
+
+function lngLatToWorld([lng, lat], zoom) {
+  const scale = TILE_SIZE * (2 ** zoom)
+  const safeLat = clamp(Number(lat) || 0, -85.05112878, 85.05112878)
+  const safeLng = Number(lng) || 0
+  const sin = Math.sin((safeLat * Math.PI) / 180)
+  return {
+    x: ((safeLng + 180) / 360) * scale,
+    y: (0.5 - Math.log((1 + sin) / (1 - sin)) / (4 * Math.PI)) * scale
+  }
+}
+
+function worldToLngLat(x, y, zoom) {
+  const scale = TILE_SIZE * (2 ** zoom)
+  const safeY = clamp(y, 0, scale)
+  const lng = (((x / scale) * 360 - 180 + 540) % 360) - 180
+  const n = Math.PI - (2 * Math.PI * safeY) / scale
+  const lat = (180 / Math.PI) * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n)))
+  return [lng, clamp(lat, -85.05112878, 85.05112878)]
+}
+
+function getBoundsCenter(bounds) {
+  return [(bounds.minLng + bounds.maxLng) / 2, (bounds.minLat + bounds.maxLat) / 2]
+}
+
+function getFitZoom(bounds, size, fullBleed) {
+  if (!size.width || !size.height) return fullBleed ? 15 : 14
+  const usableWidth = size.width * (fullBleed ? 0.76 : 0.68)
+  const usableHeight = size.height * (fullBleed ? 0.74 : 0.66)
+  for (let zoom = TILE_MAX_ZOOM; zoom >= TILE_MIN_ZOOM; zoom--) {
+    const nw = lngLatToWorld([bounds.minLng, bounds.maxLat], zoom)
+    const se = lngLatToWorld([bounds.maxLng, bounds.minLat], zoom)
+    if (Math.abs(se.x - nw.x) <= usableWidth && Math.abs(se.y - nw.y) <= usableHeight) return zoom
+  }
+  return TILE_MIN_ZOOM
+}
+
+function getSatelliteInitialView(features, size, fullBleed) {
+  const bounds = getMapBounds(features)
+  const [lng, lat] = getBoundsCenter(bounds)
+  return { lng, lat, zoom: getFitZoom(bounds, size, fullBleed) }
+}
+
+function getRingLabelCoord(ring) {
+  if (!ring?.length) return null
+  const lngs = ring.map(([lng]) => lng)
+  const lats = ring.map(([, lat]) => lat)
+  return [
+    (Math.min(...lngs) + Math.max(...lngs)) / 2,
+    (Math.min(...lats) + Math.max(...lats)) / 2
+  ]
 }
 
 function pointToCoord(point) {
@@ -1316,6 +1376,290 @@ function TalhaoGeoModal({ fazendaId, initialMode, sugerirCodigo, talhoes, onClos
 
 function SimpleFarmMap({ features = [], drawPoints = [], onMapClick, onFeatureClick, height = 340, drawing = false, selectedCode = null, selectedMode = 'timeline', fullBleed = false }) {
   const normalized = features.map((feature, index) => ({ feature: normalizeFeature(feature, feature?.properties?.codigo || `T${index + 1}`), index })).filter(item => item.feature)
+  if (drawing || onMapClick) {
+    return (
+      <VectorFarmMap
+        normalized={normalized}
+        drawPoints={drawPoints}
+        onMapClick={onMapClick}
+        onFeatureClick={onFeatureClick}
+        height={height}
+        drawing={drawing}
+        selectedCode={selectedCode}
+        selectedMode={selectedMode}
+        fullBleed={fullBleed}
+      />
+    )
+  }
+  return (
+    <SatelliteFarmMap
+      normalized={normalized}
+      onFeatureClick={onFeatureClick}
+      height={height}
+      selectedCode={selectedCode}
+      selectedMode={selectedMode}
+      fullBleed={fullBleed}
+    />
+  )
+}
+
+function distanceBetween(a, b) {
+  return Math.hypot(a.x - b.x, a.y - b.y)
+}
+
+function midpointBetween(a, b) {
+  return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
+}
+
+function SatelliteFarmMap({ normalized = [], onFeatureClick, height = 340, selectedCode = null, selectedMode = 'timeline', fullBleed = false }) {
+  const containerRef = useRef(null)
+  const pointersRef = useRef(new Map())
+  const gestureRef = useRef(null)
+  const suppressClickRef = useRef(false)
+  const [size, setSize] = useState({ width: 0, height: 0 })
+  const [view, setView] = useState(() => getSatelliteInitialView(normalized.map(item => item.feature), { width: 0, height: 0 }, fullBleed))
+  const featureSignature = normalized.map(({ feature, index }) => {
+    const ring = getFeatureRing(feature) || []
+    return `${feature.properties?.codigo || index}:${ring.map(coord => coord.join(',')).join(';')}`
+  }).join('|')
+
+  useEffect(() => {
+    const node = containerRef.current
+    if (!node) return undefined
+    const updateSize = () => {
+      const rect = node.getBoundingClientRect()
+      setSize({ width: Math.max(0, rect.width), height: Math.max(0, rect.height) })
+    }
+    updateSize()
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', updateSize)
+      return () => window.removeEventListener('resize', updateSize)
+    }
+    const observer = new ResizeObserver(updateSize)
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [])
+
+  useEffect(() => {
+    if (!size.width || !size.height) return
+    setView(getSatelliteInitialView(normalized.map(item => item.feature), size, fullBleed))
+  }, [featureSignature, size.width, size.height, fullBleed])
+
+  const tileLayer = useMemo(() => {
+    if (!size.width || !size.height) return { tiles: [], topLeft: { x: 0, y: 0 }, zoom: view.zoom }
+    const zoom = clamp(Math.round(view.zoom), TILE_MIN_ZOOM, TILE_MAX_ZOOM)
+    const center = lngLatToWorld([view.lng, view.lat], zoom)
+    const topLeft = { x: center.x - size.width / 2, y: center.y - size.height / 2 }
+    const minX = Math.floor(topLeft.x / TILE_SIZE) - 1
+    const maxX = Math.floor((topLeft.x + size.width) / TILE_SIZE) + 1
+    const minY = Math.floor(topLeft.y / TILE_SIZE) - 1
+    const maxY = Math.floor((topLeft.y + size.height) / TILE_SIZE) + 1
+    const tileCount = 2 ** zoom
+    const tiles = []
+    for (let x = minX; x <= maxX; x++) {
+      for (let y = minY; y <= maxY; y++) {
+        if (y < 0 || y >= tileCount) continue
+        const wrappedX = ((x % tileCount) + tileCount) % tileCount
+        tiles.push({
+          key: `${zoom}-${x}-${y}`,
+          src: `${SATELLITE_TILE_URL}/${zoom}/${y}/${wrappedX}`,
+          left: x * TILE_SIZE - topLeft.x,
+          top: y * TILE_SIZE - topLeft.y
+        })
+      }
+    }
+    return { tiles, topLeft, zoom }
+  }, [size.width, size.height, view.lng, view.lat, view.zoom])
+
+  function pointFromEvent(e) {
+    const rect = e.currentTarget.getBoundingClientRect()
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top }
+  }
+
+  function screenToWorld(point, sourceView = view) {
+    const center = lngLatToWorld([sourceView.lng, sourceView.lat], sourceView.zoom)
+    return { x: center.x + point.x - size.width / 2, y: center.y + point.y - size.height / 2 }
+  }
+
+  function setCenterFromWorld(center, zoom) {
+    const [lng, lat] = worldToLngLat(center.x, center.y, zoom)
+    setView({ lng, lat, zoom })
+  }
+
+  function zoomAt(point, nextZoom, sourceView = view) {
+    if (!size.width || !size.height) return
+    const zoom = clamp(nextZoom, TILE_MIN_ZOOM, TILE_MAX_ZOOM)
+    const focusWorld = screenToWorld(point, sourceView)
+    const focusCoord = worldToLngLat(focusWorld.x, focusWorld.y, sourceView.zoom)
+    const focusAtNextZoom = lngLatToWorld(focusCoord, zoom)
+    setCenterFromWorld({
+      x: focusAtNextZoom.x - point.x + size.width / 2,
+      y: focusAtNextZoom.y - point.y + size.height / 2
+    }, zoom)
+  }
+
+  function handleWheel(e) {
+    e.preventDefault()
+    const nextZoom = view.zoom + (e.deltaY < 0 ? 1 : -1)
+    suppressClickRef.current = true
+    zoomAt(pointFromEvent(e), nextZoom)
+  }
+
+  function handleDoubleClick(e) {
+    e.preventDefault()
+    suppressClickRef.current = true
+    zoomAt(pointFromEvent(e), view.zoom + 1)
+  }
+
+  function handlePointerDown(e) {
+    if (e.pointerType === 'mouse' && e.button !== 0) return
+    const point = pointFromEvent(e)
+    pointersRef.current.set(e.pointerId, point)
+    e.currentTarget.setPointerCapture?.(e.pointerId)
+    const points = Array.from(pointersRef.current.values())
+    if (points.length >= 2) {
+      const [a, b] = points
+      gestureRef.current = { type: 'pinch', startDistance: Math.max(1, distanceBetween(a, b)), startMidpoint: midpointBetween(a, b), startView: view }
+    } else {
+      gestureRef.current = { type: 'pan', lastPoint: point }
+    }
+  }
+
+  function handlePointerMove(e) {
+    if (!pointersRef.current.has(e.pointerId)) return
+    const point = pointFromEvent(e)
+    pointersRef.current.set(e.pointerId, point)
+    const points = Array.from(pointersRef.current.values())
+    if (points.length >= 2) {
+      const [a, b] = points
+      const currentMidpoint = midpointBetween(a, b)
+      const gesture = gestureRef.current?.type === 'pinch'
+        ? gestureRef.current
+        : { type: 'pinch', startDistance: Math.max(1, distanceBetween(a, b)), startMidpoint: currentMidpoint, startView: view }
+      gestureRef.current = gesture
+      const ratio = distanceBetween(a, b) / gesture.startDistance
+      const nextZoom = clamp(Math.round(gesture.startView.zoom + Math.log2(Math.max(0.35, ratio))), TILE_MIN_ZOOM, TILE_MAX_ZOOM)
+      const startFocusWorld = screenToWorld(gesture.startMidpoint, gesture.startView)
+      const startFocusCoord = worldToLngLat(startFocusWorld.x, startFocusWorld.y, gesture.startView.zoom)
+      const focusAtNextZoom = lngLatToWorld(startFocusCoord, nextZoom)
+      if (Math.abs(ratio - 1) > 0.03 || distanceBetween(currentMidpoint, gesture.startMidpoint) > 3) suppressClickRef.current = true
+      setCenterFromWorld({
+        x: focusAtNextZoom.x - currentMidpoint.x + size.width / 2,
+        y: focusAtNextZoom.y - currentMidpoint.y + size.height / 2
+      }, nextZoom)
+      return
+    }
+
+    const gesture = gestureRef.current?.type === 'pan' ? gestureRef.current : { type: 'pan', lastPoint: point }
+    const dx = point.x - gesture.lastPoint.x
+    const dy = point.y - gesture.lastPoint.y
+    if (Math.abs(dx) + Math.abs(dy) > 2) suppressClickRef.current = true
+    setView(current => {
+      const center = lngLatToWorld([current.lng, current.lat], current.zoom)
+      const [lng, lat] = worldToLngLat(center.x - dx, center.y - dy, current.zoom)
+      return { ...current, lng, lat }
+    })
+    gestureRef.current = { type: 'pan', lastPoint: point }
+  }
+
+  function handlePointerUp(e) {
+    pointersRef.current.delete(e.pointerId)
+    e.currentTarget.releasePointerCapture?.(e.pointerId)
+    const points = Array.from(pointersRef.current.values())
+    if (points.length === 1) gestureRef.current = { type: 'pan', lastPoint: points[0] }
+    if (points.length === 0) gestureRef.current = null
+  }
+
+  function handleFeatureClick(e, index, feature) {
+    e.stopPropagation()
+    if (suppressClickRef.current) {
+      suppressClickRef.current = false
+      return
+    }
+    onFeatureClick?.(index, feature)
+  }
+
+  function resetMap(e) {
+    e.stopPropagation()
+    setView(getSatelliteInitialView(normalized.map(item => item.feature), size, fullBleed))
+  }
+
+  function changeZoom(e, delta) {
+    e.stopPropagation()
+    setView(current => ({ ...current, zoom: clamp(current.zoom + delta, TILE_MIN_ZOOM, TILE_MAX_ZOOM) }))
+  }
+
+  return (
+    <div
+      ref={containerRef}
+      style={{ ...(fullBleed ? simpleMapFullStyle : simpleMapStyle), height, cursor: 'grab' }}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
+      onWheel={handleWheel}
+      onDoubleClick={handleDoubleClick}
+    >
+      <div style={satelliteTileLayerStyle}>
+        {tileLayer.tiles.map(tile => (
+          <img
+            key={tile.key}
+            alt=""
+            src={tile.src}
+            draggable={false}
+            decoding="async"
+            style={{ ...satelliteTileStyle, transform: `translate3d(${tile.left}px, ${tile.top}px, 0)` }}
+          />
+        ))}
+      </div>
+      <div style={satelliteShadeStyle} />
+      <svg width={size.width || '100%'} height={size.height || '100%'} style={satelliteSvgStyle}>
+        {normalized.map(({ feature, index }) => {
+          const ring = getFeatureRing(feature) || []
+          const points = ring.map(coord => {
+            const world = lngLatToWorld(coord, tileLayer.zoom || view.zoom)
+            return `${world.x - tileLayer.topLeft.x},${world.y - tileLayer.topLeft.y}`
+          }).join(' ')
+          const labelCoord = getRingLabelCoord(ring)
+          const labelWorld = labelCoord ? lngLatToWorld(labelCoord, tileLayer.zoom || view.zoom) : null
+          const selected = selectedCode && feature.properties?.codigo === selectedCode
+          const selectedFill = selectedMode === 'chuvas' ? 'rgba(55,145,210,0.42)' : 'rgba(232,168,76,0.40)'
+          const labelSize = selected ? (fullBleed ? 11 : 10) : (fullBleed ? 9 : 8)
+          return (
+            <g key={`${feature.properties?.codigo || index}-${index}`} onClick={e => handleFeatureClick(e, index, feature)} style={{ cursor: onFeatureClick ? 'pointer' : 'default' }}>
+              <polygon points={points} fill={selected ? selectedFill : 'rgba(46,124,42,0.26)'} stroke={selected ? 'rgba(255,255,255,0.96)' : 'rgba(255,255,255,0.70)'} strokeWidth={selected ? 1.4 : 0.8} />
+              {labelWorld && (
+                <text
+                  x={labelWorld.x - tileLayer.topLeft.x}
+                  y={labelWorld.y - tileLayer.topLeft.y}
+                  fill="white"
+                  fontSize={labelSize}
+                  fontWeight="800"
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  paintOrder="stroke"
+                  stroke="rgba(0,0,0,0.64)"
+                  strokeWidth="3"
+                >
+                  {feature.properties?.codigo}
+                </text>
+              )}
+            </g>
+          )
+        })}
+      </svg>
+      <div style={satelliteControlsStyle} onPointerDown={e => e.stopPropagation()} onWheel={e => e.stopPropagation()} onDoubleClick={e => e.stopPropagation()}>
+        <button type="button" aria-label="Aproximar mapa" onClick={e => changeZoom(e, 1)} style={satelliteControlButtonStyle}>+</button>
+        <button type="button" aria-label="Afastar mapa" onClick={e => changeZoom(e, -1)} style={satelliteControlButtonStyle}>-</button>
+        <button type="button" aria-label="Reajustar mapa" onClick={resetMap} style={satelliteFitButtonStyle}>Ajustar</button>
+      </div>
+      <div style={satelliteBadgeStyle}>Satelite</div>
+      {normalized.length === 0 && <div style={mapEmptyHintStyle}>Nenhum talhÃ£o com geometria cadastrada</div>}
+    </div>
+  )
+}
+
+function VectorFarmMap({ normalized = [], drawPoints = [], onMapClick, onFeatureClick, height = 340, drawing = false, selectedCode = null, selectedMode = 'timeline', fullBleed = false }) {
   const bounds = getMapBounds(normalized.map(item => item.feature))
   const [viewTransform, setViewTransform] = useState({ x: 0, y: 0, scale: 1 })
   const dragRef = useRef(null)
@@ -1369,7 +1713,7 @@ function SimpleFarmMap({ features = [], drawPoints = [], onMapClick, onFeatureCl
 
   return (
     <div
-      style={{ ...(fullBleed ? simpleMapFullStyle : simpleMapStyle), height, cursor: canPan ? 'grab' : 'default' }}
+      style={{ ...(fullBleed ? simpleMapFullStyle : simpleMapStyle), height, cursor: canPan ? 'grab' : 'crosshair' }}
       onClick={handleClick}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
@@ -1398,13 +1742,14 @@ function SimpleFarmMap({ features = [], drawPoints = [], onMapClick, onFeatureCl
           {normalized.map(({ feature, index }) => {
             const ring = getFeatureRing(feature) || []
             const points = ring.map(coord => projectCoord(coord, bounds).join(',')).join(' ')
-            const center = ring.length ? projectCoord(ring[Math.floor(ring.length / 2)], bounds) : [50, 50]
+            const centerCoord = getRingLabelCoord(ring)
+            const center = centerCoord ? projectCoord(centerCoord, bounds) : [50, 50]
             const selected = selectedCode && feature.properties?.codigo === selectedCode
             const selectedFill = selectedMode === 'chuvas' ? 'rgba(70,158,205,0.52)' : 'rgba(232,168,76,0.46)'
             return (
               <g key={`${feature.properties?.codigo || index}-${index}`} onClick={e => { e.stopPropagation(); if (suppressClickRef.current) { suppressClickRef.current = false; return }; onFeatureClick?.(index, feature) }} style={{ cursor: onFeatureClick ? 'pointer' : 'default' }}>
-                <polygon points={points} fill={selected ? selectedFill : 'rgba(61,138,34,0.34)'} stroke={selected ? 'rgba(255,255,255,0.98)' : 'rgba(255,255,255,0.74)'} strokeWidth={selected ? '1.6' : '0.7'} vectorEffect="non-scaling-stroke" />
-                <text x={center[0]} y={center[1]} fill="white" fontSize="4" fontWeight="800" textAnchor="middle" dominantBaseline="middle" style={{ textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>{feature.properties?.codigo}</text>
+                <polygon points={points} fill={selected ? selectedFill : 'rgba(61,138,34,0.34)'} stroke={selected ? 'rgba(255,255,255,0.98)' : 'rgba(255,255,255,0.74)'} strokeWidth={selected ? '1.4' : '0.7'} vectorEffect="non-scaling-stroke" />
+                <text x={center[0]} y={center[1]} fill="white" fontSize="2.25" fontWeight="800" textAnchor="middle" dominantBaseline="middle" paintOrder="stroke" stroke="rgba(0,0,0,0.58)" strokeWidth="0.55">{feature.properties?.codigo}</text>
               </g>
             )
           })}
@@ -1938,7 +2283,15 @@ const drawToolsStyle = { display: 'flex', alignItems: 'center', gap: 8, flexWrap
 const kmlDropStyle = { display: 'grid', gap: 5, placeContent: 'center', textAlign: 'center', minHeight: 96, border: `1.5px dashed ${C.greenDp}`, borderRadius: 14, background: C.greenLight, color: C.textDk, cursor: 'pointer', marginBottom: 10 }
 const geoFormStyle = { display: 'grid', gap: 10, marginTop: 12, borderTop: `1px solid ${C.borderSoft}`, paddingTop: 12 }
 const formErrorStyle = { background: C.redLight, color: C.redDk, borderRadius: 10, padding: '10px 12px', fontSize: 12, border: `1px solid ${C.red}33` }
-const simpleMapStyle = { position: 'relative', borderRadius: 14, overflow: 'hidden', border: `1px solid ${C.border}`, background: '#12351f', minHeight: 240 }
-const simpleMapFullStyle = { position: 'relative', borderRadius: 0, overflow: 'hidden', border: 'none', background: '#12351f', minHeight: '100vh', touchAction: 'none' }
+const simpleMapStyle = { position: 'relative', borderRadius: 14, overflow: 'hidden', border: `1px solid ${C.border}`, background: '#0e1d14', minHeight: 240, touchAction: 'none', overscrollBehavior: 'contain' }
+const simpleMapFullStyle = { position: 'relative', borderRadius: 0, overflow: 'hidden', border: 'none', background: '#0e1d14', minHeight: '100vh', touchAction: 'none', overscrollBehavior: 'contain' }
+const satelliteTileLayerStyle = { position: 'absolute', inset: 0, overflow: 'hidden', background: '#0e1d14' }
+const satelliteTileStyle = { position: 'absolute', width: TILE_SIZE, height: TILE_SIZE, objectFit: 'cover', userSelect: 'none', pointerEvents: 'none', willChange: 'transform' }
+const satelliteShadeStyle = { position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(5,12,8,0.20), rgba(5,12,8,0.34))', pointerEvents: 'none' }
+const satelliteSvgStyle = { position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'block' }
+const satelliteControlsStyle = { position: 'absolute', right: 14, top: 14, display: 'flex', gap: 8, alignItems: 'center', zIndex: 2 }
+const satelliteControlButtonStyle = { width: 34, height: 34, borderRadius: 10, border: '1px solid rgba(255,255,255,0.24)', background: 'rgba(255,255,255,0.92)', color: C.textDk, fontSize: 18, lineHeight: 1, fontWeight: 900, cursor: 'pointer', boxShadow: '0 8px 20px rgba(0,0,0,0.20)' }
+const satelliteFitButtonStyle = { height: 34, borderRadius: 10, border: '1px solid rgba(255,255,255,0.24)', background: 'rgba(255,255,255,0.92)', color: C.textDk, padding: '0 12px', fontSize: 11, fontWeight: 900, cursor: 'pointer', boxShadow: '0 8px 20px rgba(0,0,0,0.20)' }
+const satelliteBadgeStyle = { position: 'absolute', left: 14, bottom: 14, zIndex: 2, background: 'rgba(13,28,17,0.72)', color: 'rgba(255,255,255,0.86)', border: '1px solid rgba(255,255,255,0.18)', borderRadius: 999, padding: '6px 10px', fontSize: 10, fontWeight: 900, letterSpacing: 0, textTransform: 'uppercase', pointerEvents: 'none' }
 const mapDrawHintStyle = { position: 'absolute', left: 12, bottom: 12, background: 'rgba(255,255,255,0.94)', color: C.textDk, borderRadius: 10, padding: '8px 10px', fontSize: 12, fontWeight: 800, boxShadow: '0 4px 16px rgba(0,0,0,0.16)' }
 const mapEmptyHintStyle = { position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', color: 'rgba(255,255,255,0.86)', fontSize: 13, fontWeight: 800, textAlign: 'center', padding: 20 }
