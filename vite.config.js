@@ -7,19 +7,28 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
+      includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'og-terranexa.png'],
       manifest: {
+        id: '/',
         name: 'TerraNexa',
         short_name: 'TerraNexa',
-        description: 'Gestão do campo para pequenos produtores',
+        description: 'Gestao do campo para pequenos produtores',
         lang: 'pt-BR',
         theme_color: '#3D8A22',
-        background_color: '#FFFFFF',
+        background_color: '#102316',
         display: 'standalone',
-        orientation: 'portrait',
+        display_override: ['fullscreen', 'standalone'],
+        orientation: 'portrait-primary',
         scope: '/',
         start_url: '/',
+        categories: ['business', 'productivity', 'utilities'],
         icons: [
+          {
+            src: '/favicon.svg',
+            sizes: 'any',
+            type: 'image/svg+xml',
+            purpose: 'any'
+          },
           {
             src: '/icon-192.png',
             sizes: '192x192',
@@ -31,10 +40,19 @@ export default defineConfig({
             type: 'image/png'
           },
           {
-            src: '/icon-512.png',
+            src: '/icon-maskable-512.png',
             sizes: '512x512',
             type: 'image/png',
-            purpose: 'any maskable'
+            purpose: 'maskable'
+          }
+        ],
+        shortcuts: [
+          {
+            name: 'Abrir mapa',
+            short_name: 'Mapa',
+            description: 'Abrir o mapa principal da fazenda',
+            url: '/',
+            icons: [{ src: '/icon-192.png', sizes: '192x192' }]
           }
         ]
       },

@@ -9,6 +9,12 @@ html, body, #root {
   width: 100%;
 }
 
+@supports (height: 100dvh) {
+  html, body, #root {
+    height: 100dvh;
+  }
+}
+
 body {
   font-family: Georgia, 'Times New Roman', serif;
   background: #FFFFFF;
@@ -16,16 +22,30 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
-  overscroll-behavior-x: none;
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 
 @media (max-width: 899px) {
-  html, body, #root {
-    min-height: 100dvh;
+  html,
+  body {
+    position: fixed;
+    inset: 0;
+    height: 100dvh;
+    max-height: 100dvh;
+    overflow: hidden;
   }
 
-  body {
-    overscroll-behavior-y: none;
+  #root {
+    position: fixed;
+    inset: 0;
+    height: 100dvh;
+    max-height: 100dvh;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: none;
+    -webkit-overflow-scrolling: touch;
   }
 }
 

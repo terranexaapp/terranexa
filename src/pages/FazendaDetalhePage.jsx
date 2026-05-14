@@ -1709,6 +1709,8 @@ function SatelliteFarmMap({ normalized = [], onFeatureClick, height = 340, selec
   const suppressClickRef = useRef(false)
   const [size, setSize] = useState({ width: 0, height: 0 })
   const [view, setView] = useState(() => getSatelliteInitialView(normalized.map(item => item.feature), { width: 0, height: 0 }, fullBleed))
+  const [manualDevicePosition, setManualDevicePosition] = useState(null)
+  const [locatingDevice, setLocatingDevice] = useState(false)
   const controlsOnRight = useMediaQuery('(max-width: 899px)')
   const featureSignature = normalized.map(({ feature, index }) => {
     const ring = getFeatureRing(feature) || []
@@ -1723,8 +1725,9 @@ function SatelliteFarmMap({ normalized = [], onFeatureClick, height = 340, selec
       nome: item.nome || `Pluviometro ${index + 1}`
     }))
     .filter(item => item.ativo !== false && Number.isFinite(item.latitude) && Number.isFinite(item.longitude))
-  const deviceMarker = Number.isFinite(Number(devicePosition?.latitude)) && Number.isFinite(Number(devicePosition?.longitude))
-    ? { latitude: Number(devicePosition.latitude), longitude: Number(devicePosition.longitude), accuracy: Number(devicePosition.accuracy || 0) }
+  const liveDevicePosition = devicePosition || manualDevicePosition
+  const deviceMarker = Number.isFinite(Number(liveDevicePosition?.latitude)) && Number.isFinite(Number(liveDevicePosition?.longitude))
+    ? { latitude: Number(liveDevicePosition.latitude), longitude: Number(liveDevicePosition.longitude), accuracy: Number(liveDevicePosition.accuracy || 0) }
     : null
 
   useEffect(() => {
@@ -1968,6 +1971,40 @@ function SatelliteFarmMap({ normalized = [], onFeatureClick, height = 340, selec
     setView(current => ({ ...current, zoom: clamp(current.zoom + delta, TILE_MIN_ZOOM, TILE_MAX_ZOOM) }))
   }
 
+  function centerDeviceMarker(marker) {
+    setView(current => ({
+      ...current,
+      lat: marker.latitude,
+      lng: marker.longitude,
+      zoom: Math.max(current.zoom, 16)
+    }))
+  }
+
+  function centerOnDevice(e) {
+    e.stopPropagation()
+    if (deviceMarker) {
+      centerDeviceMarker(deviceMarker)
+      return
+    }
+    if (typeof navigator === 'undefined' || !navigator.geolocation || locatingDevice) return
+    setLocatingDevice(true)
+    navigator.geolocation.getCurrentPosition(
+      position => {
+        const coords = position.coords || {}
+        const marker = {
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+          accuracy: coords.accuracy
+        }
+        setManualDevicePosition(marker)
+        centerDeviceMarker(marker)
+        setLocatingDevice(false)
+      },
+      () => setLocatingDevice(false),
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 3000 }
+    )
+  }
+
   return (
     <div
       ref={containerRef}
@@ -2073,6 +2110,11 @@ function SatelliteFarmMap({ normalized = [], onFeatureClick, height = 340, selec
       <div style={controlsOnRight ? satelliteControlsMobileStyle : satelliteControlsStyle} onPointerDown={e => e.stopPropagation()} onWheel={e => e.stopPropagation()} onDoubleClick={e => e.stopPropagation()}>
         <button type="button" aria-label="Aproximar mapa" onClick={e => changeZoom(e, 1)} style={satelliteControlButtonStyle}>+</button>
         <button type="button" aria-label="Afastar mapa" onClick={e => changeZoom(e, -1)} style={satelliteControlButtonStyle}>-</button>
+        {controlsOnRight && (
+          <button type="button" aria-label="Centralizar no GPS" title="Centralizar no GPS" onClick={centerOnDevice} style={satelliteGpsButtonStyle}>
+            {locatingDevice ? '...' : '⌖'}
+          </button>
+        )}
       </div>
       <div style={satelliteBadgeStyle}>Satelite</div>
       {normalized.length === 0 && <div style={mapEmptyHintStyle}>Nenhum talhÃ£o com geometria cadastrada</div>}
@@ -2976,6 +3018,7 @@ const satelliteSvgStyle = { position: 'absolute', inset: 0, width: '100%', heigh
 const satelliteControlsStyle = { position: 'absolute', left: 24, top: 72, display: 'grid', gap: 8, alignItems: 'center', zIndex: 5 }
 const satelliteControlsMobileStyle = { position: 'absolute', right: 12, top: 18, display: 'grid', gap: 8, alignItems: 'center', zIndex: 5 }
 const satelliteControlButtonStyle = { width: 34, height: 34, borderRadius: 10, border: '1px solid rgba(255,255,255,0.24)', background: 'rgba(255,255,255,0.92)', color: C.textDk, fontSize: 18, lineHeight: 1, fontWeight: 900, cursor: 'pointer', boxShadow: '0 8px 20px rgba(0,0,0,0.20)' }
+const satelliteGpsButtonStyle = { ...satelliteControlButtonStyle, color: C.greenDp, fontSize: 20, background: 'rgba(255,255,255,0.94)' }
 const satelliteBadgeStyle = { position: 'absolute', left: 14, bottom: 14, zIndex: 2, background: 'rgba(13,28,17,0.72)', color: 'rgba(255,255,255,0.86)', border: '1px solid rgba(255,255,255,0.18)', borderRadius: 999, padding: '6px 10px', fontSize: 10, fontWeight: 900, letterSpacing: 0, textTransform: 'uppercase', pointerEvents: 'none' }
 const mapDrawHintStyle = { position: 'absolute', left: 12, bottom: 12, background: 'rgba(255,255,255,0.94)', color: C.textDk, borderRadius: 10, padding: '8px 10px', fontSize: 12, fontWeight: 800, boxShadow: '0 4px 16px rgba(0,0,0,0.16)' }
 const mapEmptyHintStyle = { position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', color: 'rgba(255,255,255,0.86)', fontSize: 13, fontWeight: 800, textAlign: 'center', padding: 20 }
