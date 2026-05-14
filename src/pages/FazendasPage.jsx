@@ -4,7 +4,6 @@ import { useAuth } from '../hooks/useAuth'
 import { supabase } from '../lib/supabase'
 import { theme } from '../styles/theme'
 import { Logo } from '../components/Logo'
-import { AppNav } from '../components/AppNav'
 
 const C = theme.normal
 
@@ -44,8 +43,8 @@ export function FazendasPage() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: C.bgSoft }}>
-      <header style={{ background: C.bg, borderBottom: `1px solid ${C.border}`, padding: '14px 16px', position: 'sticky', top: 0, zIndex: 10 }}>
+    <div style={{ minHeight: '100vh', background: 'linear-gradient(145deg, #f7fbef 0%, #eef8e7 46%, #fff5dc 100%)' }}>
+      <header style={{ background: 'rgba(255,255,255,0.84)', borderBottom: `1px solid ${C.border}`, padding: '14px 16px', position: 'sticky', top: 0, zIndex: 10, backdropFilter: 'blur(14px)' }}>
         <div style={{ maxWidth: 900, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <Logo size={32} />
@@ -54,7 +53,6 @@ export function FazendasPage() {
               <p style={{ margin: '2px 0 0', fontSize: 8, color: C.textDim, fontFamily: 'monospace', letterSpacing: '2px' }}>{profile?.nome?.toUpperCase() || 'PRODUTOR'}</p>
             </div>
           </div>
-          <AppNav compact />
           <button onClick={signOut} style={{ background: C.bgLight, border: `1px solid ${C.border}`, borderRadius: 8, padding: '7px 12px', color: C.textDk, fontSize: 10, fontFamily: 'monospace', fontWeight: 700, letterSpacing: '1px', cursor: 'pointer' }}>SAIR</button>
         </div>
       </header>
