@@ -606,13 +606,15 @@ function FazendaMapaPrincipal({ fazenda, talhoes, pluviometros = [], talhaoSel, 
       valor: money((op.insumos || []).reduce((s, i) => s + Number(i.custo_total || 0), 0) + Number(op.custo_aplicacao || 0))
     }))
     : [
-      { data: 'Hoje', titulo: 'Sem operacoes registradas', status: 'Pendente', valor: 'Adicionar primeiro registro' }
+      { data: 'Hoje', titulo: 'Sem operacoes', status: 'Pendente', valor: 'Adicionar registro' },
+      { data: 'Proximo passo', titulo: 'Monitoramento', status: 'Aberta', valor: 'Scouting' },
+      { data: 'Proximo passo', titulo: 'Ordem servico', status: 'Aberta', valor: 'Planejar' }
     ]
 
   async function handleFeatureClick(index) {
     const talhao = features[index]?.talhao
     if (!talhao) return
-    if (talhaoSel?.id !== talhao.id) setTimelineMode('resumo')
+    if (talhaoSel?.id !== talhao.id) setTimelineMode(timelineIsDocked ? 'resumo' : 'historico')
     await alternarTalhao(talhao)
   }
 
@@ -644,18 +646,18 @@ function FazendaMapaPrincipal({ fazenda, talhoes, pluviometros = [], talhaoSel, 
 
       {selected && (
         <div style={timelineIsDocked ? timelineDockStyle : timelineMobileStyle}>
-          <div style={timelineHeaderStyle}>
+          <div style={timelineIsDocked ? timelineHeaderStyle : timelineHeaderMobileStyle}>
             <div>
-              <p style={eyebrowStyle}>TALHAO SELECIONADO</p>
-              <h3 style={{ margin: '4px 0 0', color: C.bg, fontSize: 20, fontFamily: 'Georgia, serif' }}>{selected.codigo} · {formatCultura(selected.cultura)}</h3>
+              <p style={timelineIsDocked ? eyebrowStyle : timelineMobileEyebrowStyle}>{timelineIsDocked ? 'TALHAO SELECIONADO' : 'TALHAO'}</p>
+              <h3 style={timelineIsDocked ? timelineTitleStyle : timelineMobileTitleStyle}>{selected.codigo} · {formatCultura(selected.cultura)}</h3>
             </div>
             <span style={timelineAreaPillStyle}>{Number(selected.area_ha || 0).toFixed(2)} ha</span>
           </div>
           <div style={timelineActionsStyle}>
-            <button onClick={() => setActiveView('monitoramento')} style={timelineActionButtonStyle}>Monitorar</button>
-            <button onClick={() => navigate('/os')} style={timelineActionButtonStyle}>Criar ordem</button>
+            <button onClick={() => setActiveView('monitoramento')} style={timelineIsDocked ? timelineActionButtonStyle : timelineMobileActionButtonStyle}>Monitorar</button>
+            <button onClick={() => navigate('/os')} style={timelineIsDocked ? timelineActionButtonStyle : timelineMobileActionButtonStyle}>Criar ordem</button>
           </div>
-          <div style={timelineModeTabsStyle}>
+          <div style={timelineIsDocked ? timelineModeTabsStyle : timelineModeTabsMobileStyle}>
             {[
               ['resumo', 'Resumo'],
               ['historico', 'Historico'],
@@ -666,7 +668,7 @@ function FazendaMapaPrincipal({ fazenda, talhoes, pluviometros = [], talhaoSel, 
                 key={id}
                 onClick={() => setTimelineMode(id)}
                 style={{
-                  ...timelineModeButtonStyle,
+                  ...(timelineIsDocked ? timelineModeButtonStyle : timelineMobileModeButtonStyle),
                   background: timelineMode === id ? C.bg : 'rgba(255,255,255,0.08)',
                   color: timelineMode === id ? C.textDk : C.bg,
                   borderColor: timelineMode === id ? C.bg : 'rgba(255,255,255,0.28)'
@@ -691,15 +693,16 @@ function FazendaMapaPrincipal({ fazenda, talhoes, pluviometros = [], talhaoSel, 
             </div>
           )}
           {timelineMode === 'historico' && (
-            <div style={timelineIsDocked ? timelineTableDesktopStyle : timelineTableStyle}>
+            <div style={timelineIsDocked ? timelineTableDesktopStyle : timelineTableHorizontalStyle}>
               {timeline.map((item, index) => (
-                <button key={`${item.data}-${item.titulo}-${index}`} style={timelineCellStyle}>
+                <button key={`${item.data}-${item.titulo}-${index}`} style={timelineIsDocked ? timelineCellStyle : timelineCellHorizontalStyle}>
                   <span>{item.data}</span>
                   <strong>{item.titulo}</strong>
                   <em>{item.status}</em>
                   <small>{item.valor}</small>
                 </button>
               ))}
+              {!timelineIsDocked && <div aria-hidden="true" style={timelineScrollEndStyle} />}
             </div>
           )}
           {timelineMode === 'chuvas' && (
@@ -2693,9 +2696,13 @@ const mapMainPageMobileStyle = { position: 'relative', width: '100%', minHeight:
 const mapTopInfoStyle = { position: 'absolute', top: 92, left: 18, zIndex: 5, background: 'rgba(5,18,12,0.62)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 14, padding: '12px 14px', backdropFilter: 'blur(8px)', maxWidth: 360 }
 const mapTalhaoChipStyle = { position: 'absolute', top: 92, right: 18, zIndex: 5, background: 'rgba(255,255,255,0.92)', border: `1px solid ${C.border}`, borderRadius: 14, padding: '11px 13px', minWidth: 190, boxShadow: '0 10px 30px rgba(0,0,0,0.16)', display: 'grid', gap: 2 }
 const timelineDockStyle = { position: 'absolute', top: 92, right: 16, bottom: 16, zIndex: 6, width: 'min(360px, calc(100% - 32px))', background: 'rgba(18,73,37,0.68)', border: '1px solid rgba(168,217,143,0.58)', borderRadius: 16, padding: 13, backdropFilter: 'blur(14px)', boxShadow: '0 18px 48px rgba(0,0,0,0.32)', overflowY: 'auto', display: 'flex', flexDirection: 'column' }
-const timelineMobileStyle = { position: 'relative', zIndex: 6, margin: 12, background: 'rgba(18,73,37,0.78)', border: '1px solid rgba(168,217,143,0.58)', borderRadius: 16, padding: 13, boxShadow: '0 16px 36px rgba(0,0,0,0.26)' }
+const timelineMobileStyle = { position: 'relative', zIndex: 6, margin: 8, background: 'rgba(18,73,37,0.82)', border: '1px solid rgba(168,217,143,0.58)', borderRadius: 12, padding: 10, boxShadow: '0 12px 28px rgba(0,0,0,0.24)' }
 const timelineHeaderStyle = { display: 'grid', gap: 8, marginBottom: 10 }
-const timelineAreaPillStyle = { justifySelf: 'flex-start', background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.24)', borderRadius: 999, padding: '5px 9px', color: C.bg, fontSize: 11, fontFamily: 'monospace', fontWeight: 900 }
+const timelineHeaderMobileStyle = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 7 }
+const timelineMobileEyebrowStyle = { margin: 0, fontSize: 8, color: 'rgba(255,255,255,0.62)', fontFamily: 'monospace', letterSpacing: '1.1px', fontWeight: 900 }
+const timelineTitleStyle = { margin: '4px 0 0', color: C.bg, fontSize: 20, fontFamily: 'Georgia, serif' }
+const timelineMobileTitleStyle = { margin: '2px 0 0', color: C.bg, fontSize: 16, fontFamily: 'Georgia, serif', lineHeight: 1.05 }
+const timelineAreaPillStyle = { justifySelf: 'flex-start', alignSelf: 'center', background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.24)', borderRadius: 999, padding: '4px 8px', color: C.bg, fontSize: 10, fontFamily: 'monospace', fontWeight: 900, whiteSpace: 'nowrap' }
 const timelineSummaryCardStyle = { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, padding: 12, color: C.textDk, display: 'grid', gap: 11 }
 const timelineCardTitleStyle = { margin: 0, color: C.textDk, fontSize: 15, fontFamily: 'Georgia, serif', fontWeight: 900 }
 const timelineSummaryRowsStyle = { display: 'grid', gap: 9 }
@@ -2706,10 +2713,16 @@ const timelineTextButtonStyle = { justifySelf: 'flex-start', background: 'transp
 const timelineTableStyle = { display: 'grid', gap: 8, paddingBottom: 3 }
 const timelineTableDesktopStyle = { display: 'grid', gap: 8, paddingBottom: 3, flex: 1, gridAutoRows: 'minmax(96px, 1fr)' }
 const timelineCellStyle = { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 10, minHeight: 92, textAlign: 'left', color: C.textDk, display: 'grid', gap: 3, cursor: 'pointer' }
+const timelineTableHorizontalStyle = { display: 'flex', gap: 8, overflowX: 'auto', padding: '1px 2px 7px', marginRight: -10, scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch' }
+const timelineCellHorizontalStyle = { ...timelineCellStyle, minWidth: 148, maxWidth: 148, minHeight: 82, padding: 9, gap: 2, scrollSnapAlign: 'start' }
+const timelineScrollEndStyle = { minWidth: 2, flex: '0 0 2px' }
 const timelineActionsStyle = { display: 'flex', gap: 8, flexWrap: 'wrap', margin: '0 0 10px' }
 const timelineActionButtonStyle = { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 9, padding: '8px 11px', color: C.textDk, fontWeight: 900, cursor: 'pointer' }
+const timelineMobileActionButtonStyle = { ...timelineActionButtonStyle, borderRadius: 8, padding: '7px 10px', fontSize: 11 }
 const timelineModeTabsStyle = { display: 'flex', gap: 7, flexWrap: 'wrap', margin: '0 0 9px' }
 const timelineModeButtonStyle = { border: '1px solid rgba(255,255,255,0.72)', borderRadius: 999, padding: '7px 11px', fontSize: 11, fontWeight: 900, cursor: 'pointer' }
+const timelineModeTabsMobileStyle = { display: 'flex', gap: 6, flexWrap: 'nowrap', overflowX: 'auto', margin: '0 0 8px', paddingBottom: 1 }
+const timelineMobileModeButtonStyle = { ...timelineModeButtonStyle, padding: '6px 9px', fontSize: 10, flex: '0 0 auto' }
 const timelineRainLayoutStyle = { display: 'grid', gap: 8, alignItems: 'stretch' }
 const timelineDateGridStyle = { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 10, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 8, alignItems: 'end' }
 const timelineDateLabelStyle = { display: 'grid', gap: 5, color: C.textDim, fontSize: 9, fontFamily: 'monospace', letterSpacing: '1px', fontWeight: 900 }
