@@ -55,6 +55,13 @@ const TILE_SIZE = 256
 const TILE_MIN_ZOOM = 4
 const TILE_MAX_ZOOM = 19
 const SATELLITE_TILE_URL = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile'
+const LEAFLET_SCRIPT_URL = '/vendor/leaflet/leaflet.js'
+const LEAFLET_STYLESHEET_URL = '/vendor/leaflet/leaflet.css'
+const MAPBOX_TOKEN = (import.meta.env.VITE_MAPBOX_TOKEN || '').trim()
+const MAPBOX_SATELLITE_TILE_URL = `https://api.mapbox.com/styles/v1/mapbox/satellite-v9/tiles/256/{z}/{x}/{y}?access_token=${MAPBOX_TOKEN}`
+const MAPBOX_ATTRIBUTION = '&copy; <a href="https://www.mapbox.com/about/maps/">Mapbox</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+const ESRI_ATTRIBUTION = 'Tiles &copy; Esri'
+let leafletLoadPromise = null
 
 function useMediaQuery(query) {
   const [matches, setMatches] = useState(() => {
@@ -72,6 +79,41 @@ function useMediaQuery(query) {
   }, [query])
 
   return matches
+}
+
+function loadLeafletAssets() {
+  if (typeof window === 'undefined' || typeof document === 'undefined') {
+    return Promise.reject(new Error('Leaflet indisponivel fora do navegador'))
+  }
+  if (window.L) return Promise.resolve(window.L)
+
+  if (!document.getElementById('leaflet-css')) {
+    const link = document.createElement('link')
+    link.id = 'leaflet-css'
+    link.rel = 'stylesheet'
+    link.href = LEAFLET_STYLESHEET_URL
+    document.head.appendChild(link)
+  }
+
+  if (!leafletLoadPromise) {
+    leafletLoadPromise = new Promise((resolve, reject) => {
+      const existing = document.getElementById('leaflet-js')
+      if (existing) {
+        existing.addEventListener('load', () => resolve(window.L), { once: true })
+        existing.addEventListener('error', () => reject(new Error('Nao foi possivel carregar o Leaflet')), { once: true })
+        return
+      }
+      const script = document.createElement('script')
+      script.id = 'leaflet-js'
+      script.src = LEAFLET_SCRIPT_URL
+      script.async = true
+      script.onload = () => resolve(window.L)
+      script.onerror = () => reject(new Error('Nao foi possivel carregar o Leaflet'))
+      document.body.appendChild(script)
+    })
+  }
+
+  return leafletLoadPromise
 }
 
 const MONITORING_STORAGE_KEY = 'terranexa:monitoramento-offline'
@@ -338,6 +380,90 @@ function getRingLabelCoord(ring) {
     (Math.min(...lngs) + Math.max(...lngs)) / 2,
     (Math.min(...lats) + Math.max(...lats)) / 2
   ]
+}
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, char => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  }[char]))
+}
+
+function ringToLatLngs(ring) {
+  return (ring || [])
+    .map(([lng, lat]) => [Number(lat), Number(lng)])
+    .filter(([lat, lng]) => Number.isFinite(lat) && Number.isFinite(lng))
+}
+
+function fitLeafletToFeatures(L, map, normalized, fullBleed) {
+  const points = normalized.flatMap(({ feature }) => ringToLatLngs(getFeatureRing(feature)))
+  if (!points.length) {
+    const [lng, lat] = getBoundsCenter(MAP_DEFAULT_BOUNDS)
+    map.setView([lat, lng], fullBleed ? 12 : 11)
+    return
+  }
+  const bounds = L.latLngBounds(points)
+  map.fitBounds(bounds, {
+    padding: fullBleed ? [26, 26] : [18, 18],
+    maxZoom: fullBleed ? 16 : 15,
+    animate: false
+  })
+}
+
+function getLeafletPolygonStyle(feature, selected, selectedMode) {
+  const monitoramento = feature.properties?.monitoramento || getMonitoramentoMeta(null)
+  const fillColor = selectedMode === 'chuvas'
+    ? '#3791d2'
+    : selectedMode === 'monitoramento'
+      ? monitoramento.color
+      : selected
+        ? C.amber
+        : C.greenDp
+  const baseFillOpacity = selectedMode === 'monitoramento' ? 0.54 : 0.28
+
+  return {
+    color: selected ? '#ffffff' : selectedMode === 'monitoramento' ? monitoramento.stroke : 'rgba(255,255,255,0.70)',
+    weight: selected ? 2.2 : 1.1,
+    opacity: selected ? 0.98 : 0.82,
+    fillColor,
+    fillOpacity: selected ? Math.max(baseFillOpacity, 0.46) : baseFillOpacity
+  }
+}
+
+function leafletLabelHtml(label, selected, fullBleed) {
+  const fontSize = selected ? (fullBleed ? 12 : 11) : (fullBleed ? 10 : 9)
+  return `<span style="
+    display:inline-block;
+    color:#fff;
+    font-size:${fontSize}px;
+    font-weight:900;
+    line-height:1;
+    text-shadow:0 1px 2px rgba(0,0,0,.85),0 -1px 2px rgba(0,0,0,.65);
+    pointer-events:none;
+    white-space:nowrap;
+  ">${escapeHtml(label)}</span>`
+}
+
+function leafletPluviometroHtml(marker, selectedMode, intensity) {
+  const rain = selectedMode === 'chuvas' ? `<small style="display:block;font-size:9px;font-weight:900;margin-top:3px;">${intensity.toFixed(0)} mm</small>` : ''
+  return `<span style="
+    display:grid;
+    place-items:center;
+    min-width:74px;
+    color:#fff;
+    font-size:9px;
+    font-weight:900;
+    text-shadow:0 1px 3px rgba(0,0,0,.82);
+  ">
+    <i style="width:24px;height:24px;border-radius:999px;background:rgba(255,255,255,.94);border:2px solid ${selectedMode === 'chuvas' ? C.blue : C.greenDp};display:grid;place-items:center;color:${C.greenDp};font-style:normal;box-shadow:0 7px 18px rgba(0,0,0,.28);">
+      <span style="width:8px;height:13px;border:2px solid currentColor;border-top:none;border-radius:0 0 7px 7px;display:block;"></span>
+    </i>
+    <b style="display:block;margin-top:4px;">${escapeHtml(marker.nome)}</b>
+    ${rain}
+  </span>`
 }
 
 function pointInFeatureCoord([lng, lat], feature) {
@@ -1830,7 +1956,7 @@ function SimpleFarmMap({ features = [], drawPoints = [], onMapClick, onFeatureCl
     )
   }
   return (
-    <SatelliteFarmMap
+    <LeafletFarmMap
       normalized={normalized}
       onFeatureClick={onFeatureClick}
       height={height}
@@ -1843,6 +1969,286 @@ function SimpleFarmMap({ features = [], drawPoints = [], onMapClick, onFeatureCl
       onPluviometroClick={onPluviometroClick}
       devicePosition={devicePosition}
     />
+  )
+}
+
+function LeafletFarmMap({ normalized = [], onFeatureClick, height = 340, selectedCode = null, selectedMode = 'timeline', fullBleed = false, pluviometros = [], placingPluviometro = false, onMapPoint, onPluviometroClick, devicePosition = null }) {
+  const mapNodeRef = useRef(null)
+  const mapRef = useRef(null)
+  const featureLayerRef = useRef(null)
+  const markerLayerRef = useRef(null)
+  const rainLayerRef = useRef(null)
+  const deviceLayerRef = useRef(null)
+  const tileLayerRef = useRef(null)
+  const [leafletReady, setLeafletReady] = useState(false)
+  const [leafletError, setLeafletError] = useState('')
+  const [manualDevicePosition, setManualDevicePosition] = useState(null)
+  const [locatingDevice, setLocatingDevice] = useState(false)
+  const controlsOnRight = useMediaQuery('(max-width: 899px)')
+  const featureSignature = normalized.map(({ feature, index }) => {
+    const ring = getFeatureRing(feature) || []
+    return `${feature.properties?.codigo || index}:${ring.map(coord => coord.join(',')).join(';')}`
+  }).join('|')
+  const activePluviometros = pluviometros
+    .map((item, index) => ({
+      ...item,
+      index,
+      latitude: Number(item.latitude),
+      longitude: Number(item.longitude),
+      nome: item.nome || `Pluviometro ${index + 1}`
+    }))
+    .filter(item => item.ativo !== false && Number.isFinite(item.latitude) && Number.isFinite(item.longitude))
+  const liveDevicePosition = devicePosition || manualDevicePosition
+  const deviceMarker = Number.isFinite(Number(liveDevicePosition?.latitude)) && Number.isFinite(Number(liveDevicePosition?.longitude))
+    ? { latitude: Number(liveDevicePosition.latitude), longitude: Number(liveDevicePosition.longitude), accuracy: Number(liveDevicePosition.accuracy || 0) }
+    : null
+
+  useEffect(() => {
+    let disposed = false
+    loadLeafletAssets().then(L => {
+      if (disposed || !mapNodeRef.current || mapRef.current) return
+      const map = L.map(mapNodeRef.current, {
+        zoomControl: false,
+        attributionControl: true,
+        preferCanvas: true,
+        dragging: true,
+        touchZoom: true,
+        scrollWheelZoom: true,
+        doubleClickZoom: true,
+        tap: true,
+        inertia: true
+      })
+      featureLayerRef.current = L.layerGroup().addTo(map)
+      markerLayerRef.current = L.layerGroup().addTo(map)
+      rainLayerRef.current = L.layerGroup().addTo(map)
+      deviceLayerRef.current = L.layerGroup().addTo(map)
+      mapRef.current = map
+      setLeafletReady(true)
+      window.setTimeout(() => {
+        map.invalidateSize()
+        fitLeafletToFeatures(L, map, normalized, fullBleed)
+      }, 0)
+    }).catch(error => {
+      if (!disposed) setLeafletError(error.message || 'Nao foi possivel carregar o mapa')
+    })
+
+    return () => {
+      disposed = true
+      if (mapRef.current) {
+        mapRef.current.remove()
+        mapRef.current = null
+      }
+      featureLayerRef.current = null
+      markerLayerRef.current = null
+      rainLayerRef.current = null
+      deviceLayerRef.current = null
+      tileLayerRef.current = null
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!leafletReady || !window.L || !mapRef.current) return undefined
+    const L = window.L
+    const map = mapRef.current
+    if (tileLayerRef.current) map.removeLayer(tileLayerRef.current)
+    const hasMapbox = Boolean(MAPBOX_TOKEN)
+    tileLayerRef.current = L.tileLayer(
+      hasMapbox ? MAPBOX_SATELLITE_TILE_URL : `${SATELLITE_TILE_URL}/{z}/{y}/{x}`,
+      {
+        minZoom: TILE_MIN_ZOOM,
+        maxZoom: hasMapbox ? 22 : TILE_MAX_ZOOM,
+        tileSize: 256,
+        attribution: hasMapbox ? MAPBOX_ATTRIBUTION : ESRI_ATTRIBUTION,
+        crossOrigin: true
+      }
+    ).addTo(map)
+    return undefined
+  }, [leafletReady])
+
+  useEffect(() => {
+    if (!leafletReady || !window.L || !mapRef.current) return
+    const map = mapRef.current
+    window.setTimeout(() => {
+      map.invalidateSize()
+      fitLeafletToFeatures(window.L, map, normalized, fullBleed)
+    }, 0)
+  }, [leafletReady, featureSignature, fullBleed, height])
+
+  useEffect(() => {
+    if (!leafletReady || !window.L || !mapRef.current || !featureLayerRef.current) return
+    const L = window.L
+    const layer = featureLayerRef.current
+    layer.clearLayers()
+
+    normalized.forEach(({ feature, index }) => {
+      const ring = getFeatureRing(feature) || []
+      const latLngs = ringToLatLngs(ring)
+      if (latLngs.length < 3) return
+      const selected = selectedCode && feature.properties?.codigo === selectedCode
+      const polygon = L.polygon(latLngs, {
+        ...getLeafletPolygonStyle(feature, selected, selectedMode),
+        interactive: Boolean(onFeatureClick)
+      })
+      polygon.on('click', event => {
+        L.DomEvent.stopPropagation(event)
+        onFeatureClick?.(index, feature)
+      })
+      polygon.addTo(layer)
+
+      const labelCoord = getRingLabelCoord(ring)
+      if (labelCoord) {
+        const label = L.marker([labelCoord[1], labelCoord[0]], {
+          interactive: false,
+          icon: L.divIcon({
+            className: 'terranexa-talhao-label',
+            html: leafletLabelHtml(feature.properties?.codigo, selected, fullBleed),
+            iconSize: [72, 18],
+            iconAnchor: [36, 9]
+          })
+        })
+        label.addTo(layer)
+      }
+    })
+  }, [leafletReady, featureSignature, selectedCode, selectedMode, onFeatureClick, fullBleed])
+
+  useEffect(() => {
+    if (!leafletReady || !window.L || !mapRef.current || !markerLayerRef.current || !rainLayerRef.current) return
+    const L = window.L
+    markerLayerRef.current.clearLayers()
+    rainLayerRef.current.clearLayers()
+
+    if (selectedMode === 'chuvas') {
+      activePluviometros.forEach((marker, index) => {
+        const intensity = rainIntensityForMarker(marker, index)
+        const color = intensity > 105 ? C.red : intensity > 76 ? C.amber : C.blue
+        L.circle([marker.latitude, marker.longitude], {
+          radius: 1800 + intensity * 18,
+          stroke: false,
+          fillColor: color,
+          fillOpacity: 0.34,
+          interactive: false
+        }).addTo(rainLayerRef.current)
+      })
+    }
+
+    activePluviometros.forEach((marker, index) => {
+      const intensity = rainIntensityForMarker(marker, index)
+      const item = L.marker([marker.latitude, marker.longitude], {
+        interactive: Boolean(onPluviometroClick),
+        icon: L.divIcon({
+          className: 'terranexa-pluviometro-marker',
+          html: leafletPluviometroHtml(marker, selectedMode, intensity),
+          iconSize: [74, selectedMode === 'chuvas' ? 62 : 48],
+          iconAnchor: [37, 24]
+        })
+      })
+      item.on('click', event => {
+        L.DomEvent.stopPropagation(event)
+        onPluviometroClick?.(marker)
+      })
+      item.addTo(markerLayerRef.current)
+    })
+  }, [leafletReady, selectedMode, pluviometros, onPluviometroClick])
+
+  useEffect(() => {
+    if (!leafletReady || !window.L || !mapRef.current || !deviceLayerRef.current) return
+    const L = window.L
+    deviceLayerRef.current.clearLayers()
+    if (!deviceMarker) return
+    const position = [deviceMarker.latitude, deviceMarker.longitude]
+    if (deviceMarker.accuracy > 0) {
+      L.circle(position, {
+        radius: deviceMarker.accuracy,
+        color: 'rgba(255,255,255,0.72)',
+        weight: 1,
+        fillColor: '#2f91ff',
+        fillOpacity: 0.18,
+        interactive: false
+      }).addTo(deviceLayerRef.current)
+    }
+    L.circleMarker(position, {
+      radius: 7,
+      color: '#ffffff',
+      weight: 2,
+      fillColor: '#2f91ff',
+      fillOpacity: 1,
+      interactive: false
+    }).addTo(deviceLayerRef.current)
+  }, [leafletReady, deviceMarker?.latitude, deviceMarker?.longitude, deviceMarker?.accuracy])
+
+  useEffect(() => {
+    if (!leafletReady || !mapRef.current) return undefined
+    const map = mapRef.current
+    const handleMapClick = event => {
+      if (placingPluviometro && onMapPoint) onMapPoint({ lng: event.latlng.lng, lat: event.latlng.lat })
+    }
+    map.on('click', handleMapClick)
+    return () => map.off('click', handleMapClick)
+  }, [leafletReady, placingPluviometro, onMapPoint])
+
+  function rainIntensityForMarker(marker, index) {
+    const seed = String(marker.id || marker.nome || index).split('').reduce((sum, char) => sum + char.charCodeAt(0), 0)
+    return 42 + (seed % 86)
+  }
+
+  function changeZoom(e, delta) {
+    e.stopPropagation()
+    if (!mapRef.current) return
+    if (delta > 0) mapRef.current.zoomIn(1)
+    else mapRef.current.zoomOut(1)
+  }
+
+  function centerDeviceMarker(marker) {
+    if (!mapRef.current) return
+    mapRef.current.setView([marker.latitude, marker.longitude], Math.max(mapRef.current.getZoom(), 16), { animate: true })
+  }
+
+  function centerOnDevice(e) {
+    e.stopPropagation()
+    if (deviceMarker) {
+      centerDeviceMarker(deviceMarker)
+      return
+    }
+    if (typeof navigator === 'undefined' || !navigator.geolocation || locatingDevice) return
+    setLocatingDevice(true)
+    navigator.geolocation.getCurrentPosition(
+      position => {
+        const coords = position.coords || {}
+        const marker = {
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+          accuracy: coords.accuracy
+        }
+        setManualDevicePosition(marker)
+        centerDeviceMarker(marker)
+        setLocatingDevice(false)
+      },
+      () => setLocatingDevice(false),
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 3000 }
+    )
+  }
+
+  function resetMap(e) {
+    e.stopPropagation()
+    if (!mapRef.current || !window.L) return
+    fitLeafletToFeatures(window.L, mapRef.current, normalized, fullBleed)
+  }
+
+  return (
+    <div style={{ ...(fullBleed ? { ...simpleMapFullStyle, minHeight: height } : simpleMapStyle), height, cursor: placingPluviometro ? 'crosshair' : 'grab' }}>
+      <div ref={mapNodeRef} style={leafletMapCanvasStyle} />
+      <div style={satelliteShadeStyle} />
+      <div style={controlsOnRight ? satelliteControlsMobileStyle : satelliteControlsStyle} onPointerDown={e => e.stopPropagation()} onWheel={e => e.stopPropagation()} onDoubleClick={e => e.stopPropagation()}>
+        <button type="button" aria-label="Aproximar mapa" onClick={e => changeZoom(e, 1)} style={satelliteControlButtonStyle}>+</button>
+        <button type="button" aria-label="Afastar mapa" onClick={e => changeZoom(e, -1)} style={satelliteControlButtonStyle}>-</button>
+        <button type="button" aria-label="Centralizar no GPS" title="Centralizar no GPS" onClick={centerOnDevice} style={satelliteGpsButtonStyle}>
+          {locatingDevice ? '...' : 'GPS'}
+        </button>
+      </div>
+      <div style={satelliteBadgeStyle}>{MAPBOX_TOKEN ? 'Mapbox Satelite' : 'Satelite'}</div>
+      {leafletError && <div style={mapEmptyHintStyle}>{leafletError}</div>}
+      {!leafletError && normalized.length === 0 && <div style={mapEmptyHintStyle}>Nenhum talhÃƒÂ£o com geometria cadastrada</div>}
+    </div>
   )
 }
 
@@ -3193,6 +3599,7 @@ const geoFormStyle = { display: 'grid', gap: 10, marginTop: 12, borderTop: `1px 
 const formErrorStyle = { background: C.redLight, color: C.redDk, borderRadius: 10, padding: '10px 12px', fontSize: 12, border: `1px solid ${C.red}33` }
 const simpleMapStyle = { position: 'relative', borderRadius: 14, overflow: 'hidden', border: `1px solid ${C.border}`, background: '#0e1d14', minHeight: 240, touchAction: 'none', overscrollBehavior: 'contain' }
 const simpleMapFullStyle = { position: 'relative', borderRadius: 0, overflow: 'hidden', border: 'none', background: '#0e1d14', minHeight: '100dvh', touchAction: 'none', overscrollBehavior: 'none' }
+const leafletMapCanvasStyle = { position: 'absolute', inset: 0, width: '100%', height: '100%', zIndex: 0 }
 const satelliteTileLayerStyle = { position: 'absolute', inset: 0, overflow: 'hidden', background: '#0e1d14' }
 const satelliteTileStyle = { position: 'absolute', width: TILE_SIZE, height: TILE_SIZE, objectFit: 'cover', userSelect: 'none', pointerEvents: 'none', willChange: 'transform' }
 const satelliteShadeStyle = { position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(5,12,8,0.20), rgba(5,12,8,0.34))', pointerEvents: 'none' }

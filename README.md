@@ -77,6 +77,7 @@ Abra `.env.local` em qualquer editor e preencha:
 ```env
 VITE_SUPABASE_URL=https://SEU_PROJETO.supabase.co
 VITE_SUPABASE_ANON_KEY=cole_a_anon_key_aqui
+VITE_MAPBOX_TOKEN=cole_o_token_publico_do_mapbox_aqui
 ```
 
 ---
@@ -121,6 +122,7 @@ Isso cria uma fazenda **São José** com 4 talhões, 3 insumos e 1 operação de
 5. Em **Environment Variables**, adicione:
    - `VITE_SUPABASE_URL`
    - `VITE_SUPABASE_ANON_KEY`
+   - `VITE_MAPBOX_TOKEN`
 6. Clique em **Deploy**
 
 Em ~2 minutos seu app está no ar em `terranexa-XXX.vercel.app`. 🚀
