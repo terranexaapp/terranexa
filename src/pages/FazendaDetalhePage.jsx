@@ -1830,7 +1830,7 @@ function SatelliteFarmMap({ normalized = [], onFeatureClick, height = 340, selec
   return (
     <div
       ref={containerRef}
-      style={{ ...(fullBleed ? simpleMapFullStyle : simpleMapStyle), height, cursor: placingPluviometro ? 'crosshair' : 'grab' }}
+      style={{ ...(fullBleed ? { ...simpleMapFullStyle, minHeight: height } : simpleMapStyle), height, cursor: placingPluviometro ? 'crosshair' : 'grab' }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
@@ -1983,7 +1983,7 @@ function VectorFarmMap({ normalized = [], drawPoints = [], onMapClick, onFeature
 
   return (
     <div
-      style={{ ...(fullBleed ? simpleMapFullStyle : simpleMapStyle), height, cursor: canPan ? 'grab' : 'crosshair' }}
+      style={{ ...(fullBleed ? { ...simpleMapFullStyle, minHeight: height } : simpleMapStyle), height, cursor: canPan ? 'grab' : 'crosshair' }}
       onClick={handleClick}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
