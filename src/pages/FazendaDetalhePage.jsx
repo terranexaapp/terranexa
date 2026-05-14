@@ -73,6 +73,61 @@ function useMediaQuery(query) {
   return matches
 }
 
+const MONITORING_STORAGE_KEY = 'terranexa:monitoramento-offline'
+
+async function requestOfflineStorage() {
+  if (typeof navigator === 'undefined') return { ok: false, message: 'Armazenamento offline indisponivel' }
+  try {
+    if (navigator.storage?.persisted && await navigator.storage.persisted()) {
+      return { ok: true, message: 'Armazenamento offline permitido' }
+    }
+    if (navigator.storage?.persist) {
+      const ok = await navigator.storage.persist()
+      return { ok, message: ok ? 'Armazenamento offline permitido' : 'Armazenamento offline temporario' }
+    }
+  } catch {
+    return { ok: false, message: 'Nao foi possivel confirmar armazenamento offline' }
+  }
+  return { ok: true, message: 'Dados salvos no aparelho para uso offline' }
+}
+
+function saveMonitoringPointOffline(point, context) {
+  if (typeof window === 'undefined') return
+  try {
+    const raw = window.localStorage.getItem(MONITORING_STORAGE_KEY)
+    const registros = raw ? JSON.parse(raw) : []
+    const next = Array.isArray(registros) ? registros : []
+    next.push({ ...context, ...point, savedAt: new Date().toISOString() })
+    window.localStorage.setItem(MONITORING_STORAGE_KEY, JSON.stringify(next.slice(-600)))
+  } catch {
+    // Offline persistence is best-effort; GPS capture should keep working.
+  }
+}
+
+function useDevicePosition(enabled = true) {
+  const [position, setPosition] = useState(null)
+
+  useEffect(() => {
+    if (!enabled || typeof navigator === 'undefined' || !navigator.geolocation) return undefined
+    const watchId = navigator.geolocation.watchPosition(
+      result => {
+        const coords = result.coords || {}
+        setPosition({
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+          accuracy: coords.accuracy,
+          updatedAt: result.timestamp
+        })
+      },
+      () => {},
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 8000 }
+    )
+    return () => navigator.geolocation.clearWatch(watchId)
+  }, [enabled])
+
+  return position
+}
+
 function formatCultura(cultura = '') {
   if (!cultura) return 'Sem cultura'
   return cultura.charAt(0).toUpperCase() + cultura.slice(1)
@@ -551,6 +606,7 @@ export function FazendaDetalhePage() {
         {activeView === 'monitoramento' && (
           <MonitoramentoRegistroView
             fazenda={fazenda}
+            fazendaId={id}
             talhao={talhaoSel}
             onBack={() => setActiveView('mapa')}
           />
@@ -579,6 +635,7 @@ export function FazendaDetalhePage() {
 
 function FazendaMapaPrincipal({ fazenda, talhoes, pluviometros = [], talhaoSel, operacoes, custos, totalCusto, loadOps, alternarTalhao, navigate, setActiveView, setShowNovaOp }) {
   const timelineIsDocked = useMediaQuery('(min-width: 900px)')
+  const devicePosition = useDevicePosition(!timelineIsDocked)
   const [timelineMode, setTimelineMode] = useState('resumo')
   const [chuvaInicio, setChuvaInicio] = useState('2026-05-01')
   const [chuvaFim, setChuvaFim] = useState('2026-05-15')
@@ -618,15 +675,21 @@ function FazendaMapaPrincipal({ fazenda, talhoes, pluviometros = [], talhaoSel, 
     await alternarTalhao(talhao)
   }
 
+  async function abrirMonitoramento() {
+    await requestOfflineStorage()
+    setActiveView('monitoramento')
+  }
+
   return (
     <section style={timelineIsDocked ? mapMainPageStyle : mapMainPageMobileStyle}>
       <SimpleFarmMap
         features={features.map(item => ({ ...item.feature, properties: { ...item.feature.properties, codigo: item.talhao.codigo } }))}
-        height={timelineIsDocked || !selected ? '100vh' : '58vh'}
+        height="100vh"
         fullBleed
         selectedCode={selected?.codigo}
         selectedMode={timelineMode === 'chuvas' ? 'chuvas' : 'timeline'}
-        pluviometros={pluviometros}
+        pluviometros={[]}
+        devicePosition={devicePosition}
         onFeatureClick={handleFeatureClick}
       />
 
@@ -654,7 +717,7 @@ function FazendaMapaPrincipal({ fazenda, talhoes, pluviometros = [], talhaoSel, 
             <span style={timelineAreaPillStyle}>{Number(selected.area_ha || 0).toFixed(2)} ha</span>
           </div>
           <div style={timelineActionsStyle}>
-            <button onClick={() => setActiveView('monitoramento')} style={timelineIsDocked ? timelineActionButtonStyle : timelineMobileActionButtonStyle}>Monitorar</button>
+            <button onClick={abrirMonitoramento} style={timelineIsDocked ? timelineActionButtonStyle : timelineMobileActionButtonStyle}>Monitorar</button>
             <button onClick={() => navigate('/os')} style={timelineIsDocked ? timelineActionButtonStyle : timelineMobileActionButtonStyle}>Criar ordem</button>
           </div>
           <div style={timelineIsDocked ? timelineModeTabsStyle : timelineModeTabsMobileStyle}>
@@ -679,18 +742,31 @@ function FazendaMapaPrincipal({ fazenda, talhoes, pluviometros = [], talhaoSel, 
             ))}
           </div>
           {timelineMode === 'resumo' && (
-            <div style={timelineSummaryCardStyle}>
-              <h4 style={timelineCardTitleStyle}>Resumo do talhao</h4>
-              <div style={timelineSummaryRowsStyle}>
+            timelineIsDocked ? (
+              <div style={timelineSummaryCardStyle}>
+                <h4 style={timelineCardTitleStyle}>Resumo do talhao</h4>
+                <div style={timelineSummaryRowsStyle}>
+                  {resumoRows.map(item => (
+                    <div key={item.label} style={timelineSummaryRowStyle}>
+                      <span style={timelineSummaryLabelStyle}>{item.label}</span>
+                      <strong style={timelineSummaryValueStyle}>{item.value}</strong>
+                    </div>
+                  ))}
+                </div>
+                <button onClick={() => setShowNovaOp(true)} style={timelineTextButtonStyle}>{operacoes.length ? 'Registrar nova operacao' : 'Adicionar primeiro registro'}</button>
+              </div>
+            ) : (
+              <div style={timelineTableHorizontalStyle}>
                 {resumoRows.map(item => (
-                  <div key={item.label} style={timelineSummaryRowStyle}>
-                    <span style={timelineSummaryLabelStyle}>{item.label}</span>
-                    <strong style={timelineSummaryValueStyle}>{item.value}</strong>
+                  <div key={item.label} style={timelineInfoHorizontalCardStyle}>
+                    <span>{item.label}</span>
+                    <strong>{item.value}</strong>
                   </div>
                 ))}
+                <button onClick={() => setShowNovaOp(true)} style={timelineCtaHorizontalStyle}>{operacoes.length ? 'Nova operacao' : 'Adicionar registro'}</button>
+                <div aria-hidden="true" style={timelineScrollEndStyle} />
               </div>
-              <button onClick={() => setShowNovaOp(true)} style={timelineTextButtonStyle}>{operacoes.length ? 'Registrar nova operacao' : 'Adicionar primeiro registro'}</button>
-            </div>
+            )
           )}
           {timelineMode === 'historico' && (
             <div style={timelineIsDocked ? timelineTableDesktopStyle : timelineTableHorizontalStyle}>
@@ -706,36 +782,65 @@ function FazendaMapaPrincipal({ fazenda, talhoes, pluviometros = [], talhaoSel, 
             </div>
           )}
           {timelineMode === 'chuvas' && (
-            <div style={timelineRainLayoutStyle}>
-              <div style={timelineDateGridStyle}>
-                <label style={timelineDateLabelStyle}>
-                  Data inicial
+            timelineIsDocked ? (
+              <div style={timelineRainLayoutStyle}>
+                <div style={timelineDateGridStyle}>
+                  <label style={timelineDateLabelStyle}>
+                    Data inicial
+                    <input type="date" value={chuvaInicio} onChange={e => setChuvaInicio(e.target.value)} style={timelineDateInputStyle} />
+                  </label>
+                  <label style={timelineDateLabelStyle}>
+                    Data final
+                    <input type="date" value={chuvaFim} onChange={e => setChuvaFim(e.target.value)} style={timelineDateInputStyle} />
+                  </label>
+                  <button onClick={() => setActiveView('chuvas')} style={timelinePrimaryButtonStyle}>Abrir mapa interpolado</button>
+                </div>
+                <div style={timelineRainGridStyle}>
+                  <div style={timelineRainMetricStyle}><span>Acumulado no talhao</span><strong>{chuvaAcumulada} mm</strong></div>
+                  <div style={timelineRainMetricStyle}><span>Media diaria</span><strong>{chuvaMediaDia} mm</strong></div>
+                  <div style={timelineRainMetricStyle}><span>Maior precipitacao</span><strong>{maiorChuva} mm</strong></div>
+                  <div style={timelineRainMetricStyle}><span>Menor precipitacao</span><strong>{menorChuva} mm</strong></div>
+                </div>
+              </div>
+            ) : (
+              <div style={timelineTableHorizontalStyle}>
+                <label style={timelineInputHorizontalCardStyle}>
+                  <span>Data inicial</span>
                   <input type="date" value={chuvaInicio} onChange={e => setChuvaInicio(e.target.value)} style={timelineDateInputStyle} />
                 </label>
-                <label style={timelineDateLabelStyle}>
-                  Data final
+                <label style={timelineInputHorizontalCardStyle}>
+                  <span>Data final</span>
                   <input type="date" value={chuvaFim} onChange={e => setChuvaFim(e.target.value)} style={timelineDateInputStyle} />
                 </label>
-                <button onClick={() => setActiveView('chuvas')} style={timelinePrimaryButtonStyle}>Abrir mapa interpolado</button>
+                <button onClick={() => setActiveView('chuvas')} style={timelineCtaHorizontalStyle}>Abrir mapa de chuvas</button>
+                <div style={timelineMetricHorizontalCardStyle}><span>Acumulado</span><strong>{chuvaAcumulada} mm</strong></div>
+                <div style={timelineMetricHorizontalCardStyle}><span>Media diaria</span><strong>{chuvaMediaDia} mm</strong></div>
+                <div style={timelineMetricHorizontalCardStyle}><span>Maior chuva</span><strong>{maiorChuva} mm</strong></div>
+                <div style={timelineMetricHorizontalCardStyle}><span>Menor chuva</span><strong>{menorChuva} mm</strong></div>
+                <div aria-hidden="true" style={timelineScrollEndStyle} />
               </div>
-              <div style={timelineRainGridStyle}>
-                <div style={timelineRainMetricStyle}><span>Acumulado no talhao</span><strong>{chuvaAcumulada} mm</strong></div>
-                <div style={timelineRainMetricStyle}><span>Media diaria</span><strong>{chuvaMediaDia} mm</strong></div>
-                <div style={timelineRainMetricStyle}><span>Maior precipitacao</span><strong>{maiorChuva} mm</strong></div>
-                <div style={timelineRainMetricStyle}><span>Menor precipitacao</span><strong>{menorChuva} mm</strong></div>
-              </div>
-            </div>
+            )
           )}
           {timelineMode === 'solo' && (
-            <div style={timelineSummaryCardStyle}>
-              <h4 style={timelineCardTitleStyle}>Solo do talhao</h4>
-              <div style={timelineSummaryRowsStyle}>
-                <div style={timelineSummaryRowStyle}><span style={timelineSummaryLabelStyle}>Camada atual</span><strong style={timelineSummaryValueStyle}>Mapa de solo disponivel</strong></div>
-                <div style={timelineSummaryRowStyle}><span style={timelineSummaryLabelStyle}>Fertilidade</span><strong style={timelineSummaryValueStyle}>Aguardando leitura recente</strong></div>
-                <div style={timelineSummaryRowStyle}><span style={timelineSummaryLabelStyle}>Recomendacao</span><strong style={timelineSummaryValueStyle}>Conferir pagina Solo</strong></div>
+            timelineIsDocked ? (
+              <div style={timelineSummaryCardStyle}>
+                <h4 style={timelineCardTitleStyle}>Solo do talhao</h4>
+                <div style={timelineSummaryRowsStyle}>
+                  <div style={timelineSummaryRowStyle}><span style={timelineSummaryLabelStyle}>Camada atual</span><strong style={timelineSummaryValueStyle}>Mapa de solo disponivel</strong></div>
+                  <div style={timelineSummaryRowStyle}><span style={timelineSummaryLabelStyle}>Fertilidade</span><strong style={timelineSummaryValueStyle}>Aguardando leitura recente</strong></div>
+                  <div style={timelineSummaryRowStyle}><span style={timelineSummaryLabelStyle}>Recomendacao</span><strong style={timelineSummaryValueStyle}>Conferir pagina Solo</strong></div>
+                </div>
+                <button onClick={() => setActiveView('solo')} style={timelineTextButtonStyle}>Abrir pagina Solo</button>
               </div>
-              <button onClick={() => setActiveView('solo')} style={timelineTextButtonStyle}>Abrir pagina Solo</button>
-            </div>
+            ) : (
+              <div style={timelineTableHorizontalStyle}>
+                <div style={timelineInfoHorizontalCardStyle}><span>Camada atual</span><strong>Mapa de solo disponivel</strong></div>
+                <div style={timelineInfoHorizontalCardStyle}><span>Fertilidade</span><strong>Aguardando leitura recente</strong></div>
+                <div style={timelineInfoHorizontalCardStyle}><span>Recomendacao</span><strong>Conferir pagina Solo</strong></div>
+                <button onClick={() => setActiveView('solo')} style={timelineCtaHorizontalStyle}>Abrir Solo</button>
+                <div aria-hidden="true" style={timelineScrollEndStyle} />
+              </div>
+            )
           )}
         </div>
       )}
@@ -743,10 +848,11 @@ function FazendaMapaPrincipal({ fazenda, talhoes, pluviometros = [], talhaoSel, 
   )
 }
 
-function MonitoramentoRegistroView({ fazenda, talhao, onBack }) {
+function MonitoramentoRegistroView({ fazenda, fazendaId, talhao, onBack }) {
   const [points, setPoints] = useState([])
   const [tracking, setTracking] = useState(false)
   const [gpsStatus, setGpsStatus] = useState('Aguardando GPS')
+  const [storageStatus, setStorageStatus] = useState('Preparando modo offline')
   const watchRef = useRef(null)
 
   useEffect(() => {
@@ -755,18 +861,40 @@ function MonitoramentoRegistroView({ fazenda, talhao, onBack }) {
     }
   }, [])
 
+  useEffect(() => {
+    let active = true
+    requestOfflineStorage().then(result => {
+      if (active) setStorageStatus(result.message)
+    })
+    if (navigator.geolocation) {
+      setGpsStatus('Solicitando permissao do GPS...')
+      navigator.geolocation.getCurrentPosition(
+        position => { if (active) addPosition(position, 'Posicao atual') },
+        error => { if (active) setGpsStatus(error.message || 'Permissao de GPS pendente') },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 }
+      )
+    } else {
+      setGpsStatus('GPS indisponivel neste navegador')
+    }
+    return () => { active = false }
+  }, [talhao?.id])
+
   function addPosition(position, tipo) {
     const coords = position.coords || {}
-    setPoints(current => [
-      ...current,
-      {
-        tipo,
-        lat: coords.latitude,
-        lng: coords.longitude,
-        precisao: coords.accuracy,
-        hora: new Date().toLocaleString('pt-BR')
-      }
-    ])
+    const registro = {
+      tipo,
+      lat: coords.latitude,
+      lng: coords.longitude,
+      precisao: coords.accuracy,
+      hora: new Date().toLocaleString('pt-BR')
+    }
+    saveMonitoringPointOffline(registro, {
+      fazendaId,
+      fazendaNome: fazenda?.nome || '',
+      talhaoId: talhao?.id || null,
+      talhaoCodigo: talhao?.codigo || ''
+    })
+    setPoints(current => [...current, registro])
     setGpsStatus('Ponto registrado')
   }
 
@@ -833,6 +961,7 @@ function MonitoramentoRegistroView({ fazenda, talhao, onBack }) {
 
           <div style={gpsStatusStyle}>
             <strong>{gpsStatus}</strong>
+            <span>{storageStatus}</span>
             <span>{points.length} registros coletados nesta visita</span>
           </div>
         </div>
@@ -1516,7 +1645,7 @@ function TalhaoGeoModal({ fazendaId, initialMode, sugerirCodigo, talhoes, onClos
   )
 }
 
-function SimpleFarmMap({ features = [], drawPoints = [], onMapClick, onFeatureClick, height = 340, drawing = false, selectedCode = null, selectedMode = 'timeline', fullBleed = false, pluviometros = [], placingPluviometro = false, onMapPoint, onPluviometroClick }) {
+function SimpleFarmMap({ features = [], drawPoints = [], onMapClick, onFeatureClick, height = 340, drawing = false, selectedCode = null, selectedMode = 'timeline', fullBleed = false, pluviometros = [], placingPluviometro = false, onMapPoint, onPluviometroClick, devicePosition = null }) {
   const normalized = features.map((feature, index) => ({ feature: normalizeFeature(feature, feature?.properties?.codigo || `T${index + 1}`), index })).filter(item => item.feature)
   if (drawing || onMapClick) {
     return (
@@ -1545,6 +1674,7 @@ function SimpleFarmMap({ features = [], drawPoints = [], onMapClick, onFeatureCl
       placingPluviometro={placingPluviometro}
       onMapPoint={onMapPoint}
       onPluviometroClick={onPluviometroClick}
+      devicePosition={devicePosition}
     />
   )
 }
@@ -1571,7 +1701,7 @@ function pointInPolygon(point, polygon) {
   return inside
 }
 
-function SatelliteFarmMap({ normalized = [], onFeatureClick, height = 340, selectedCode = null, selectedMode = 'timeline', fullBleed = false, pluviometros = [], placingPluviometro = false, onMapPoint, onPluviometroClick }) {
+function SatelliteFarmMap({ normalized = [], onFeatureClick, height = 340, selectedCode = null, selectedMode = 'timeline', fullBleed = false, pluviometros = [], placingPluviometro = false, onMapPoint, onPluviometroClick, devicePosition = null }) {
   const containerRef = useRef(null)
   const pointersRef = useRef(new Map())
   const gestureRef = useRef(null)
@@ -1591,7 +1721,10 @@ function SatelliteFarmMap({ normalized = [], onFeatureClick, height = 340, selec
       longitude: Number(item.longitude),
       nome: item.nome || `Pluviometro ${index + 1}`
     }))
-    .filter(item => Number.isFinite(item.latitude) && Number.isFinite(item.longitude))
+    .filter(item => item.ativo !== false && Number.isFinite(item.latitude) && Number.isFinite(item.longitude))
+  const deviceMarker = Number.isFinite(Number(devicePosition?.latitude)) && Number.isFinite(Number(devicePosition?.longitude))
+    ? { latitude: Number(devicePosition.latitude), longitude: Number(devicePosition.longitude), accuracy: Number(devicePosition.accuracy || 0) }
+    : null
 
   useEffect(() => {
     const node = containerRef.current
@@ -1921,6 +2054,16 @@ function SatelliteFarmMap({ normalized = [], onFeatureClick, height = 340, selec
             </g>
           )
         })}
+        {deviceMarker && (() => {
+          const pos = markerScreenPosition(deviceMarker)
+          return (
+            <g key="device-position" transform={`translate(${pos.x} ${pos.y})`}>
+              <circle cx="0" cy="0" r="17" fill="rgba(47,145,255,0.20)" stroke="rgba(255,255,255,0.75)" strokeWidth="1" />
+              <circle cx="0" cy="0" r="7" fill="#2f91ff" stroke="white" strokeWidth="2" />
+              <text x="0" y="27" fill="white" fontSize="9" fontWeight="900" textAnchor="middle" paintOrder="stroke" stroke="rgba(0,0,0,0.7)" strokeWidth="3">Voce</text>
+            </g>
+          )
+        })()}
       </svg>
       <div style={satelliteControlsStyle} onPointerDown={e => e.stopPropagation()} onWheel={e => e.stopPropagation()} onDoubleClick={e => e.stopPropagation()}>
         <button type="button" aria-label="Aproximar mapa" onClick={e => changeZoom(e, 1)} style={satelliteControlButtonStyle}>+</button>
@@ -2692,11 +2835,11 @@ const sidebarNavButtonStyle = { width: '100%', border: '1px solid', borderRadius
 const heroPanelStyle = { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 14, padding: 16, display: 'flex', justifyContent: 'space-between', gap: 14, alignItems: 'center', flexWrap: 'wrap' }
 const panelStyle = { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 14, padding: 14 }
 const mapMainPageStyle = { position: 'relative', width: '100%', minHeight: '100vh', overflow: 'hidden', background: '#102316' }
-const mapMainPageMobileStyle = { position: 'relative', width: '100%', minHeight: '100vh', overflow: 'auto', background: '#102316' }
+const mapMainPageMobileStyle = { position: 'relative', width: '100%', height: '100vh', minHeight: '100vh', overflow: 'hidden', background: '#102316' }
 const mapTopInfoStyle = { position: 'absolute', top: 92, left: 18, zIndex: 5, background: 'rgba(5,18,12,0.62)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 14, padding: '12px 14px', backdropFilter: 'blur(8px)', maxWidth: 360 }
 const mapTalhaoChipStyle = { position: 'absolute', top: 92, right: 18, zIndex: 5, background: 'rgba(255,255,255,0.92)', border: `1px solid ${C.border}`, borderRadius: 14, padding: '11px 13px', minWidth: 190, boxShadow: '0 10px 30px rgba(0,0,0,0.16)', display: 'grid', gap: 2 }
 const timelineDockStyle = { position: 'absolute', top: 92, right: 16, bottom: 16, zIndex: 6, width: 'min(360px, calc(100% - 32px))', background: 'rgba(18,73,37,0.68)', border: '1px solid rgba(168,217,143,0.58)', borderRadius: 16, padding: 13, backdropFilter: 'blur(14px)', boxShadow: '0 18px 48px rgba(0,0,0,0.32)', overflowY: 'auto', display: 'flex', flexDirection: 'column' }
-const timelineMobileStyle = { position: 'relative', zIndex: 6, margin: 8, background: 'rgba(18,73,37,0.82)', border: '1px solid rgba(168,217,143,0.58)', borderRadius: 12, padding: 10, boxShadow: '0 12px 28px rgba(0,0,0,0.24)' }
+const timelineMobileStyle = { position: 'absolute', left: 9, right: 9, bottom: 10, zIndex: 6, background: 'rgba(18,73,37,0.58)', border: '1px solid rgba(168,217,143,0.42)', borderRadius: 13, padding: 9, boxShadow: '0 12px 28px rgba(0,0,0,0.24)', backdropFilter: 'blur(12px)', overflow: 'hidden' }
 const timelineHeaderStyle = { display: 'grid', gap: 8, marginBottom: 10 }
 const timelineHeaderMobileStyle = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 7 }
 const timelineMobileEyebrowStyle = { margin: 0, fontSize: 8, color: 'rgba(255,255,255,0.62)', fontFamily: 'monospace', letterSpacing: '1.1px', fontWeight: 900 }
@@ -2714,7 +2857,11 @@ const timelineTableStyle = { display: 'grid', gap: 8, paddingBottom: 3 }
 const timelineTableDesktopStyle = { display: 'grid', gap: 8, paddingBottom: 3, flex: 1, gridAutoRows: 'minmax(96px, 1fr)' }
 const timelineCellStyle = { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 10, minHeight: 92, textAlign: 'left', color: C.textDk, display: 'grid', gap: 3, cursor: 'pointer' }
 const timelineTableHorizontalStyle = { display: 'flex', gap: 8, overflowX: 'auto', padding: '1px 2px 7px', marginRight: -10, scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch' }
-const timelineCellHorizontalStyle = { ...timelineCellStyle, minWidth: 148, maxWidth: 148, minHeight: 82, padding: 9, gap: 2, scrollSnapAlign: 'start' }
+const timelineCellHorizontalStyle = { ...timelineCellStyle, minWidth: 148, maxWidth: 148, minHeight: 82, padding: 9, gap: 2, scrollSnapAlign: 'start', fontSize: 11, lineHeight: 1.25 }
+const timelineInfoHorizontalCardStyle = { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 9, minWidth: 158, maxWidth: 158, minHeight: 76, color: C.textDk, display: 'grid', alignContent: 'start', gap: 5, scrollSnapAlign: 'start', fontSize: 11, lineHeight: 1.25 }
+const timelineMetricHorizontalCardStyle = { ...timelineInfoHorizontalCardStyle, minWidth: 128, maxWidth: 128 }
+const timelineInputHorizontalCardStyle = { ...timelineInfoHorizontalCardStyle, minWidth: 164, maxWidth: 164, fontSize: 9, color: C.textDim, fontFamily: 'monospace', letterSpacing: '0.8px', fontWeight: 900 }
+const timelineCtaHorizontalStyle = { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 9, minWidth: 126, maxWidth: 126, minHeight: 76, color: C.greenDp, display: 'grid', placeItems: 'center', textAlign: 'center', fontSize: 12, fontWeight: 900, cursor: 'pointer', scrollSnapAlign: 'start' }
 const timelineScrollEndStyle = { minWidth: 2, flex: '0 0 2px' }
 const timelineActionsStyle = { display: 'flex', gap: 8, flexWrap: 'wrap', margin: '0 0 10px' }
 const timelineActionButtonStyle = { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 9, padding: '8px 11px', color: C.textDk, fontWeight: 900, cursor: 'pointer' }
@@ -2726,7 +2873,7 @@ const timelineMobileModeButtonStyle = { ...timelineModeButtonStyle, padding: '6p
 const timelineRainLayoutStyle = { display: 'grid', gap: 8, alignItems: 'stretch' }
 const timelineDateGridStyle = { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 10, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 8, alignItems: 'end' }
 const timelineDateLabelStyle = { display: 'grid', gap: 5, color: C.textDim, fontSize: 9, fontFamily: 'monospace', letterSpacing: '1px', fontWeight: 900 }
-const timelineDateInputStyle = { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: '8px 9px', color: C.textDk, fontSize: 12, fontWeight: 800, minWidth: 0 }
+const timelineDateInputStyle = { width: '100%', boxSizing: 'border-box', background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: '8px 9px', color: C.textDk, fontSize: 12, fontWeight: 800, minWidth: 0 }
 const timelinePrimaryButtonStyle = { background: C.greenDp, color: C.bg, border: 'none', borderRadius: 8, padding: '9px 10px', fontSize: 11, fontWeight: 900, cursor: 'pointer' }
 const timelineRainGridStyle = { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(120px, 1fr))', gap: 8 }
 const timelineRainMetricStyle = { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 10, color: C.textDk, display: 'grid', gap: 4 }
