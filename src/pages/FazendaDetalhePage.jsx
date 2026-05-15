@@ -38,31 +38,31 @@ const DESKTOP_NAV_GROUPS = [
   {
     title: 'Campo',
     items: [
-      { key: 'dashboard', view: 'dashboard', label: 'Dashboard', code: 'DB' },
-      { key: 'talhoes', view: 'gerencial', manager: 'talhoes', label: 'Talhoes', code: 'TA' },
-      { key: 'chuvas', view: 'chuvas', label: 'Chuvas', code: 'CH' },
-      { key: 'solo', view: 'solo', label: 'Solo', code: 'SL' },
-      { key: 'scouting', view: 'scouting', label: 'Scouting', code: 'SC' }
+      { key: 'dashboard', view: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
+      { key: 'talhoes', view: 'gerencial', manager: 'talhoes', label: 'Talhoes', icon: 'map' },
+      { key: 'chuvas', view: 'chuvas', label: 'Chuvas', icon: 'cloud-rain' },
+      { key: 'solo', view: 'solo', label: 'Solo', icon: 'soil' },
+      { key: 'scouting', view: 'scouting', label: 'Scouting', icon: 'search' }
     ]
   },
   {
     title: 'Operacao',
     items: [
-      { key: 'pluviometros', view: 'gerencial', manager: 'pluviometros', label: 'Pluviometros', code: 'PL' },
-      { key: 'estoque', view: 'gerencial', manager: 'estoque', label: 'Estoque', code: 'ES' },
-      { key: 'equipe', view: 'gerencial', manager: 'equipe', label: 'Equipe', code: 'EQ' },
-      { key: 'insumos', view: 'gerencial', manager: 'insumos', label: 'Insumos', code: 'IN' },
-      { key: 'maquinas', view: 'gerencial', manager: 'maquinas', label: 'Maquinas', code: 'MA' }
+      { key: 'pluviometros', view: 'gerencial', manager: 'pluviometros', label: 'Pluviometros', icon: 'cloud-rain' },
+      { key: 'estoque', view: 'gerencial', manager: 'estoque', label: 'Estoque', icon: 'cube' },
+      { key: 'equipe', view: 'gerencial', manager: 'equipe', label: 'Equipe', icon: 'users' },
+      { key: 'insumos', view: 'gerencial', manager: 'insumos', label: 'Insumos', icon: 'beaker' },
+      { key: 'maquinas', view: 'gerencial', manager: 'maquinas', label: 'Maquinas', icon: 'tractor' }
     ]
   },
   {
     title: 'Gestao',
     items: [
-      { key: 'safras', view: 'gerencial', manager: 'safras', label: 'Safras', code: 'SF' },
-      { key: 'custos', view: 'gerencial', manager: 'custos', label: 'Centros de custo', code: 'CC' },
-      { key: 'produtividade', view: 'gerencial', manager: 'produtividade', label: 'Produtividade', code: 'PR' },
-      { key: 'configuracao', view: 'gerencial', manager: 'configuracao', label: 'Configuracoes', code: 'CF' },
-      { key: 'relatorios', view: 'relatorios', label: 'Relatorios', code: 'RL' }
+      { key: 'safras', view: 'gerencial', manager: 'safras', label: 'Safras', icon: 'leaf' },
+      { key: 'custos', view: 'gerencial', manager: 'custos', label: 'Centros de custo', icon: 'dollar' },
+      { key: 'produtividade', view: 'gerencial', manager: 'produtividade', label: 'Produtividade', icon: 'bar-chart' },
+      { key: 'configuracao', view: 'gerencial', manager: 'configuracao', label: 'Configuracoes', icon: 'gear' },
+      { key: 'relatorios', view: 'relatorios', label: 'Relatorios', icon: 'report' }
     ]
   }
 ]
@@ -685,17 +685,25 @@ export function FazendaDetalhePage() {
         {showDesktopShell && (
           <>
             <div style={desktopTopbarBrandStyle}>
-              <button onClick={() => setMenuOpen(open => !open)} style={desktopMenuButtonStyle}>|||</button>
+              <button onClick={() => setMenuOpen(open => !open)} style={desktopMenuButtonStyle} aria-label="Abrir menu">
+                <DesktopIcon name="menu" size={24} />
+              </button>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <p style={desktopTopbarEyebrowStyle}>FAZENDA</p>
                 <h1 style={desktopTopbarTitleStyle}>{fazenda?.nome}</h1>
               </div>
             </div>
             <div style={desktopTopbarActionsStyle}>
-              <button type="button" style={desktopUtilityButtonStyle}>!</button>
-              <button type="button" style={desktopUtilityButtonStyle}>?</button>
+              <button type="button" style={desktopUtilityButtonStyle} aria-label="Notificacoes">
+                <DesktopIcon name="bell" size={20} />
+              </button>
+              <button type="button" style={desktopUtilityButtonStyle} aria-label="Ajuda">
+                <DesktopIcon name="help" size={20} />
+              </button>
               <button type="button" style={desktopAvatarButtonStyle}>AG</button>
-              <button type="button" style={desktopChevronButtonStyle}>v</button>
+              <button type="button" style={desktopChevronButtonStyle} aria-label="Abrir perfil">
+                <DesktopIcon name="chevron-down" size={18} />
+              </button>
             </div>
           </>
         )}
@@ -773,7 +781,7 @@ export function FazendaDetalhePage() {
         </div>
       )}
 
-      <main style={{ flex: 1, width: '100%', maxWidth: isMapView ? 'none' : (showDesktopShell ? 'none' : 1360), margin: showDesktopShell ? 0 : '0 auto', padding: isMapView ? 0 : (showDesktopShell ? 0 : 16), paddingTop: isMapView ? 0 : (showDesktopShell ? 92 : 98) }}>
+      <main style={{ flex: 1, width: '100%', maxWidth: isMapView ? 'none' : (showDesktopShell ? 'none' : 1360), margin: showDesktopShell ? 0 : '0 auto', padding: isMapView ? 0 : (showDesktopShell ? 0 : 16), paddingTop: isMapView ? 0 : (showDesktopShell ? 76 : 98) }}>
         <div style={showDesktopShell ? farmLayoutDesktopStyle : farmLayoutStyle}>
           {showDesktopShell && (
             <FarmDesktopSidebar
@@ -909,11 +917,11 @@ function FarmDesktopSidebar({ activeView, setActiveView, activeManager, setActiv
                   }}
                 >
                   <span style={{
-                    ...desktopNavCodeStyle,
-                    background: active ? C.bg : C.bg,
-                    color: active ? C.greenDp : C.textDk,
-                    borderColor: active ? `${C.greenDp}55` : 'transparent'
-                  }}>{item.code}</span>
+                    ...desktopNavIconStyle,
+                    color: active ? C.greenDp : C.textDk
+                  }}>
+                    <DesktopIcon name={item.icon} size={23} />
+                  </span>
                   <span style={desktopNavTextStyle}>
                     <strong style={desktopNavLabelStyle}>{item.label}</strong>
                   </span>
@@ -928,6 +936,241 @@ function FarmDesktopSidebar({ activeView, setActiveView, activeManager, setActiv
         <button type="button" onClick={() => navigate('/')} style={desktopSidebarReturnStyle}>{'<'} Recolher menu</button>
       </div>
     </aside>
+  )
+}
+
+function DesktopIcon({ name, size = 22 }) {
+  const common = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.9, strokeLinecap: 'round', strokeLinejoin: 'round' }
+  let shape
+
+  switch (name) {
+    case 'menu':
+      shape = (
+        <>
+          <path d="M5 7h14" />
+          <path d="M5 12h14" />
+          <path d="M5 17h14" />
+        </>
+      )
+      break
+    case 'bell':
+      shape = (
+        <>
+          <path d="M15 18H9" />
+          <path d="M18 16H6c1.5-1.6 2-3.5 2-6a4 4 0 0 1 8 0c0 2.5.5 4.4 2 6Z" />
+          <path d="M13.6 20a2 2 0 0 1-3.2 0" />
+        </>
+      )
+      break
+    case 'help':
+      shape = (
+        <>
+          <circle cx="12" cy="12" r="8.5" />
+          <path d="M9.8 9.3a2.5 2.5 0 0 1 4.8 1.2c0 1.8-2.1 2-2.1 3.6" />
+          <path d="M12 17.3h.01" />
+        </>
+      )
+      break
+    case 'chevron-down':
+      shape = <path d="m7 10 5 5 5-5" />
+      break
+    case 'dashboard':
+      shape = (
+        <>
+          <rect x="4" y="4" width="6.5" height="6.5" rx="1.4" />
+          <rect x="13.5" y="4" width="6.5" height="6.5" rx="1.4" />
+          <rect x="4" y="13.5" width="6.5" height="6.5" rx="1.4" />
+          <rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.4" />
+        </>
+      )
+      break
+    case 'home':
+      shape = (
+        <>
+          <path d="m4 11 8-7 8 7" />
+          <path d="M6.5 10.5V20h11v-9.5" />
+          <path d="M10 20v-5h4v5" />
+        </>
+      )
+      break
+    case 'map':
+      shape = (
+        <>
+          <path d="M4 6.5 9 4l6 2.5 5-2.5v13.5L15 20l-6-2.5L4 20V6.5Z" />
+          <path d="M9 4v13.5" />
+          <path d="M15 6.5V20" />
+        </>
+      )
+      break
+    case 'cloud-rain':
+      shape = (
+        <>
+          <path d="M7 16h10a3.5 3.5 0 0 0 .6-6.9A5.3 5.3 0 0 0 7 8.3 3.9 3.9 0 0 0 7 16Z" />
+          <path d="M8 20v-1.2" />
+          <path d="M12 21v-1.2" />
+          <path d="M16 20v-1.2" />
+        </>
+      )
+      break
+    case 'soil':
+      shape = (
+        <>
+          <path d="M4 15c2.4-1.5 5-1.5 8 0s5.6 1.5 8 0" />
+          <path d="M4 19c2.4-1.5 5-1.5 8 0s5.6 1.5 8 0" />
+          <path d="M12 12V5" />
+          <path d="M12 8c2.5 0 4.5-1.5 5-3.7-2.7-.4-4.5.6-5 3.7Z" />
+          <path d="M12 10c-2.3 0-4-1.3-4.5-3.2 2.2-.3 3.8.5 4.5 3.2Z" />
+        </>
+      )
+      break
+    case 'search':
+      shape = (
+        <>
+          <circle cx="10.5" cy="10.5" r="5.8" />
+          <path d="m15 15 5 5" />
+        </>
+      )
+      break
+    case 'cube':
+      shape = (
+        <>
+          <path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3Z" />
+          <path d="M4 7.5 12 12l8-4.5" />
+          <path d="M12 12v9" />
+        </>
+      )
+      break
+    case 'users':
+      shape = (
+        <>
+          <circle cx="9" cy="8" r="3" />
+          <path d="M3.8 19c.8-3.2 2.5-4.8 5.2-4.8s4.4 1.6 5.2 4.8" />
+          <path d="M15.8 10.4a2.7 2.7 0 1 0-1-5.2" />
+          <path d="M15.3 14.4c2.5.3 4.1 1.8 4.9 4.6" />
+        </>
+      )
+      break
+    case 'beaker':
+      shape = (
+        <>
+          <path d="M9 3h6" />
+          <path d="M10 3v5.5L5.5 18.8A1.5 1.5 0 0 0 6.9 21h10.2a1.5 1.5 0 0 0 1.4-2.2L14 8.5V3" />
+          <path d="M8.1 16h7.8" />
+        </>
+      )
+      break
+    case 'tractor':
+      shape = (
+        <>
+          <path d="M4 16h2.4" />
+          <path d="M9.6 16h4.2" />
+          <path d="M16.8 16H20" />
+          <path d="M7 12h6l1.2 4" />
+          <path d="M7 12V7h4l2 5" />
+          <path d="M5 7h3" />
+          <circle cx="7.8" cy="17" r="2.7" />
+          <circle cx="17.2" cy="17" r="3.2" />
+        </>
+      )
+      break
+    case 'leaf':
+      shape = (
+        <>
+          <path d="M5 19c7.5-.4 13-6 14-14-8 .7-13.4 5.7-14 14Z" />
+          <path d="M5 19c3.7-4.1 7.1-6.8 12-10" />
+        </>
+      )
+      break
+    case 'dollar':
+      shape = (
+        <>
+          <circle cx="12" cy="12" r="8.5" />
+          <path d="M12 7v10" />
+          <path d="M15 9.2c-.8-.7-1.8-1.1-3-1.1-1.5 0-2.7.8-2.7 2s1.1 1.7 2.9 2.1c1.9.4 3 .9 3 2.2s-1.2 2.2-3 2.2c-1.4 0-2.6-.4-3.6-1.3" />
+        </>
+      )
+      break
+    case 'bar-chart':
+      shape = (
+        <>
+          <path d="M4 20h16" />
+          <path d="M6.5 20v-5" />
+          <path d="M11.5 20V9" />
+          <path d="M16.5 20V5" />
+        </>
+      )
+      break
+    case 'gear':
+      shape = (
+        <>
+          <circle cx="12" cy="12" r="3" />
+          <path d="M12 3v2" />
+          <path d="M12 19v2" />
+          <path d="M4.2 7.5 6 8.5" />
+          <path d="M18 15.5l1.8 1" />
+          <path d="M4.2 16.5 6 15.5" />
+          <path d="M18 8.5l1.8-1" />
+          <path d="M7.5 4.2 8.5 6" />
+          <path d="M15.5 18l1 1.8" />
+          <path d="M16.5 4.2 15.5 6" />
+          <path d="M8.5 18l-1 1.8" />
+        </>
+      )
+      break
+    case 'report':
+      shape = (
+        <>
+          <path d="M6 3h9l3 3v15H6V3Z" />
+          <path d="M14 3v4h4" />
+          <path d="M9 12h6" />
+          <path d="M9 16h6" />
+        </>
+      )
+      break
+    case 'pencil':
+      shape = (
+        <>
+          <path d="M4 20h4l11-11a2.1 2.1 0 0 0-3-3L5 17l-1 3Z" />
+          <path d="m14 8 3 3" />
+        </>
+      )
+      break
+    case 'upload':
+      shape = (
+        <>
+          <path d="M12 16V4" />
+          <path d="m7 9 5-5 5 5" />
+          <path d="M5 16v3h14v-3" />
+        </>
+      )
+      break
+    case 'plus-circle':
+      shape = (
+        <>
+          <circle cx="12" cy="12" r="8.5" />
+          <path d="M12 8v8" />
+          <path d="M8 12h8" />
+        </>
+      )
+      break
+    case 'refresh':
+      shape = (
+        <>
+          <path d="M20 6v5h-5" />
+          <path d="M4 18v-5h5" />
+          <path d="M18 10a6.5 6.5 0 0 0-10.8-3" />
+          <path d="M6 14a6.5 6.5 0 0 0 10.8 3" />
+        </>
+      )
+      break
+    default:
+      shape = <circle cx="12" cy="12" r="8" />
+  }
+
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} aria-hidden="true" style={{ display: 'block' }} {...common}>
+      {shape}
+    </svg>
   )
 }
 
@@ -1824,42 +2067,70 @@ function MapaCadastroTalhoes({ talhoes, total, onOpenCadastro, onSelectTalhao })
 
   return (
     <div style={mapManagerShellStyle}>
-      <div style={mapSideMenuStyle}>
-        <p style={sidebarEyebrowStyle}>MAPA</p>
-        <button onClick={() => onOpenCadastro('draw')} style={mapToolButtonStyle}>Desenhar talhão</button>
-        <button onClick={() => onOpenCadastro('kml')} style={mapToolButtonStyle}>Importar KML</button>
-        <button onClick={() => onOpenCadastro()} style={mapToolButtonStyle}>Cadastro completo</button>
-      </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', marginBottom: 10 }}>
-          <div>
-            <p style={eyebrowStyle}>TALHÕES GEOREFERENCIADOS</p>
-            <h3 style={panelTitleStyle}>Mapa da fazenda</h3>
-          </div>
-          <span style={mapCounterStyle}>{talhoes.length} talhoes</span>
+      <div style={managerBreadcrumbRowStyle}>
+        <div style={managerBreadcrumbStyle}>
+          <DesktopIcon name="home" size={20} />
+          <span style={managerBreadcrumbSepStyle}>{'>'}</span>
+          <span>Talhoes georreferenciados</span>
+          <span style={managerBreadcrumbSepStyle}>{'>'}</span>
+          <strong>Mapa da fazenda</strong>
         </div>
-        <div style={managementSummaryStripStyle}>
-          <div style={managementSummaryCardStyle}>
-            <span>AREA TOTAL</span>
-            <strong>{Number(total || 0).toFixed(2)} ha</strong>
+        <div style={managerMapActionsStyle}>
+          <span style={mapCounterStyle}>{talhoes.length} talhoes</span>
+          <button type="button" style={mapRefreshButtonStyle} aria-label="Atualizar mapa">
+            <DesktopIcon name="refresh" size={19} />
+          </button>
+        </div>
+      </div>
+
+      <div style={managementSummaryStripStyle}>
+        <div style={managementSummaryCardStyle}>
+          <span style={managementSummaryIconStyle}><DesktopIcon name="map" size={25} /></span>
+          <div style={managementSummaryTextStyle}>
+            <span style={managementSummaryLabelStyle}>Area total</span>
+            <strong style={managementSummaryValueStyle}>{Number(total || 0).toFixed(2)} ha</strong>
           </div>
-          <div style={managementSummaryCardStyle}>
-            <span>TALHOES</span>
-            <strong>{talhoes.length}</strong>
+        </div>
+        <div style={managementSummaryCardStyle}>
+          <span style={managementSummaryIconStyle}><DesktopIcon name="dashboard" size={24} /></span>
+          <div style={managementSummaryTextStyle}>
+            <span style={managementSummaryLabelStyle}>Talhoes</span>
+            <strong style={managementSummaryValueStyle}>{talhoes.length}</strong>
           </div>
-          <div style={managementSummaryCardStyle}>
-            <span>COM GEOMETRIA</span>
-            <strong>{features.length}</strong>
+        </div>
+        <div style={managementSummaryCardStyle}>
+          <span style={managementSummaryIconStyle}><DesktopIcon name="soil" size={25} /></span>
+          <div style={managementSummaryTextStyle}>
+            <span style={managementSummaryLabelStyle}>Com geometria</span>
+            <strong style={managementSummaryValueStyle}>{features.length}</strong>
           </div>
+        </div>
+      </div>
+
+      <div style={managerMapStageStyle}>
+        <div style={mapOverlayToolsStyle}>
+          <button onClick={() => onOpenCadastro('draw')} style={mapToolButtonStyle}>
+            <DesktopIcon name="pencil" size={24} />
+            <span>Desenhar</span>
+          </button>
+          <button onClick={() => onOpenCadastro('kml')} style={mapToolButtonStyle}>
+            <DesktopIcon name="upload" size={24} />
+            <span>Importar<br />KML</span>
+          </button>
+          <button onClick={() => onOpenCadastro()} style={mapToolButtonStyle}>
+            <DesktopIcon name="plus-circle" size={24} />
+            <span>Cadastro</span>
+          </button>
         </div>
         <SimpleFarmMap
           features={features.map(item => ({ ...item.feature, properties: { ...item.feature.properties, codigo: item.talhao.codigo } }))}
-          height={360}
+          height={430}
           onFeatureClick={(index) => onSelectTalhao(features[index].talhao)}
         />
       </div>
     </div>
   )
+
 }
 
 function TalhaoGeoModal({ fazendaId, initialMode, sugerirCodigo, talhoes, onClose, onCreated }) {
@@ -3569,15 +3840,15 @@ const viewTitleStyle = { margin: '4px 0 0', fontSize: 24, color: C.textDk, fontW
 const viewSubtitleStyle = { margin: '8px 0 0', fontSize: 13, color: C.textMid, maxWidth: 620, lineHeight: 1.45 }
 const panelTitleStyle = { margin: 0, fontSize: 15, color: C.textDk, fontWeight: 800, fontFamily: 'Georgia, serif' }
 const viewStackStyle = { display: 'grid', gap: 14 }
-const desktopTopbarStyle = { position: 'fixed', top: 0, left: 0, right: 0, height: 92, zIndex: 40, background: C.bg, borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 34px 0 22px', boxSizing: 'border-box' }
-const desktopTopbarBrandStyle = { width: 266, display: 'flex', alignItems: 'center', gap: 18 }
-const desktopMenuButtonStyle = { background: C.greenDp, color: C.bg, border: 'none', borderRadius: 10, width: 52, height: 52, fontSize: 18, fontWeight: 900, cursor: 'pointer', letterSpacing: -3, lineHeight: 1 }
-const desktopTopbarEyebrowStyle = { margin: 0, fontSize: 10, color: C.greenDp, fontFamily: 'monospace', letterSpacing: '4px', fontWeight: 900 }
-const desktopTopbarTitleStyle = { margin: '4px 0 0', color: C.textDk, fontSize: 26, lineHeight: 1, fontFamily: 'Georgia, serif', fontWeight: 900 }
-const desktopTopbarActionsStyle = { display: 'flex', alignItems: 'center', gap: 22, color: C.textDk }
-const desktopUtilityButtonStyle = { width: 34, height: 34, border: 'none', background: 'transparent', color: C.textDk, fontSize: 17, fontWeight: 800, cursor: 'pointer' }
-const desktopAvatarButtonStyle = { width: 46, height: 46, borderRadius: 999, border: `1px solid ${C.greenDp}22`, background: C.greenLight, color: C.greenDp, fontSize: 15, fontWeight: 900, cursor: 'pointer' }
-const desktopChevronButtonStyle = { width: 28, height: 28, border: 'none', background: 'transparent', color: C.textDk, fontSize: 14, fontWeight: 900, cursor: 'pointer' }
+const desktopTopbarStyle = { position: 'fixed', top: 0, left: 0, right: 0, height: 76, zIndex: 40, background: C.bg, borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 26px 0 20px', boxSizing: 'border-box' }
+const desktopTopbarBrandStyle = { width: 280, display: 'flex', alignItems: 'center', gap: 14 }
+const desktopMenuButtonStyle = { background: C.greenDp, color: C.bg, border: 'none', borderRadius: 10, width: 42, height: 42, display: 'grid', placeItems: 'center', cursor: 'pointer', lineHeight: 1 }
+const desktopTopbarEyebrowStyle = { margin: 0, fontSize: 9, color: C.greenDp, fontFamily: 'monospace', letterSpacing: '3.2px', fontWeight: 900 }
+const desktopTopbarTitleStyle = { margin: '3px 0 0', color: C.textDk, fontSize: 22, lineHeight: 1.04, fontFamily: 'Georgia, serif', fontWeight: 900, whiteSpace: 'nowrap' }
+const desktopTopbarActionsStyle = { display: 'flex', alignItems: 'center', gap: 15, color: C.textDk }
+const desktopUtilityButtonStyle = { width: 32, height: 32, border: 'none', background: 'transparent', color: C.textDk, display: 'grid', placeItems: 'center', cursor: 'pointer' }
+const desktopAvatarButtonStyle = { width: 38, height: 38, borderRadius: 999, border: `1px solid ${C.greenDp}22`, background: C.greenLight, color: C.greenDp, fontSize: 14, fontWeight: 900, cursor: 'pointer' }
+const desktopChevronButtonStyle = { width: 28, height: 28, border: 'none', background: 'transparent', color: C.textDk, display: 'grid', placeItems: 'center', cursor: 'pointer' }
 const floatingHeaderStyle = { position: 'fixed', top: 14, left: 14, zIndex: 40, background: 'rgba(255,255,255,0.94)', border: `1px solid ${C.border}`, borderRadius: 14, padding: 8, boxShadow: '0 10px 30px rgba(0,0,0,0.12)', backdropFilter: 'blur(10px)' }
 const hamburgerButtonStyle = { background: C.greenDp, color: C.bg, border: 'none', borderRadius: 9, width: 36, height: 36, fontSize: 18, fontWeight: 900, cursor: 'pointer' }
 const drawerBackdropStyle = { position: 'fixed', inset: 0, zIndex: 60, background: 'rgba(0,0,0,0.24)' }
@@ -3590,22 +3861,23 @@ const drawerBrandStyle = { background: C.bg, border: `1px solid ${C.border}`, bo
 const drawerReturnButtonStyle = { width: '100%', border: `1px solid ${C.border}`, borderRadius: 11, padding: '12px 13px', background: C.bgLight, color: C.textDk, fontSize: 12, fontWeight: 900, textAlign: 'left', cursor: 'pointer' }
 const farmLayoutStyle = { display: 'block', alignItems: 'flex-start', gap: 14 }
 const farmSidebarStyle = { display: 'none' }
-const farmLayoutDesktopStyle = { display: 'grid', gridTemplateColumns: '288px minmax(0, 1fr)', gap: 0, alignItems: 'start', minHeight: 'calc(100vh - 92px)' }
-const farmContentDesktopStyle = { minWidth: 0, padding: '0 24px 32px 32px' }
-const farmDesktopSidebarStyle = { position: 'sticky', top: 92, alignSelf: 'start', background: C.bg, borderRight: `1px solid ${C.border}`, padding: '30px 14px 28px 8px', height: 'calc(100vh - 92px)', display: 'flex', flexDirection: 'column', gap: 22, boxSizing: 'border-box' }
+const farmLayoutDesktopStyle = { display: 'grid', gridTemplateColumns: '244px minmax(0, 1fr)', gap: 0, alignItems: 'start', minHeight: 'calc(100vh - 76px)' }
+const farmContentDesktopStyle = { minWidth: 0, padding: '0 20px 28px 24px' }
+const farmDesktopSidebarStyle = { position: 'sticky', top: 76, alignSelf: 'start', background: C.bg, borderRight: `1px solid ${C.border}`, padding: '24px 10px 22px 8px', height: 'calc(100vh - 76px)', display: 'flex', flexDirection: 'column', gap: 16, boxSizing: 'border-box' }
 const desktopSidebarHeaderStyle = { borderBottom: `1px solid ${C.borderSoft}`, padding: '2px 2px 11px', display: 'grid', gap: 3 }
 const desktopSidebarFarmNameStyle = { color: C.textDk, fontSize: 15, lineHeight: 1.15, fontFamily: 'Georgia, serif' }
 const desktopSidebarFarmMetaStyle = { color: C.textMid, fontSize: 11, lineHeight: 1.25 }
-const desktopSidebarGroupsStyle = { display: 'grid', gap: 28 }
-const desktopNavGroupStyle = { display: 'grid', gap: 8 }
-const desktopNavGroupTitleStyle = { margin: '0 14px 6px', color: C.textDim, fontSize: 11, fontFamily: 'system-ui, -apple-system, Segoe UI, sans-serif', letterSpacing: '1px', fontWeight: 900 }
-const desktopNavButtonStyle = { width: '100%', minHeight: 52, border: '1px solid', borderRadius: 8, padding: '0 14px 0 25px', display: 'grid', gridTemplateColumns: '32px minmax(0, 1fr)', gap: 16, alignItems: 'center', textAlign: 'left', cursor: 'pointer', fontFamily: 'system-ui, -apple-system, Segoe UI, sans-serif' }
-const desktopNavCodeStyle = { width: 32, height: 32, border: '1px solid', borderRadius: 8, display: 'grid', placeItems: 'center', fontSize: 10, fontFamily: 'monospace', fontWeight: 900 }
+const desktopSidebarGroupsStyle = { display: 'grid', gap: 18 }
+const desktopNavGroupStyle = { display: 'grid', gap: 5 }
+const desktopNavGroupTitleStyle = { margin: '0 12px 5px', color: C.textDim, fontSize: 10, fontFamily: 'system-ui, -apple-system, Segoe UI, sans-serif', letterSpacing: '1px', fontWeight: 900 }
+const desktopNavButtonStyle = { width: '100%', minHeight: 44, border: '1px solid', borderRadius: 7, padding: '0 11px 0 18px', display: 'grid', gridTemplateColumns: '24px minmax(0, 1fr)', gap: 12, alignItems: 'center', textAlign: 'left', cursor: 'pointer', fontFamily: 'system-ui, -apple-system, Segoe UI, sans-serif' }
+const desktopNavIconStyle = { width: 24, height: 24, display: 'grid', placeItems: 'center' }
+const desktopNavCodeStyle = { width: 24, height: 24, border: '1px solid', borderRadius: 7, display: 'grid', placeItems: 'center', fontSize: 9, fontFamily: 'monospace', fontWeight: 900 }
 const desktopNavTextStyle = { display: 'grid', gap: 1, minWidth: 0 }
-const desktopNavLabelStyle = { color: C.textDk, fontSize: 16, lineHeight: 1.1, fontFamily: 'system-ui, -apple-system, Segoe UI, sans-serif', fontWeight: 700 }
+const desktopNavLabelStyle = { color: C.textDk, fontSize: 14, lineHeight: 1.1, fontFamily: 'system-ui, -apple-system, Segoe UI, sans-serif', fontWeight: 700 }
 const desktopNavHintStyle = { color: C.textMid, fontSize: 10, lineHeight: 1.18, fontFamily: 'system-ui, -apple-system, Segoe UI, sans-serif', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
 const desktopSidebarFooterStyle = { marginTop: 'auto', borderTop: `1px solid ${C.borderSoft}`, paddingTop: 10, display: 'grid', gap: 7 }
-const desktopSidebarReturnStyle = { width: '100%', background: 'transparent', border: 'none', color: '#25364f', padding: '14px 20px', fontSize: 14, fontWeight: 700, textAlign: 'left', cursor: 'pointer', fontFamily: 'system-ui, -apple-system, Segoe UI, sans-serif' }
+const desktopSidebarReturnStyle = { width: '100%', background: 'transparent', border: 'none', color: '#25364f', padding: '12px 18px', fontSize: 13, fontWeight: 700, textAlign: 'left', cursor: 'pointer', fontFamily: 'system-ui, -apple-system, Segoe UI, sans-serif' }
 const sidebarEyebrowStyle = { margin: '2px 4px 5px', fontSize: 9, color: C.textDim, fontFamily: 'monospace', letterSpacing: '1.4px', fontWeight: 900 }
 const sidebarNavButtonStyle = { width: '100%', border: '1px solid', borderRadius: 10, padding: '10px 11px', fontSize: 12, fontWeight: 800, textAlign: 'left', cursor: 'pointer' }
 const heroPanelStyle = { background: C.bg, border: 'none', borderBottom: `1px solid ${C.border}`, borderRadius: 0, padding: '28px 20px 22px', display: 'flex', justifyContent: 'space-between', gap: 14, alignItems: 'center', flexWrap: 'wrap' }
@@ -3711,7 +3983,7 @@ const plotShapeStyle = { position: 'absolute', border: '2px solid rgba(255,255,2
 const legendStyle = { position: 'absolute', left: 14, bottom: 14, background: 'rgba(5,14,11,0.86)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 10, color: C.bg, padding: 12, width: 190 }
 const gradientBarStyle = { height: 10, borderRadius: 99, margin: '8px 0 5px', background: 'linear-gradient(90deg, #2fb15f, #e8c84c, #ef4d39)' }
 const managementPageStyle = { display: 'grid', gap: 14 }
-const managementHeroStyle = { background: C.bg, border: 'none', borderBottom: `1px solid ${C.border}`, borderRadius: 0, padding: '28px 20px 22px' }
+const managementHeroStyle = { background: C.bg, border: 'none', borderBottom: `1px solid ${C.border}`, borderRadius: 0, padding: '24px 20px 18px' }
 const managementHeroCompactStyle = { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, padding: 12 }
 const managementWorkspaceDesktopStyle = { display: 'grid', gridTemplateColumns: '220px minmax(0, 1fr)', gap: 12, alignItems: 'start' }
 const managementWorkspaceSingleStyle = { display: 'grid', gap: 12 }
@@ -3731,8 +4003,12 @@ const managementModuleContentStyle = { minWidth: 0 }
 const managementMenuGridStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 10 }
 const managementMenuCardStyle = { minHeight: 82, border: '1px solid', borderRadius: 10, padding: '12px 13px', display: 'grid', alignContent: 'start', gap: 5, textAlign: 'left', color: C.textDk, cursor: 'pointer' }
 const managementContentPanelStyle = { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 14, padding: 16, display: 'grid', gap: 12 }
-const managementSummaryStripStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 8, marginBottom: 10 }
-const managementSummaryCardStyle = { background: C.greenLight, border: `1px solid ${C.greenDp}22`, borderRadius: 12, padding: '10px 12px', display: 'grid', gap: 2 }
+const managementSummaryStripStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 14 }
+const managementSummaryCardStyle = { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: '15px 20px', display: 'grid', gridTemplateColumns: '44px minmax(0, 1fr)', gap: 15, alignItems: 'center', minHeight: 78, boxSizing: 'border-box' }
+const managementSummaryIconStyle = { width: 44, height: 44, borderRadius: 999, background: C.greenLight, color: C.greenDp, border: `1px solid ${C.greenDp}22`, display: 'grid', placeItems: 'center' }
+const managementSummaryTextStyle = { display: 'grid', gap: 3, minWidth: 0 }
+const managementSummaryLabelStyle = { color: C.textMid, fontSize: 13, fontFamily: 'system-ui, -apple-system, Segoe UI, sans-serif' }
+const managementSummaryValueStyle = { color: C.textDk, fontSize: 24, lineHeight: 1, fontFamily: 'Georgia, serif', fontWeight: 900 }
 const managementPlaceholderGridStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10 }
 const managementPlaceholderCardStyle = { background: C.bgSoft, border: `1px solid ${C.border}`, borderRadius: 12, padding: 12, display: 'grid', gap: 4 }
 const farmConfigGridStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 10 }
@@ -3742,10 +4018,17 @@ const managerCardStyle = { background: C.bg, border: `1px solid ${C.border}`, bo
 const reportButtonStyle = { background: C.bgSoft, border: `1px solid ${C.border}`, borderRadius: 10, padding: 11, display: 'grid', gridTemplateColumns: '34px 1fr', gap: 9, textAlign: 'left', alignItems: 'center', color: C.textDk }
 const reportPreviewStyle = { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 14, padding: 18, minHeight: 460 }
 const reportCoverArtStyle = { width: 180, height: 120, borderRadius: 12, background: 'linear-gradient(135deg, rgba(61,138,34,0.95), rgba(232,168,76,0.72)), repeating-linear-gradient(30deg, rgba(255,255,255,0.35) 0 2px, transparent 2px 18px)' }
-const mapManagerShellStyle = { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 14, padding: 12, display: 'flex', gap: 12, alignItems: 'stretch' }
+const mapManagerShellStyle = { background: C.bg, border: 'none', borderRadius: 0, padding: '14px 0 0', display: 'grid', gap: 14, alignItems: 'stretch' }
 const mapSideMenuStyle = { width: 170, flexShrink: 0, borderRight: `1px solid ${C.borderSoft}`, paddingRight: 10, display: 'grid', alignContent: 'start', gap: 8 }
-const mapToolButtonStyle = { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: '10px 11px', color: C.textDk, fontSize: 12, fontWeight: 800, textAlign: 'left', cursor: 'pointer' }
+const managerBreadcrumbRowStyle = { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }
+const managerBreadcrumbStyle = { display: 'flex', alignItems: 'center', gap: 12, color: C.textDk, fontSize: 15, fontFamily: 'system-ui, -apple-system, Segoe UI, sans-serif', minWidth: 0 }
+const managerBreadcrumbSepStyle = { color: C.textDim, fontSize: 18, lineHeight: 1 }
+const managerMapActionsStyle = { display: 'flex', alignItems: 'center', gap: 10 }
+const managerMapStageStyle = { position: 'relative', minWidth: 0 }
+const mapOverlayToolsStyle = { position: 'absolute', left: 12, top: 12, zIndex: 6, display: 'grid', gap: 8 }
+const mapToolButtonStyle = { width: 64, minHeight: 62, background: 'rgba(255,255,255,0.94)', border: `1px solid ${C.border}`, borderRadius: 7, padding: '8px 6px', color: C.textDk, fontSize: 10.5, lineHeight: 1.15, fontWeight: 700, textAlign: 'center', cursor: 'pointer', display: 'grid', justifyItems: 'center', alignContent: 'center', gap: 5, boxShadow: '0 8px 20px rgba(0,0,0,0.14)' }
 const mapCounterStyle = { background: C.greenLight, color: C.greenDp, border: `1px solid ${C.greenDp}33`, borderRadius: 999, padding: '5px 9px', fontSize: 10, fontFamily: 'monospace', fontWeight: 900 }
+const mapRefreshButtonStyle = { width: 36, height: 36, borderRadius: 8, border: `1px solid ${C.border}`, background: C.bg, color: C.textDk, cursor: 'pointer', display: 'grid', placeItems: 'center' }
 const modalOverlayStyle = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.58)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 14 }
 const geoModalStyle = { background: C.bg, borderRadius: 18, width: '100%', maxWidth: 1060, maxHeight: '94vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }
 const geoModalHeaderStyle = { padding: '16px 18px', borderBottom: `1px solid ${C.border}`, display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center' }
@@ -3768,7 +4051,7 @@ const satelliteShadeStyle = { position: 'absolute', inset: 0, background: 'linea
 const rainInterpolationLayerStyle = { position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 1, mixBlendMode: 'screen', opacity: 0.78 }
 const rainInterpolationSpotStyle = { position: 'absolute', width: 260, height: 260, borderRadius: 999, transform: 'translate(-50%, -50%)', filter: 'blur(8px)' }
 const satelliteSvgStyle = { position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'block' }
-const satelliteControlsStyle = { position: 'absolute', left: 24, top: 72, display: 'grid', gap: 8, alignItems: 'center', zIndex: 5 }
+const satelliteControlsStyle = { position: 'absolute', left: 14, bottom: 16, display: 'grid', gap: 8, alignItems: 'center', zIndex: 5 }
 const satelliteControlsMobileStyle = { position: 'absolute', right: 12, top: 18, display: 'grid', gap: 8, alignItems: 'center', zIndex: 5 }
 const satelliteControlButtonStyle = { width: 34, height: 34, borderRadius: 10, border: '1px solid rgba(255,255,255,0.24)', background: 'rgba(255,255,255,0.92)', color: C.textDk, fontSize: 18, lineHeight: 1, fontWeight: 900, cursor: 'pointer', boxShadow: '0 8px 20px rgba(0,0,0,0.20)' }
 const satelliteGpsButtonStyle = { ...satelliteControlButtonStyle, color: C.greenDp, fontSize: 20, background: 'rgba(255,255,255,0.94)' }
