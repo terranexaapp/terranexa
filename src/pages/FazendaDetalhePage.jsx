@@ -34,6 +34,39 @@ const NAV_ITEMS = [
   { id: 'relatorios', label: 'Relatórios' }
 ]
 
+const DESKTOP_NAV_GROUPS = [
+  {
+    title: 'Campo',
+    items: [
+      { key: 'dashboard', view: 'dashboard', label: 'Dashboard', code: 'DB' },
+      { key: 'talhoes', view: 'gerencial', manager: 'talhoes', label: 'Talhoes', code: 'TA' },
+      { key: 'chuvas', view: 'chuvas', label: 'Chuvas', code: 'CH' },
+      { key: 'solo', view: 'solo', label: 'Solo', code: 'SL' },
+      { key: 'scouting', view: 'scouting', label: 'Scouting', code: 'SC' }
+    ]
+  },
+  {
+    title: 'Operacao',
+    items: [
+      { key: 'pluviometros', view: 'gerencial', manager: 'pluviometros', label: 'Pluviometros', code: 'PL' },
+      { key: 'estoque', view: 'gerencial', manager: 'estoque', label: 'Estoque', code: 'ES' },
+      { key: 'equipe', view: 'gerencial', manager: 'equipe', label: 'Equipe', code: 'EQ' },
+      { key: 'insumos', view: 'gerencial', manager: 'insumos', label: 'Insumos', code: 'IN' },
+      { key: 'maquinas', view: 'gerencial', manager: 'maquinas', label: 'Maquinas', code: 'MA' }
+    ]
+  },
+  {
+    title: 'Gestao',
+    items: [
+      { key: 'safras', view: 'gerencial', manager: 'safras', label: 'Safras', code: 'SF' },
+      { key: 'custos', view: 'gerencial', manager: 'custos', label: 'Centros de custo', code: 'CC' },
+      { key: 'produtividade', view: 'gerencial', manager: 'produtividade', label: 'Produtividade', code: 'PR' },
+      { key: 'configuracao', view: 'gerencial', manager: 'configuracao', label: 'Configuracoes', code: 'CF' },
+      { key: 'relatorios', view: 'relatorios', label: 'Relatorios', code: 'RL' }
+    ]
+  }
+]
+
 const reportTypes = [
   'Relatório agronômico completo',
   'Relatório financeiro por talhão e safra',
@@ -495,6 +528,7 @@ export function FazendaDetalhePage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const [activeView, setActiveView] = useState('mapa')
+  const [activeManager, setActiveManager] = useState('talhoes')
   const [menuOpen, setMenuOpen] = useState(false)
   const [fazenda, setFazenda] = useState(null)
   const [talhoes, setTalhoes] = useState([])
@@ -634,6 +668,8 @@ export function FazendaDetalhePage() {
     return status === 'late' || status === 'never'
   }).length
   const isMapView = activeView === 'mapa'
+  const isDesktopShell = useMediaQuery('(min-width: 980px)')
+  const showDesktopShell = isDesktopShell && !isMapView
 
   if (loading) {
     return (
@@ -644,9 +680,26 @@ export function FazendaDetalhePage() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: isMapView ? '#102316' : C.bgSoft, display: 'flex', flexDirection: 'column' }}>
-      <header style={floatingHeaderStyle}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: isMapView ? 0 : 8 }}>
+    <div style={{ minHeight: '100vh', background: isMapView ? '#102316' : C.bg, display: 'flex', flexDirection: 'column' }}>
+      <header style={showDesktopShell ? desktopTopbarStyle : floatingHeaderStyle}>
+        {showDesktopShell && (
+          <>
+            <div style={desktopTopbarBrandStyle}>
+              <button onClick={() => setMenuOpen(open => !open)} style={desktopMenuButtonStyle}>|||</button>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={desktopTopbarEyebrowStyle}>FAZENDA</p>
+                <h1 style={desktopTopbarTitleStyle}>{fazenda?.nome}</h1>
+              </div>
+            </div>
+            <div style={desktopTopbarActionsStyle}>
+              <button type="button" style={desktopUtilityButtonStyle}>!</button>
+              <button type="button" style={desktopUtilityButtonStyle}>?</button>
+              <button type="button" style={desktopAvatarButtonStyle}>AG</button>
+              <button type="button" style={desktopChevronButtonStyle}>v</button>
+            </div>
+          </>
+        )}
+        <div style={{ display: showDesktopShell ? 'none' : 'flex', alignItems: 'center', gap: isMapView ? 0 : 8 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: isMapView ? 0 : 8 }}>
             <button onClick={() => setMenuOpen(open => !open)} style={hamburgerButtonStyle}>☰</button>
             {!isMapView && (
@@ -720,26 +773,21 @@ export function FazendaDetalhePage() {
         </div>
       )}
 
-      <main style={{ flex: 1, width: '100%', maxWidth: isMapView ? 'none' : 1320, margin: '0 auto', padding: isMapView ? 0 : 16, paddingTop: isMapView ? 0 : 98 }}>
-        <div style={farmLayoutStyle}>
-          <aside style={farmSidebarStyle}>
-            <p style={sidebarEyebrowStyle}>MENU</p>
-            {NAV_ITEMS.map(item => (
-              <button
-                key={item.id}
-                onClick={() => setActiveView(item.id)}
-                style={{
-                  ...sidebarNavButtonStyle,
-                  background: activeView === item.id ? C.greenDp : C.bg,
-                  color: activeView === item.id ? C.bg : C.textDk,
-                  borderColor: activeView === item.id ? C.greenDp : C.border
-                }}
-              >
-                {item.label}
-              </button>
-            ))}
-          </aside>
-          <section style={{ flex: 1, minWidth: 0 }}>
+      <main style={{ flex: 1, width: '100%', maxWidth: isMapView ? 'none' : (showDesktopShell ? 'none' : 1360), margin: showDesktopShell ? 0 : '0 auto', padding: isMapView ? 0 : (showDesktopShell ? 0 : 16), paddingTop: isMapView ? 0 : (showDesktopShell ? 92 : 98) }}>
+        <div style={showDesktopShell ? farmLayoutDesktopStyle : farmLayoutStyle}>
+          {showDesktopShell && (
+            <FarmDesktopSidebar
+              activeView={activeView}
+              setActiveView={setActiveView}
+              activeManager={activeManager}
+              setActiveManager={setActiveManager}
+              fazenda={fazenda}
+              total={total}
+              talhoes={talhoes}
+              navigate={navigate}
+            />
+          )}
+          <section style={showDesktopShell ? farmContentDesktopStyle : { flex: 1, minWidth: 0 }}>
         {activeView === 'mapa' && (
           <FazendaMapaPrincipal
             fazenda={fazenda}
@@ -787,6 +835,8 @@ export function FazendaDetalhePage() {
             fazendaId={id}
             pluviometros={pluviometros}
             pluviometrosErro={pluviometrosErro}
+            activeManager={activeManager}
+            setActiveManager={setActiveManager}
             loadOps={loadOps}
             opSel={opSel}
             setOpSel={setOpSel}
@@ -828,6 +878,56 @@ export function FazendaDetalhePage() {
         <NovaOperacaoModal talhao={talhaoSel} fazendaId={id} onClose={() => setShowNovaOp(false)} onSaved={async () => { setShowNovaOp(false); await abrirTalhao(talhaoSel) }} />
       )}
     </div>
+  )
+}
+
+function FarmDesktopSidebar({ activeView, setActiveView, activeManager, setActiveManager, navigate }) {
+  function openItem(item) {
+    if (item.manager) setActiveManager(item.manager)
+    setActiveView(item.view)
+  }
+
+  return (
+    <aside style={farmDesktopSidebarStyle}>
+      <div style={desktopSidebarGroupsStyle}>
+        {DESKTOP_NAV_GROUPS.map(group => (
+          <div key={group.title} style={desktopNavGroupStyle}>
+            <p style={desktopNavGroupTitleStyle}>{group.title.toUpperCase()}</p>
+            {group.items.map(item => {
+              const active = item.manager ? activeView === 'gerencial' && activeManager === item.manager : activeView === item.view
+              return (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={() => openItem(item)}
+                  style={{
+                    ...desktopNavButtonStyle,
+                    background: active ? C.greenLight : C.bg,
+                    borderColor: active ? C.greenDp : 'transparent',
+                    color: active ? C.textDk : C.textMid,
+                    boxShadow: active ? `inset 4px 0 0 ${C.greenDp}` : 'none'
+                  }}
+                >
+                  <span style={{
+                    ...desktopNavCodeStyle,
+                    background: active ? C.bg : C.bg,
+                    color: active ? C.greenDp : C.textDk,
+                    borderColor: active ? `${C.greenDp}55` : 'transparent'
+                  }}>{item.code}</span>
+                  <span style={desktopNavTextStyle}>
+                    <strong style={desktopNavLabelStyle}>{item.label}</strong>
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        ))}
+      </div>
+
+      <div style={desktopSidebarFooterStyle}>
+        <button type="button" onClick={() => navigate('/')} style={desktopSidebarReturnStyle}>{'<'} Recolher menu</button>
+      </div>
+    </aside>
   )
 }
 
@@ -2966,74 +3066,95 @@ function PluviometroManager({ fazendaId, talhoes, pluviometros, pluviometrosErro
   )
 }
 
-function GerencialView({ fazenda, fazendaId, talhoes, pluviometros = [], pluviometrosErro = '', total, abrirTalhao, setShowNovo, onCreatePluviometro, onUpdatePluviometro, onDeletePluviometro, navigate }) {
-  const [activeManager, setActiveManager] = useState('talhoes')
+function GerencialView({ fazenda, fazendaId, talhoes, pluviometros = [], pluviometrosErro = '', total, abrirTalhao, setShowNovo, onCreatePluviometro, onUpdatePluviometro, onDeletePluviometro, activeManager, setActiveManager, navigate }) {
+  const isManagerDesktop = useMediaQuery('(min-width: 900px)')
+  const isManagerCompact = useMediaQuery('(max-width: 700px)')
   const managementMenu = [
-    { id: 'talhoes', title: 'Cadastro de Talhao', text: 'Areas, culturas, fases e limites dos talhoes' },
-    { id: 'pluviometros', title: 'Pluviometros', text: 'Pontos georreferenciados e chuva interpolada' },
-    { id: 'estoque', title: 'Estoque', text: 'Saldos, entradas, saidas e estoque minimo' },
-    { id: 'equipe', title: 'Equipe', text: 'Tecnicos, operadores e responsaveis' },
-    { id: 'insumos', title: 'Insumos', text: 'Produtos, doses, custo medio e fornecedores' },
-    { id: 'safras', title: 'Safras e Culturas', text: 'Ciclo agricola, variedades e metas' },
-    { id: 'maquinas', title: 'Maquinas e Implementos', text: 'Frota, capacidade e custo hora' },
-    { id: 'custos', title: 'Centros de Custo', text: 'Custos por fazenda, safra e atividade' },
-    { id: 'produtividade', title: 'Historico de Produtividade', text: 'Safras, rendimento e comparativos' },
-    { id: 'configuracao', title: 'Configuracao da Fazenda', text: 'Nome, municipio, usuarios e preferencias' }
+    { id: 'talhoes', title: 'Cadastro de Talhao', short: 'Talhoes', text: 'Areas, culturas, fases e limites dos talhoes' },
+    { id: 'pluviometros', title: 'Pluviometros', short: 'Chuva', text: 'Pontos georreferenciados e chuva interpolada' },
+    { id: 'estoque', title: 'Estoque', short: 'Estoque', text: 'Saldos, entradas, saidas e estoque minimo' },
+    { id: 'equipe', title: 'Equipe', short: 'Equipe', text: 'Tecnicos, operadores e responsaveis' },
+    { id: 'insumos', title: 'Insumos', short: 'Insumos', text: 'Produtos, doses, custo medio e fornecedores' },
+    { id: 'safras', title: 'Safras e Culturas', short: 'Safras', text: 'Ciclo agricola, variedades e metas' },
+    { id: 'maquinas', title: 'Maquinas e Implementos', short: 'Maquinas', text: 'Frota, capacidade e custo hora' },
+    { id: 'custos', title: 'Centros de Custo', short: 'Custos', text: 'Custos por fazenda, safra e atividade' },
+    { id: 'produtividade', title: 'Historico de Produtividade', short: 'Produtividade', text: 'Safras, rendimento e comparativos' },
+    { id: 'configuracao', title: 'Configuracao da Fazenda', short: 'Config.', text: 'Nome, municipio, usuarios e preferencias' }
   ]
+  const managementGroups = [
+    { title: 'Campo', ids: ['talhoes', 'pluviometros', 'safras'] },
+    { title: 'Operacao', ids: ['estoque', 'equipe', 'insumos', 'maquinas'] },
+    { title: 'Gestao', ids: ['custos', 'produtividade', 'configuracao'] }
+  ].map(group => ({
+    ...group,
+    items: group.ids.map(itemId => managementMenu.find(item => item.id === itemId)).filter(Boolean)
+  }))
   const activeItem = managementMenu.find(item => item.id === activeManager) || managementMenu[0]
 
   return (
     <section style={managementPageStyle}>
-      <div style={managementHeroStyle}>
+      <div style={isManagerCompact ? managementHeroCompactStyle : managementHeroStyle}>
         <p style={eyebrowStyle}>GESTAO OPERACIONAL</p>
         <h2 style={viewTitleStyle}>Gerenciamento da fazenda</h2>
-        <p style={viewSubtitleStyle}>Cadastros administrativos, mapas, equipe, estoque e configuracoes da propriedade.</p>
+        {!isManagerCompact && <p style={viewSubtitleStyle}>Cadastros administrativos, mapas, equipe, estoque e configuracoes da propriedade.</p>}
       </div>
 
-      <div style={managementMenuGridStyle}>
-        {managementMenu.map(item => {
-          const active = activeManager === item.id
-          return (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => setActiveManager(item.id)}
-              style={{
-                ...managementMenuCardStyle,
-                background: active ? C.greenLight : C.bg,
-                borderColor: active ? C.greenDp : C.border
-              }}
-            >
-              <strong>{item.title}</strong>
-              <span>{item.text}</span>
-            </button>
-          )
-        })}
+      <div style={isManagerDesktop ? managementWorkspaceSingleStyle : (isManagerCompact ? managementWorkspaceCompactStyle : managementWorkspaceMobileStyle)}>
+        {!isManagerDesktop && (
+        <aside style={isManagerCompact ? managementNavRailCompactStyle : managementNavRailMobileStyle}>
+          {managementGroups.map(group => (
+            <div key={group.title} style={isManagerCompact ? managementNavGroupCompactStyle : managementNavGroupStyle}>
+              {!isManagerCompact && <p style={desktopNavGroupTitleStyle}>{group.title.toUpperCase()}</p>}
+              {group.items.map(item => {
+                const active = activeManager === item.id
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setActiveManager(item.id)}
+                    style={{
+                      ...(isManagerCompact ? managementNavItemCompactStyle : managementNavItemStyle),
+                      background: active ? C.greenLight : C.bg,
+                      borderColor: active ? C.greenDp : C.border,
+                      color: active ? C.textDk : C.textMid
+                    }}
+                  >
+                    <strong style={isManagerCompact ? managementNavLabelCompactStyle : managementNavLabelStyle}>{isManagerCompact ? item.short : item.title}</strong>
+                    {!isManagerCompact && <small style={managementNavHintStyle}>{item.text}</small>}
+                  </button>
+                )
+              })}
+            </div>
+          ))}
+        </aside>
+        )}
+
+        <div style={managementModuleContentStyle}>
+          {activeManager === 'talhoes' && (
+            <MapaCadastroTalhoes talhoes={talhoes} total={total} onOpenCadastro={setShowNovo} onSelectTalhao={abrirTalhao} />
+          )}
+
+          {activeManager === 'pluviometros' && (
+            <PluviometroManager
+              fazendaId={fazendaId}
+              talhoes={talhoes}
+              pluviometros={pluviometros}
+              pluviometrosErro={pluviometrosErro}
+              onCreate={onCreatePluviometro}
+              onUpdate={onUpdatePluviometro}
+              onDelete={onDeletePluviometro}
+            />
+          )}
+
+          {activeManager === 'configuracao' && (
+            <ConfiguracaoFazendaPanel fazenda={fazenda} talhoes={talhoes} total={total} />
+          )}
+
+          {!['talhoes', 'pluviometros', 'configuracao'].includes(activeManager) && (
+            <ManagementModulePanel item={activeItem} navigate={navigate} />
+          )}
+        </div>
       </div>
-
-      {activeManager === 'talhoes' && (
-        <MapaCadastroTalhoes talhoes={talhoes} total={total} onOpenCadastro={setShowNovo} onSelectTalhao={abrirTalhao} />
-      )}
-
-      {activeManager === 'pluviometros' && (
-        <PluviometroManager
-          fazendaId={fazendaId}
-          talhoes={talhoes}
-          pluviometros={pluviometros}
-          pluviometrosErro={pluviometrosErro}
-          onCreate={onCreatePluviometro}
-          onUpdate={onUpdatePluviometro}
-          onDelete={onDeletePluviometro}
-        />
-      )}
-
-      {activeManager === 'configuracao' && (
-        <ConfiguracaoFazendaPanel fazenda={fazenda} talhoes={talhoes} total={total} />
-      )}
-
-      {!['talhoes', 'pluviometros', 'configuracao'].includes(activeManager) && (
-        <ManagementModulePanel item={activeItem} navigate={navigate} />
-      )}
     </section>
   )
 }
@@ -3448,6 +3569,15 @@ const viewTitleStyle = { margin: '4px 0 0', fontSize: 24, color: C.textDk, fontW
 const viewSubtitleStyle = { margin: '8px 0 0', fontSize: 13, color: C.textMid, maxWidth: 620, lineHeight: 1.45 }
 const panelTitleStyle = { margin: 0, fontSize: 15, color: C.textDk, fontWeight: 800, fontFamily: 'Georgia, serif' }
 const viewStackStyle = { display: 'grid', gap: 14 }
+const desktopTopbarStyle = { position: 'fixed', top: 0, left: 0, right: 0, height: 92, zIndex: 40, background: C.bg, borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 34px 0 22px', boxSizing: 'border-box' }
+const desktopTopbarBrandStyle = { width: 266, display: 'flex', alignItems: 'center', gap: 18 }
+const desktopMenuButtonStyle = { background: C.greenDp, color: C.bg, border: 'none', borderRadius: 10, width: 52, height: 52, fontSize: 18, fontWeight: 900, cursor: 'pointer', letterSpacing: -3, lineHeight: 1 }
+const desktopTopbarEyebrowStyle = { margin: 0, fontSize: 10, color: C.greenDp, fontFamily: 'monospace', letterSpacing: '4px', fontWeight: 900 }
+const desktopTopbarTitleStyle = { margin: '4px 0 0', color: C.textDk, fontSize: 26, lineHeight: 1, fontFamily: 'Georgia, serif', fontWeight: 900 }
+const desktopTopbarActionsStyle = { display: 'flex', alignItems: 'center', gap: 22, color: C.textDk }
+const desktopUtilityButtonStyle = { width: 34, height: 34, border: 'none', background: 'transparent', color: C.textDk, fontSize: 17, fontWeight: 800, cursor: 'pointer' }
+const desktopAvatarButtonStyle = { width: 46, height: 46, borderRadius: 999, border: `1px solid ${C.greenDp}22`, background: C.greenLight, color: C.greenDp, fontSize: 15, fontWeight: 900, cursor: 'pointer' }
+const desktopChevronButtonStyle = { width: 28, height: 28, border: 'none', background: 'transparent', color: C.textDk, fontSize: 14, fontWeight: 900, cursor: 'pointer' }
 const floatingHeaderStyle = { position: 'fixed', top: 14, left: 14, zIndex: 40, background: 'rgba(255,255,255,0.94)', border: `1px solid ${C.border}`, borderRadius: 14, padding: 8, boxShadow: '0 10px 30px rgba(0,0,0,0.12)', backdropFilter: 'blur(10px)' }
 const hamburgerButtonStyle = { background: C.greenDp, color: C.bg, border: 'none', borderRadius: 9, width: 36, height: 36, fontSize: 18, fontWeight: 900, cursor: 'pointer' }
 const drawerBackdropStyle = { position: 'fixed', inset: 0, zIndex: 60, background: 'rgba(0,0,0,0.24)' }
@@ -3460,9 +3590,25 @@ const drawerBrandStyle = { background: C.bg, border: `1px solid ${C.border}`, bo
 const drawerReturnButtonStyle = { width: '100%', border: `1px solid ${C.border}`, borderRadius: 11, padding: '12px 13px', background: C.bgLight, color: C.textDk, fontSize: 12, fontWeight: 900, textAlign: 'left', cursor: 'pointer' }
 const farmLayoutStyle = { display: 'block', alignItems: 'flex-start', gap: 14 }
 const farmSidebarStyle = { display: 'none' }
+const farmLayoutDesktopStyle = { display: 'grid', gridTemplateColumns: '288px minmax(0, 1fr)', gap: 0, alignItems: 'start', minHeight: 'calc(100vh - 92px)' }
+const farmContentDesktopStyle = { minWidth: 0, padding: '0 24px 32px 32px' }
+const farmDesktopSidebarStyle = { position: 'sticky', top: 92, alignSelf: 'start', background: C.bg, borderRight: `1px solid ${C.border}`, padding: '30px 14px 28px 8px', height: 'calc(100vh - 92px)', display: 'flex', flexDirection: 'column', gap: 22, boxSizing: 'border-box' }
+const desktopSidebarHeaderStyle = { borderBottom: `1px solid ${C.borderSoft}`, padding: '2px 2px 11px', display: 'grid', gap: 3 }
+const desktopSidebarFarmNameStyle = { color: C.textDk, fontSize: 15, lineHeight: 1.15, fontFamily: 'Georgia, serif' }
+const desktopSidebarFarmMetaStyle = { color: C.textMid, fontSize: 11, lineHeight: 1.25 }
+const desktopSidebarGroupsStyle = { display: 'grid', gap: 28 }
+const desktopNavGroupStyle = { display: 'grid', gap: 8 }
+const desktopNavGroupTitleStyle = { margin: '0 14px 6px', color: C.textDim, fontSize: 11, fontFamily: 'system-ui, -apple-system, Segoe UI, sans-serif', letterSpacing: '1px', fontWeight: 900 }
+const desktopNavButtonStyle = { width: '100%', minHeight: 52, border: '1px solid', borderRadius: 8, padding: '0 14px 0 25px', display: 'grid', gridTemplateColumns: '32px minmax(0, 1fr)', gap: 16, alignItems: 'center', textAlign: 'left', cursor: 'pointer', fontFamily: 'system-ui, -apple-system, Segoe UI, sans-serif' }
+const desktopNavCodeStyle = { width: 32, height: 32, border: '1px solid', borderRadius: 8, display: 'grid', placeItems: 'center', fontSize: 10, fontFamily: 'monospace', fontWeight: 900 }
+const desktopNavTextStyle = { display: 'grid', gap: 1, minWidth: 0 }
+const desktopNavLabelStyle = { color: C.textDk, fontSize: 16, lineHeight: 1.1, fontFamily: 'system-ui, -apple-system, Segoe UI, sans-serif', fontWeight: 700 }
+const desktopNavHintStyle = { color: C.textMid, fontSize: 10, lineHeight: 1.18, fontFamily: 'system-ui, -apple-system, Segoe UI, sans-serif', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
+const desktopSidebarFooterStyle = { marginTop: 'auto', borderTop: `1px solid ${C.borderSoft}`, paddingTop: 10, display: 'grid', gap: 7 }
+const desktopSidebarReturnStyle = { width: '100%', background: 'transparent', border: 'none', color: '#25364f', padding: '14px 20px', fontSize: 14, fontWeight: 700, textAlign: 'left', cursor: 'pointer', fontFamily: 'system-ui, -apple-system, Segoe UI, sans-serif' }
 const sidebarEyebrowStyle = { margin: '2px 4px 5px', fontSize: 9, color: C.textDim, fontFamily: 'monospace', letterSpacing: '1.4px', fontWeight: 900 }
 const sidebarNavButtonStyle = { width: '100%', border: '1px solid', borderRadius: 10, padding: '10px 11px', fontSize: 12, fontWeight: 800, textAlign: 'left', cursor: 'pointer' }
-const heroPanelStyle = { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 14, padding: 16, display: 'flex', justifyContent: 'space-between', gap: 14, alignItems: 'center', flexWrap: 'wrap' }
+const heroPanelStyle = { background: C.bg, border: 'none', borderBottom: `1px solid ${C.border}`, borderRadius: 0, padding: '28px 20px 22px', display: 'flex', justifyContent: 'space-between', gap: 14, alignItems: 'center', flexWrap: 'wrap' }
 const panelStyle = { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 14, padding: 14 }
 const mapMainPageStyle = { position: 'relative', width: '100%', minHeight: '100vh', overflow: 'hidden', background: '#102316' }
 const mapMainPageMobileStyle = { position: 'relative', width: '100%', height: '100dvh', minHeight: '100dvh', maxHeight: '100dvh', overflow: 'hidden', overscrollBehavior: 'none', background: '#102316' }
@@ -3565,7 +3711,23 @@ const plotShapeStyle = { position: 'absolute', border: '2px solid rgba(255,255,2
 const legendStyle = { position: 'absolute', left: 14, bottom: 14, background: 'rgba(5,14,11,0.86)', border: '1px solid rgba(255,255,255,0.14)', borderRadius: 10, color: C.bg, padding: 12, width: 190 }
 const gradientBarStyle = { height: 10, borderRadius: 99, margin: '8px 0 5px', background: 'linear-gradient(90deg, #2fb15f, #e8c84c, #ef4d39)' }
 const managementPageStyle = { display: 'grid', gap: 14 }
-const managementHeroStyle = { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 14, padding: 16 }
+const managementHeroStyle = { background: C.bg, border: 'none', borderBottom: `1px solid ${C.border}`, borderRadius: 0, padding: '28px 20px 22px' }
+const managementHeroCompactStyle = { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, padding: 12 }
+const managementWorkspaceDesktopStyle = { display: 'grid', gridTemplateColumns: '220px minmax(0, 1fr)', gap: 12, alignItems: 'start' }
+const managementWorkspaceSingleStyle = { display: 'grid', gap: 12 }
+const managementWorkspaceMobileStyle = { display: 'grid', gap: 12 }
+const managementWorkspaceCompactStyle = { display: 'grid', gap: 10 }
+const managementNavRailStyle = { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, padding: 11, display: 'grid', alignContent: 'start', gap: 12, position: 'sticky', top: 86 }
+const managementNavRailMobileStyle = { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, padding: 11, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }
+const managementNavRailCompactStyle = { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 12, padding: 8, display: 'flex', gap: 7, overflowX: 'auto', position: 'sticky', top: 82, zIndex: 4, boxShadow: '0 8px 22px rgba(0,0,0,0.04)', WebkitOverflowScrolling: 'touch' }
+const managementNavGroupStyle = { display: 'grid', gap: 6 }
+const managementNavGroupCompactStyle = { display: 'flex', gap: 7, flex: '0 0 auto' }
+const managementNavItemStyle = { width: '100%', minHeight: 44, border: '1px solid', borderRadius: 8, padding: '8px 9px', display: 'grid', gap: 2, textAlign: 'left', cursor: 'pointer' }
+const managementNavItemCompactStyle = { minHeight: 34, border: '1px solid', borderRadius: 999, padding: '8px 12px', display: 'grid', placeItems: 'center', textAlign: 'center', cursor: 'pointer', whiteSpace: 'nowrap' }
+const managementNavLabelStyle = { color: C.textDk, fontSize: 12, lineHeight: 1.16 }
+const managementNavLabelCompactStyle = { color: C.textDk, fontSize: 12, lineHeight: 1, fontFamily: 'system-ui, -apple-system, Segoe UI, sans-serif' }
+const managementNavHintStyle = { color: C.textMid, fontSize: 10, lineHeight: 1.2, fontFamily: 'system-ui, -apple-system, Segoe UI, sans-serif' }
+const managementModuleContentStyle = { minWidth: 0 }
 const managementMenuGridStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 10 }
 const managementMenuCardStyle = { minHeight: 82, border: '1px solid', borderRadius: 10, padding: '12px 13px', display: 'grid', alignContent: 'start', gap: 5, textAlign: 'left', color: C.textDk, cursor: 'pointer' }
 const managementContentPanelStyle = { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 14, padding: 16, display: 'grid', gap: 12 }
