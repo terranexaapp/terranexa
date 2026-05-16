@@ -9,520 +9,65 @@ import { uploadArquivoFazenda } from '../lib/storage'
 import { NovaOperacaoModal } from '../components/NovaOperacaoModal'
 import { Logo } from '../components/Logo'
 import { theme } from '../styles/theme'
+import { DesktopIcon } from './FazendaDetalhe/DesktopIcon'
+import {
+  FASE_LABELS,
+  NAV_ITEMS,
+  DESKTOP_NAV_GROUPS,
+  reportTypes,
+  MAP_DEFAULT_BOUNDS,
+  TILE_SIZE,
+  TILE_MIN_ZOOM,
+  TILE_MAX_ZOOM,
+  SATELLITE_TILE_URL,
+  MAPBOX_TOKEN,
+  MAPBOX_SATELLITE_TILE_URL,
+  MAPBOX_ATTRIBUTION,
+  ESRI_ATTRIBUTION,
+  MONITORAMENTO_LEGEND
+} from './FazendaDetalhe/constants'
+import { useMediaQuery, useDevicePosition } from './FazendaDetalhe/hooks'
+import { loadLeafletAssets } from './FazendaDetalhe/leafletLoader'
+import { requestOfflineStorage, saveMonitoringPointOffline } from './FazendaDetalhe/offline'
+import {
+  formatCultura,
+  money,
+  formatShortDate,
+  formatMonitoramentoDate,
+  daysSinceDate,
+  getMonitoramentoMeta,
+  indexMonitoramentosByTalhao,
+  calcularAreaGeo,
+  parseKmlText,
+  featureName,
+  featureCode,
+  getFeatureRing,
+  getMapBounds,
+  projectCoord,
+  clamp,
+  lngLatToWorld,
+  worldToLngLat,
+  getBoundsCenter,
+  getFitZoom,
+  getSatelliteInitialView,
+  getRingLabelCoord,
+  escapeHtml,
+  ringToLatLngs,
+  fitLeafletToFeatures,
+  getLeafletPolygonStyle,
+  leafletLabelHtml,
+  leafletPluviometroHtml,
+  pointInFeatureCoord,
+  findTalhaoForCoord,
+  pointToCoord,
+  pointsToFeature,
+  distanceBetween,
+  midpointBetween,
+  pointInPolygon,
+  normalizeFeature
+} from './FazendaDetalhe/utils'
 
 const C = theme.normal
-const FASE_LABELS = {
-  preparo: 'Preparo',
-  plantio: 'Plantio',
-  brotacao: 'Brotacao',
-  vegetativo: 'Vegetativo',
-  floracao: 'Floracao',
-  frutificacao: 'Frutificacao',
-  maturacao: 'Maturacao',
-  colheita: 'Colheita',
-  pos_colheita: 'Pos-colheita',
-  pousio: 'Pousio'
-}
-
-const NAV_ITEMS = [
-  { id: 'mapa', label: 'Mapa' },
-  { id: 'dashboard', label: 'Dashboard' },
-  { id: 'chuvas', label: 'Chuvas' },
-  { id: 'solo', label: 'Solo' },
-  { id: 'scouting', label: 'Scouting' },
-  { id: 'gerencial', label: 'Gerenciamento' },
-  { id: 'relatorios', label: 'Relatórios' }
-]
-
-const DESKTOP_NAV_GROUPS = [
-  {
-    title: 'Campo',
-    items: [
-      { key: 'dashboard', view: 'dashboard', label: 'Dashboard', icon: 'dashboard' },
-      { key: 'talhoes', view: 'gerencial', manager: 'talhoes', label: 'Talhoes', icon: 'map' },
-      { key: 'chuvas', view: 'chuvas', label: 'Chuvas', icon: 'cloud-rain' },
-      { key: 'solo', view: 'solo', label: 'Solo', icon: 'soil' },
-      { key: 'scouting', view: 'scouting', label: 'Scouting', icon: 'search' }
-    ]
-  },
-  {
-    title: 'Operacao',
-    items: [
-      { key: 'pluviometros', view: 'gerencial', manager: 'pluviometros', label: 'Pluviometros', icon: 'cloud-rain' },
-      { key: 'estoque', view: 'gerencial', manager: 'estoque', label: 'Estoque', icon: 'cube' },
-      { key: 'equipe', view: 'gerencial', manager: 'equipe', label: 'Equipe', icon: 'users' },
-      { key: 'insumos', view: 'gerencial', manager: 'insumos', label: 'Insumos', icon: 'beaker' },
-      { key: 'maquinas', view: 'gerencial', manager: 'maquinas', label: 'Maquinas', icon: 'tractor' }
-    ]
-  },
-  {
-    title: 'Gestao',
-    items: [
-      { key: 'safras', view: 'gerencial', manager: 'safras', label: 'Safras', icon: 'leaf' },
-      { key: 'custos', view: 'gerencial', manager: 'custos', label: 'Centros de custo', icon: 'dollar' },
-      { key: 'produtividade', view: 'gerencial', manager: 'produtividade', label: 'Produtividade', icon: 'bar-chart' },
-      { key: 'configuracao', view: 'gerencial', manager: 'configuracao', label: 'Configuracoes', icon: 'gear' },
-      { key: 'relatorios', view: 'relatorios', label: 'Relatorios', icon: 'report' }
-    ]
-  }
-]
-
-const reportTypes = [
-  'Relatório agronômico completo',
-  'Relatório financeiro por talhão e safra',
-  'Relatório de chuva interpolada',
-  'Relatório de fertilidade do solo',
-  'Relatório de scouting e dano econômico',
-  'Relatório de ordens de serviço',
-  'Relatório de estoque e consumo de insumos',
-  'Relatório executivo da fazenda'
-]
-
-const MAP_DEFAULT_BOUNDS = {
-  minLng: -40.545,
-  maxLng: -40.465,
-  minLat: -9.430,
-  maxLat: -9.350
-}
-const TILE_SIZE = 256
-const TILE_MIN_ZOOM = 4
-const TILE_MAX_ZOOM = 19
-const SATELLITE_TILE_URL = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile'
-const LEAFLET_SCRIPT_URL = '/vendor/leaflet/leaflet.js'
-const LEAFLET_STYLESHEET_URL = '/vendor/leaflet/leaflet.css'
-const MAPBOX_TOKEN = (import.meta.env.VITE_MAPBOX_TOKEN || '').trim()
-const MAPBOX_SATELLITE_TILE_URL = `https://api.mapbox.com/styles/v1/mapbox/satellite-v9/tiles/256/{z}/{x}/{y}?access_token=${MAPBOX_TOKEN}`
-const MAPBOX_ATTRIBUTION = '&copy; <a href="https://www.mapbox.com/about/maps/">Mapbox</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-const ESRI_ATTRIBUTION = 'Tiles &copy; Esri'
-let leafletLoadPromise = null
-
-function useMediaQuery(query) {
-  const [matches, setMatches] = useState(() => {
-    if (typeof window === 'undefined') return false
-    return window.matchMedia(query).matches
-  })
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return undefined
-    const media = window.matchMedia(query)
-    const update = () => setMatches(media.matches)
-    update()
-    media.addEventListener('change', update)
-    return () => media.removeEventListener('change', update)
-  }, [query])
-
-  return matches
-}
-
-function loadLeafletAssets() {
-  if (typeof window === 'undefined' || typeof document === 'undefined') {
-    return Promise.reject(new Error('Leaflet indisponivel fora do navegador'))
-  }
-  if (window.L) return Promise.resolve(window.L)
-
-  if (!document.getElementById('leaflet-css')) {
-    const link = document.createElement('link')
-    link.id = 'leaflet-css'
-    link.rel = 'stylesheet'
-    link.href = LEAFLET_STYLESHEET_URL
-    document.head.appendChild(link)
-  }
-
-  if (!leafletLoadPromise) {
-    leafletLoadPromise = new Promise((resolve, reject) => {
-      const existing = document.getElementById('leaflet-js')
-      if (existing) {
-        existing.addEventListener('load', () => resolve(window.L), { once: true })
-        existing.addEventListener('error', () => reject(new Error('Nao foi possivel carregar o Leaflet')), { once: true })
-        return
-      }
-      const script = document.createElement('script')
-      script.id = 'leaflet-js'
-      script.src = LEAFLET_SCRIPT_URL
-      script.async = true
-      script.onload = () => resolve(window.L)
-      script.onerror = () => reject(new Error('Nao foi possivel carregar o Leaflet'))
-      document.body.appendChild(script)
-    })
-  }
-
-  return leafletLoadPromise
-}
-
-const MONITORING_STORAGE_KEY = 'terranexa:monitoramento-offline'
-
-const MONITORAMENTO_LEGEND = [
-  { key: 'recent', title: 'Recente', range: '<= 5 dias', color: C.greenDp, fill: 'rgba(61,138,34,0.50)', stroke: 'rgba(185,235,160,0.86)' },
-  { key: 'attention', title: 'Atencao', range: '6 a 10 dias', color: C.amberDk, fill: 'rgba(232,168,76,0.54)', stroke: 'rgba(255,225,150,0.90)' },
-  { key: 'late', title: 'Atrasado', range: '> 10 dias', color: C.redDk, fill: 'rgba(232,90,58,0.56)', stroke: 'rgba(255,180,160,0.88)' },
-  { key: 'never', title: 'Nunca', range: 'Sem visita', color: '#8A9070', fill: 'rgba(138,144,112,0.52)', stroke: 'rgba(230,230,215,0.74)' }
-]
-
-async function requestOfflineStorage() {
-  if (typeof navigator === 'undefined') return { ok: false, message: 'Armazenamento offline indisponivel' }
-  try {
-    if (navigator.storage?.persisted && await navigator.storage.persisted()) {
-      return { ok: true, message: 'Armazenamento offline permitido' }
-    }
-    if (navigator.storage?.persist) {
-      const ok = await navigator.storage.persist()
-      return { ok, message: ok ? 'Armazenamento offline permitido' : 'Armazenamento offline temporario' }
-    }
-  } catch {
-    return { ok: false, message: 'Nao foi possivel confirmar armazenamento offline' }
-  }
-  return { ok: true, message: 'Dados salvos no aparelho para uso offline' }
-}
-
-function saveMonitoringPointOffline(point, context) {
-  if (typeof window === 'undefined') return
-  try {
-    const raw = window.localStorage.getItem(MONITORING_STORAGE_KEY)
-    const registros = raw ? JSON.parse(raw) : []
-    const next = Array.isArray(registros) ? registros : []
-    next.push({ ...context, ...point, savedAt: new Date().toISOString() })
-    window.localStorage.setItem(MONITORING_STORAGE_KEY, JSON.stringify(next.slice(-600)))
-  } catch {
-    // Offline persistence is best-effort; GPS capture should keep working.
-  }
-}
-
-function useDevicePosition(enabled = true) {
-  const [position, setPosition] = useState(null)
-
-  useEffect(() => {
-    if (!enabled || typeof navigator === 'undefined' || !navigator.geolocation) return undefined
-    const watchId = navigator.geolocation.watchPosition(
-      result => {
-        const coords = result.coords || {}
-        setPosition({
-          latitude: coords.latitude,
-          longitude: coords.longitude,
-          accuracy: coords.accuracy,
-          updatedAt: result.timestamp
-        })
-      },
-      () => {},
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 8000 }
-    )
-    return () => navigator.geolocation.clearWatch(watchId)
-  }, [enabled])
-
-  return position
-}
-
-function formatCultura(cultura = '') {
-  if (!cultura) return 'Sem cultura'
-  return cultura.charAt(0).toUpperCase() + cultura.slice(1)
-}
-
-function money(value) {
-  return `R$ ${Number(value || 0).toFixed(2)}`
-}
-
-function formatShortDate(value) {
-  if (!value) return 'Sem data'
-  const [year, month, day] = String(value).split('-')
-  if (year && month && day) return `${day}/${month}/${year}`
-  return String(value)
-}
-
-function formatMonitoramentoDate(value) {
-  if (!value) return 'Sem data'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return formatShortDate(value)
-  return date.toLocaleDateString('pt-BR')
-}
-
-function daysSinceDate(value) {
-  if (!value) return null
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return null
-  const today = new Date()
-  const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate())
-  const dateStart = new Date(date.getFullYear(), date.getMonth(), date.getDate())
-  return Math.max(0, Math.floor((todayStart - dateStart) / 86400000))
-}
-
-function getMonitoramentoMeta(registro) {
-  if (!registro?.visitado_em) {
-    const tone = MONITORAMENTO_LEGEND.find(item => item.key === 'never')
-    return {
-      ...tone,
-      status: 'never',
-      days: null,
-      title: 'Nunca monitorado',
-      detail: 'Sem visita registrada',
-      shortLabel: 'Nunca'
-    }
-  }
-
-  const days = daysSinceDate(registro.visitado_em)
-  if (days === null) return getMonitoramentoMeta(null)
-  const key = days <= 5 ? 'recent' : days <= 10 ? 'attention' : 'late'
-  const tone = MONITORAMENTO_LEGEND.find(item => item.key === key) || MONITORAMENTO_LEGEND[3]
-  const dayText = days === 0 ? 'Monitorado hoje' : days === 1 ? '1 dia sem monitoramento' : `${days} dias sem monitoramento`
-
-  return {
-    ...tone,
-    status: key,
-    days,
-    title: dayText,
-    detail: `Ultima visita: ${formatMonitoramentoDate(registro.visitado_em)}`,
-    shortLabel: days === 0 ? 'Hoje' : `${days}d`
-  }
-}
-
-function indexMonitoramentosByTalhao(items = []) {
-  return (items || []).reduce((acc, item) => {
-    if (item?.talhao_id) acc[item.talhao_id] = item
-    return acc
-  }, {})
-}
-
-function calcularAreaGeo(feature) {
-  if (!feature?.geometry?.coordinates?.[0]) return 0
-  try {
-    const ring = feature.geometry.coordinates[0]
-    let area = 0
-    const R = 6371000
-    for (let i = 0; i < ring.length - 1; i++) {
-      const [lon1, lat1] = ring[i]
-      const [lon2, lat2] = ring[i + 1]
-      area += (lon2 - lon1) * Math.PI / 180 * (2 + Math.sin(lat1 * Math.PI / 180) + Math.sin(lat2 * Math.PI / 180))
-    }
-    return Math.round(Math.abs(area * R * R / 2 / 10000) * 100) / 100
-  } catch {
-    return 0
-  }
-}
-
-function parseKmlText(text) {
-  const parser = new DOMParser()
-  const xml = parser.parseFromString(text, 'text/xml')
-  if (xml.querySelector('parsererror')) throw new Error('Arquivo KML inválido')
-  const features = []
-  xml.querySelectorAll('Placemark').forEach((placemark, idx) => {
-    const coordsEl = placemark.querySelector('coordinates')
-    if (!coordsEl) return
-    const name = placemark.querySelector('name')?.textContent || `Talhão ${idx + 1}`
-    const coordinates = coordsEl.textContent.trim().split(/\s+/).map(item => {
-      const [lng, lat] = item.split(',').map(Number)
-      return [lng, lat]
-    }).filter(([lng, lat]) => !Number.isNaN(lng) && !Number.isNaN(lat))
-    if (coordinates.length < 3) return
-    const first = coordinates[0]
-    const last = coordinates[coordinates.length - 1]
-    if (first[0] !== last[0] || first[1] !== last[1]) coordinates.push(first)
-    features.push({ type: 'Feature', properties: { name }, geometry: { type: 'Polygon', coordinates: [coordinates] } })
-  })
-  if (!features.length) throw new Error('KML não contém polígonos válidos')
-  return { type: 'FeatureCollection', features }
-}
-
-function featureName(feature, index = 0) {
-  const props = feature?.properties || {}
-  return props.name || props.nome || props.NOME || props.talhao || props.TALHAO || `Talhão ${index + 1}`
-}
-
-function featureCode(feature, index = 0) {
-  const name = featureName(feature, index)
-  const clean = String(name).replace(/\.[a-z0-9]+$/i, '').replace(/[^a-zA-Z0-9_-]/g, '').toUpperCase()
-  return clean || `T${index + 1}`
-}
-
-function getFeatureRing(feature) {
-  if (!feature?.geometry) return null
-  if (feature.geometry.type === 'Polygon') return feature.geometry.coordinates?.[0] || null
-  if (feature.geometry.type === 'MultiPolygon') return feature.geometry.coordinates?.[0]?.[0] || null
-  return null
-}
-
-function getMapBounds(features) {
-  const coords = features.flatMap(feature => getFeatureRing(feature) || [])
-  if (!coords.length) return MAP_DEFAULT_BOUNDS
-  const lngs = coords.map(([lng]) => lng)
-  const lats = coords.map(([, lat]) => lat)
-  const padLng = Math.max((Math.max(...lngs) - Math.min(...lngs)) * 0.12, 0.01)
-  const padLat = Math.max((Math.max(...lats) - Math.min(...lats)) * 0.12, 0.01)
-  return {
-    minLng: Math.min(...lngs) - padLng,
-    maxLng: Math.max(...lngs) + padLng,
-    minLat: Math.min(...lats) - padLat,
-    maxLat: Math.max(...lats) + padLat
-  }
-}
-
-function projectCoord([lng, lat], bounds) {
-  const x = ((lng - bounds.minLng) / (bounds.maxLng - bounds.minLng)) * 100
-  const y = (1 - ((lat - bounds.minLat) / (bounds.maxLat - bounds.minLat))) * 100
-  return [x, y]
-}
-
-function clamp(value, min, max) {
-  return Math.min(max, Math.max(min, value))
-}
-
-function lngLatToWorld([lng, lat], zoom) {
-  const scale = TILE_SIZE * (2 ** zoom)
-  const safeLat = clamp(Number(lat) || 0, -85.05112878, 85.05112878)
-  const safeLng = Number(lng) || 0
-  const sin = Math.sin((safeLat * Math.PI) / 180)
-  return {
-    x: ((safeLng + 180) / 360) * scale,
-    y: (0.5 - Math.log((1 + sin) / (1 - sin)) / (4 * Math.PI)) * scale
-  }
-}
-
-function worldToLngLat(x, y, zoom) {
-  const scale = TILE_SIZE * (2 ** zoom)
-  const safeY = clamp(y, 0, scale)
-  const lng = (((x / scale) * 360 - 180 + 540) % 360) - 180
-  const n = Math.PI - (2 * Math.PI * safeY) / scale
-  const lat = (180 / Math.PI) * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n)))
-  return [lng, clamp(lat, -85.05112878, 85.05112878)]
-}
-
-function getBoundsCenter(bounds) {
-  return [(bounds.minLng + bounds.maxLng) / 2, (bounds.minLat + bounds.maxLat) / 2]
-}
-
-function getFitZoom(bounds, size, fullBleed) {
-  if (!size.width || !size.height) return fullBleed ? 15 : 14
-  const usableWidth = size.width * (fullBleed ? 0.76 : 0.68)
-  const usableHeight = size.height * (fullBleed ? 0.74 : 0.66)
-  for (let zoom = TILE_MAX_ZOOM; zoom >= TILE_MIN_ZOOM; zoom--) {
-    const nw = lngLatToWorld([bounds.minLng, bounds.maxLat], zoom)
-    const se = lngLatToWorld([bounds.maxLng, bounds.minLat], zoom)
-    if (Math.abs(se.x - nw.x) <= usableWidth && Math.abs(se.y - nw.y) <= usableHeight) return zoom
-  }
-  return TILE_MIN_ZOOM
-}
-
-function getSatelliteInitialView(features, size, fullBleed) {
-  const bounds = getMapBounds(features)
-  const [lng, lat] = getBoundsCenter(bounds)
-  return { lng, lat, zoom: getFitZoom(bounds, size, fullBleed) }
-}
-
-function getRingLabelCoord(ring) {
-  if (!ring?.length) return null
-  const lngs = ring.map(([lng]) => lng)
-  const lats = ring.map(([, lat]) => lat)
-  return [
-    (Math.min(...lngs) + Math.max(...lngs)) / 2,
-    (Math.min(...lats) + Math.max(...lats)) / 2
-  ]
-}
-
-function escapeHtml(value) {
-  return String(value ?? '').replace(/[&<>"']/g, char => ({
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#39;'
-  }[char]))
-}
-
-function ringToLatLngs(ring) {
-  return (ring || [])
-    .map(([lng, lat]) => [Number(lat), Number(lng)])
-    .filter(([lat, lng]) => Number.isFinite(lat) && Number.isFinite(lng))
-}
-
-function fitLeafletToFeatures(L, map, normalized, fullBleed) {
-  const points = normalized.flatMap(({ feature }) => ringToLatLngs(getFeatureRing(feature)))
-  if (!points.length) {
-    const [lng, lat] = getBoundsCenter(MAP_DEFAULT_BOUNDS)
-    map.setView([lat, lng], fullBleed ? 12 : 11)
-    return
-  }
-  const bounds = L.latLngBounds(points)
-  map.fitBounds(bounds, {
-    padding: fullBleed ? [26, 26] : [18, 18],
-    maxZoom: fullBleed ? 16 : 15,
-    animate: false
-  })
-}
-
-function getLeafletPolygonStyle(feature, selected, selectedMode) {
-  const monitoramento = feature.properties?.monitoramento || getMonitoramentoMeta(null)
-  const fillColor = selectedMode === 'chuvas'
-    ? '#3791d2'
-    : selectedMode === 'monitoramento'
-      ? monitoramento.color
-      : selected
-        ? C.amber
-        : C.greenDp
-  const baseFillOpacity = selectedMode === 'monitoramento' ? 0.54 : 0.28
-
-  return {
-    color: selected ? '#ffffff' : selectedMode === 'monitoramento' ? monitoramento.stroke : 'rgba(255,255,255,0.70)',
-    weight: selected ? 2.2 : 1.1,
-    opacity: selected ? 0.98 : 0.82,
-    fillColor,
-    fillOpacity: selected ? Math.max(baseFillOpacity, 0.46) : baseFillOpacity
-  }
-}
-
-function leafletLabelHtml(label, selected, fullBleed) {
-  const fontSize = selected ? (fullBleed ? 12 : 11) : (fullBleed ? 10 : 9)
-  return `<span style="
-    display:inline-block;
-    color:#fff;
-    font-size:${fontSize}px;
-    font-weight:900;
-    line-height:1;
-    text-shadow:0 1px 2px rgba(0,0,0,.85),0 -1px 2px rgba(0,0,0,.65);
-    pointer-events:none;
-    white-space:nowrap;
-  ">${escapeHtml(label)}</span>`
-}
-
-function leafletPluviometroHtml(marker, selectedMode, intensity) {
-  const rain = selectedMode === 'chuvas' ? `<small style="display:block;font-size:9px;font-weight:900;margin-top:3px;">${intensity.toFixed(0)} mm</small>` : ''
-  return `<span style="
-    display:grid;
-    place-items:center;
-    min-width:74px;
-    color:#fff;
-    font-size:9px;
-    font-weight:900;
-    text-shadow:0 1px 3px rgba(0,0,0,.82);
-  ">
-    <i style="width:24px;height:24px;border-radius:999px;background:rgba(255,255,255,.94);border:2px solid ${selectedMode === 'chuvas' ? C.blue : C.greenDp};display:grid;place-items:center;color:${C.greenDp};font-style:normal;box-shadow:0 7px 18px rgba(0,0,0,.28);">
-      <span style="width:8px;height:13px;border:2px solid currentColor;border-top:none;border-radius:0 0 7px 7px;display:block;"></span>
-    </i>
-    <b style="display:block;margin-top:4px;">${escapeHtml(marker.nome)}</b>
-    ${rain}
-  </span>`
-}
-
-function pointInFeatureCoord([lng, lat], feature) {
-  const ring = getFeatureRing(feature) || []
-  return pointInPolygon({ x: lng, y: lat }, ring.map(([ringLng, ringLat]) => ({ x: ringLng, y: ringLat })))
-}
-
-function findTalhaoForCoord(talhoes, lng, lat) {
-  return talhoes.find(talhao => {
-    const feature = normalizeFeature(talhao.geometria, talhao.codigo)
-    return feature ? pointInFeatureCoord([lng, lat], feature) : false
-  }) || null
-}
-
-function pointToCoord(point) {
-  const lng = MAP_DEFAULT_BOUNDS.minLng + (point.x / 100) * (MAP_DEFAULT_BOUNDS.maxLng - MAP_DEFAULT_BOUNDS.minLng)
-  const lat = MAP_DEFAULT_BOUNDS.maxLat - (point.y / 100) * (MAP_DEFAULT_BOUNDS.maxLat - MAP_DEFAULT_BOUNDS.minLat)
-  return [lng, lat]
-}
-
-function pointsToFeature(points, codigo = 'Novo talhão') {
-  if (points.length < 3) return null
-  const coordinates = points.map(pointToCoord)
-  coordinates.push(coordinates[0])
-  return { type: 'Feature', properties: { codigo, name: codigo }, geometry: { type: 'Polygon', coordinates: [coordinates] } }
-}
 
 export function FazendaDetalhePage() {
   const { id } = useParams()
@@ -936,241 +481,6 @@ function FarmDesktopSidebar({ activeView, setActiveView, activeManager, setActiv
         <button type="button" onClick={() => navigate('/')} style={desktopSidebarReturnStyle}>{'<'} Recolher menu</button>
       </div>
     </aside>
-  )
-}
-
-function DesktopIcon({ name, size = 22 }) {
-  const common = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.9, strokeLinecap: 'round', strokeLinejoin: 'round' }
-  let shape
-
-  switch (name) {
-    case 'menu':
-      shape = (
-        <>
-          <path d="M5 7h14" />
-          <path d="M5 12h14" />
-          <path d="M5 17h14" />
-        </>
-      )
-      break
-    case 'bell':
-      shape = (
-        <>
-          <path d="M15 18H9" />
-          <path d="M18 16H6c1.5-1.6 2-3.5 2-6a4 4 0 0 1 8 0c0 2.5.5 4.4 2 6Z" />
-          <path d="M13.6 20a2 2 0 0 1-3.2 0" />
-        </>
-      )
-      break
-    case 'help':
-      shape = (
-        <>
-          <circle cx="12" cy="12" r="8.5" />
-          <path d="M9.8 9.3a2.5 2.5 0 0 1 4.8 1.2c0 1.8-2.1 2-2.1 3.6" />
-          <path d="M12 17.3h.01" />
-        </>
-      )
-      break
-    case 'chevron-down':
-      shape = <path d="m7 10 5 5 5-5" />
-      break
-    case 'dashboard':
-      shape = (
-        <>
-          <rect x="4" y="4" width="6.5" height="6.5" rx="1.4" />
-          <rect x="13.5" y="4" width="6.5" height="6.5" rx="1.4" />
-          <rect x="4" y="13.5" width="6.5" height="6.5" rx="1.4" />
-          <rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.4" />
-        </>
-      )
-      break
-    case 'home':
-      shape = (
-        <>
-          <path d="m4 11 8-7 8 7" />
-          <path d="M6.5 10.5V20h11v-9.5" />
-          <path d="M10 20v-5h4v5" />
-        </>
-      )
-      break
-    case 'map':
-      shape = (
-        <>
-          <path d="M4 6.5 9 4l6 2.5 5-2.5v13.5L15 20l-6-2.5L4 20V6.5Z" />
-          <path d="M9 4v13.5" />
-          <path d="M15 6.5V20" />
-        </>
-      )
-      break
-    case 'cloud-rain':
-      shape = (
-        <>
-          <path d="M7 16h10a3.5 3.5 0 0 0 .6-6.9A5.3 5.3 0 0 0 7 8.3 3.9 3.9 0 0 0 7 16Z" />
-          <path d="M8 20v-1.2" />
-          <path d="M12 21v-1.2" />
-          <path d="M16 20v-1.2" />
-        </>
-      )
-      break
-    case 'soil':
-      shape = (
-        <>
-          <path d="M4 15c2.4-1.5 5-1.5 8 0s5.6 1.5 8 0" />
-          <path d="M4 19c2.4-1.5 5-1.5 8 0s5.6 1.5 8 0" />
-          <path d="M12 12V5" />
-          <path d="M12 8c2.5 0 4.5-1.5 5-3.7-2.7-.4-4.5.6-5 3.7Z" />
-          <path d="M12 10c-2.3 0-4-1.3-4.5-3.2 2.2-.3 3.8.5 4.5 3.2Z" />
-        </>
-      )
-      break
-    case 'search':
-      shape = (
-        <>
-          <circle cx="10.5" cy="10.5" r="5.8" />
-          <path d="m15 15 5 5" />
-        </>
-      )
-      break
-    case 'cube':
-      shape = (
-        <>
-          <path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3Z" />
-          <path d="M4 7.5 12 12l8-4.5" />
-          <path d="M12 12v9" />
-        </>
-      )
-      break
-    case 'users':
-      shape = (
-        <>
-          <circle cx="9" cy="8" r="3" />
-          <path d="M3.8 19c.8-3.2 2.5-4.8 5.2-4.8s4.4 1.6 5.2 4.8" />
-          <path d="M15.8 10.4a2.7 2.7 0 1 0-1-5.2" />
-          <path d="M15.3 14.4c2.5.3 4.1 1.8 4.9 4.6" />
-        </>
-      )
-      break
-    case 'beaker':
-      shape = (
-        <>
-          <path d="M9 3h6" />
-          <path d="M10 3v5.5L5.5 18.8A1.5 1.5 0 0 0 6.9 21h10.2a1.5 1.5 0 0 0 1.4-2.2L14 8.5V3" />
-          <path d="M8.1 16h7.8" />
-        </>
-      )
-      break
-    case 'tractor':
-      shape = (
-        <>
-          <path d="M4 16h2.4" />
-          <path d="M9.6 16h4.2" />
-          <path d="M16.8 16H20" />
-          <path d="M7 12h6l1.2 4" />
-          <path d="M7 12V7h4l2 5" />
-          <path d="M5 7h3" />
-          <circle cx="7.8" cy="17" r="2.7" />
-          <circle cx="17.2" cy="17" r="3.2" />
-        </>
-      )
-      break
-    case 'leaf':
-      shape = (
-        <>
-          <path d="M5 19c7.5-.4 13-6 14-14-8 .7-13.4 5.7-14 14Z" />
-          <path d="M5 19c3.7-4.1 7.1-6.8 12-10" />
-        </>
-      )
-      break
-    case 'dollar':
-      shape = (
-        <>
-          <circle cx="12" cy="12" r="8.5" />
-          <path d="M12 7v10" />
-          <path d="M15 9.2c-.8-.7-1.8-1.1-3-1.1-1.5 0-2.7.8-2.7 2s1.1 1.7 2.9 2.1c1.9.4 3 .9 3 2.2s-1.2 2.2-3 2.2c-1.4 0-2.6-.4-3.6-1.3" />
-        </>
-      )
-      break
-    case 'bar-chart':
-      shape = (
-        <>
-          <path d="M4 20h16" />
-          <path d="M6.5 20v-5" />
-          <path d="M11.5 20V9" />
-          <path d="M16.5 20V5" />
-        </>
-      )
-      break
-    case 'gear':
-      shape = (
-        <>
-          <circle cx="12" cy="12" r="3" />
-          <path d="M12 3v2" />
-          <path d="M12 19v2" />
-          <path d="M4.2 7.5 6 8.5" />
-          <path d="M18 15.5l1.8 1" />
-          <path d="M4.2 16.5 6 15.5" />
-          <path d="M18 8.5l1.8-1" />
-          <path d="M7.5 4.2 8.5 6" />
-          <path d="M15.5 18l1 1.8" />
-          <path d="M16.5 4.2 15.5 6" />
-          <path d="M8.5 18l-1 1.8" />
-        </>
-      )
-      break
-    case 'report':
-      shape = (
-        <>
-          <path d="M6 3h9l3 3v15H6V3Z" />
-          <path d="M14 3v4h4" />
-          <path d="M9 12h6" />
-          <path d="M9 16h6" />
-        </>
-      )
-      break
-    case 'pencil':
-      shape = (
-        <>
-          <path d="M4 20h4l11-11a2.1 2.1 0 0 0-3-3L5 17l-1 3Z" />
-          <path d="m14 8 3 3" />
-        </>
-      )
-      break
-    case 'upload':
-      shape = (
-        <>
-          <path d="M12 16V4" />
-          <path d="m7 9 5-5 5 5" />
-          <path d="M5 16v3h14v-3" />
-        </>
-      )
-      break
-    case 'plus-circle':
-      shape = (
-        <>
-          <circle cx="12" cy="12" r="8.5" />
-          <path d="M12 8v8" />
-          <path d="M8 12h8" />
-        </>
-      )
-      break
-    case 'refresh':
-      shape = (
-        <>
-          <path d="M20 6v5h-5" />
-          <path d="M4 18v-5h5" />
-          <path d="M18 10a6.5 6.5 0 0 0-10.8-3" />
-          <path d="M6 14a6.5 6.5 0 0 0 10.8 3" />
-        </>
-      )
-      break
-    default:
-      shape = <circle cx="12" cy="12" r="8" />
-  }
-
-  return (
-    <svg viewBox="0 0 24 24" width={size} height={size} aria-hidden="true" style={{ display: 'block' }} {...common}>
-      {shape}
-    </svg>
   )
 }
 
@@ -2623,28 +1933,6 @@ function LeafletFarmMap({ normalized = [], onFeatureClick, height = 340, selecte
   )
 }
 
-function distanceBetween(a, b) {
-  return Math.hypot(a.x - b.x, a.y - b.y)
-}
-
-function midpointBetween(a, b) {
-  return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
-}
-
-function pointInPolygon(point, polygon) {
-  if (!polygon?.length) return false
-  let inside = false
-  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-    const xi = polygon[i].x
-    const yi = polygon[i].y
-    const xj = polygon[j].x
-    const yj = polygon[j].y
-    const intersects = ((yi > point.y) !== (yj > point.y)) && (point.x < ((xj - xi) * (point.y - yi)) / ((yj - yi) || 1) + xi)
-    if (intersects) inside = !inside
-  }
-  return inside
-}
-
 function SatelliteFarmMap({ normalized = [], onFeatureClick, height = 340, selectedCode = null, selectedMode = 'timeline', fullBleed = false, pluviometros = [], placingPluviometro = false, onMapPoint, onPluviometroClick, devicePosition = null }) {
   const containerRef = useRef(null)
   const pointersRef = useRef(new Map())
@@ -3182,18 +2470,6 @@ function VectorFarmMap({ normalized = [], drawPoints = [], onMapClick, onFeature
       {normalized.length === 0 && !drawing && <div style={mapEmptyHintStyle}>Nenhum talhão com geometria cadastrada</div>}
     </div>
   )
-}
-
-function normalizeFeature(raw, codigo = 'T1') {
-  if (!raw) return null
-  let feature = raw
-  if (typeof raw === 'string') {
-    try { feature = JSON.parse(raw) } catch { return null }
-  }
-  if (feature.type === 'FeatureCollection') feature = feature.features?.[0]
-  if (feature.type !== 'Feature' && feature.type) feature = { type: 'Feature', properties: {}, geometry: feature }
-  if (!feature?.geometry) return null
-  return { ...feature, properties: { ...(feature.properties || {}), codigo: feature.properties?.codigo || codigo } }
 }
 
 function PluviometroManager({ fazendaId, talhoes, pluviometros, pluviometrosErro, onCreate, onUpdate, onDelete }) {
