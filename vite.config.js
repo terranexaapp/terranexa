@@ -70,5 +70,19 @@ export default defineConfig({
       }
     })
   ],
-  server: { port: 5173, host: true }
+  server: { port: 5173, host: true },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return
+          if (id.includes('react-router')) return 'vendor-router'
+          if (id.includes('/react/') || id.includes('/react-dom/') || id.includes('/scheduler/')) return 'vendor-react'
+          if (id.includes('@supabase')) return 'vendor-supabase'
+          if (id.includes('leaflet')) return 'vendor-leaflet'
+          if (id.includes('@turf') || id.includes('jszip') || id.includes('shpjs') || id.includes('@tmcw')) return 'vendor-geo'
+        }
+      }
+    }
+  }
 })
