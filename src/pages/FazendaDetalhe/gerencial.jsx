@@ -6,6 +6,7 @@ import { SimpleFarmMap } from './maps'
 import { ManagementModulePanel, ConfiguracaoFazendaPanel } from './panels'
 import { SafrasManager } from './safrasManager'
 import { EquipeManager } from './equipeManager'
+import { EstoqueManager } from './estoqueManager'
 import { normalizeFeature, findTalhaoForCoord } from './utils'
 import {
   eyebrowStyle,
@@ -504,7 +505,9 @@ export function GerencialView({
 
           {activeManager === 'equipe' && <EquipeManager fazendaId={fazendaId} />}
 
-          {!['talhoes', 'pluviometros', 'configuracao', 'safras', 'equipe'].includes(activeManager) && (
+          {activeManager === 'estoque' && <EstoqueManager fazendaId={fazendaId} navigate={navigate} />}
+
+          {!['talhoes', 'pluviometros', 'configuracao', 'safras', 'equipe', 'estoque'].includes(activeManager) && (
             <ManagementModulePanel item={activeItem} navigate={navigate} />
           )}
         </div>
