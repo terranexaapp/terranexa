@@ -84,7 +84,7 @@ E em **API → CORS / Allowed Origins**:
 Em **Authentication → Providers → Email**:
 
 - **Enable email confirmations:** **ON** em produção
-  (no `INSTALACAO.md` está documentado como OFF pra facilitar dev).
+  (durante o dev pode ficar OFF pra agilizar testes — ver README.md, Passo 5, dica).
 - **Secure email change:** ON
 - **Secure password change:** ON
 - Configurar SMTP próprio em **Auth → Settings → SMTP** (o SMTP

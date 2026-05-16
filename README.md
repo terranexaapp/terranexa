@@ -32,22 +32,22 @@
 
 ### Passo 2 — Rodar as migrations do banco
 
-O projeto possui **duas trilhas de migration** com propósitos diferentes:
-
-- **`supabase/migrations/`** — trilha **mínima** (`001` → `004`) com o schema básico (fazendas, talhões, insumos, operações, OS, RLS, geometria). É o suficiente pra rodar **Login / Fazendas / Insumos / OS / Cadastro de talhões via mapa**.
-- **`database/`** — trilha **completa** (`001A` … `004_final_check`) com módulos agronômicos avançados (pluviômetros, monitoramento, scouting, amostras de solo, armadilhas, storage buckets, equipes). Necessária pra usar as visões **Chuvas / Solo / Scouting** dentro de `FazendaDetalhePage`.
-
-Quando o projeto estiver pronto:
+Todo o schema do TerraNexa está em [`database/`](./database/README.md).
+Não há mais trilha alternativa em `supabase/migrations/` (foi consolidada).
 
 1. No menu lateral do Supabase, clique em **SQL Editor** → **New query**
-2. Rode os arquivos da trilha mínima **na ordem**:
-   - `supabase/migrations/001_initial_schema.sql`
-   - `supabase/migrations/002_rls_policies.sql`
-   - `supabase/migrations/004_geometria_e_area_automatica.sql`
-3. Confirme que aparece *"Success. No rows returned"* em cada um
-4. Para habilitar os módulos avançados, rode também (na ordem) os arquivos de `database/` — começando por `001_terranexa_schema.sql`, depois `001A` → `001F4`, depois `002_storage_buckets.sql`
+2. Cole e rode os arquivos **na ordem** documentada em
+   [`database/README.md`](./database/README.md):
+   `000_preflight_check.sql` → `001A`..`001D` → `001E1`..`001E3`
+   → `001E_functions_and_views.sql` → `001F1`..`001F4` →
+   `001G_area_trigger.sql` → `002_storage_buckets.sql` →
+   `003_vincular_dados_existentes.sql` → `004_final_check.sql`
+3. Confirme que cada um retorna *"Success. No rows returned"*. O
+   `004_final_check.sql` reporta no fim se algo ficou de fora.
 
-> ⚠️ **Não rode o `003_seed_demo_data.sql` ainda** — ele só funciona depois que você criar seu primeiro usuário pelo app.
+> 💡 **Dados de exemplo (opcional):** após criar seu usuário no app,
+> rode `database/seeds/demo_data.sql` (edite a constante `USER_EMAIL`
+> antes) pra ter uma fazenda demo com 4 talhões e 1 operação.
 
 ---
 
@@ -112,7 +112,7 @@ Pronto! Já está rodando com banco real. 🎉
 
 Se quiser ver o app já com uma fazenda exemplo:
 
-1. Abra `supabase/migrations/003_seed_demo_data.sql`
+1. Abra `database/seeds/demo_data.sql`
 2. Edite a linha `USER_EMAIL` e coloque o e-mail que você usou no cadastro
 3. Cole o SQL inteiro no **SQL Editor** do Supabase e rode
 
@@ -166,9 +166,11 @@ terranexa/
 │   ├── styles/             Tema e CSS global
 │   ├── App.jsx             Roteamento principal
 │   └── main.jsx            Entry point
-├── supabase/
-│   └── migrations/         Schema mínimo + RLS (trilha base)
-├── database/               Trilha completa: módulos agronômicos avançados
+├── database/               Schema canônico (ver database/README.md)
+│   ├── 000_preflight…sql   Ordem de execução numerada
+│   ├── 001A..001G…sql      Schema, funções, RLS, triggers
+│   ├── 002..004…sql        Storage, backfill, final check
+│   └── seeds/              Dados de exemplo (opcional)
 ├── .env.example            Modelo de variáveis de ambiente
 ├── index.html              HTML base
 ├── package.json

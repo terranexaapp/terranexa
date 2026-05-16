@@ -103,10 +103,26 @@ Ainda em aberto pra auditoria completa com axe-devtools (Fase 5):
 - Anúncio de mudança de página pelo screen reader.
 - Skip links ("pular pra conteúdo principal").
 
-### Database
+### Database ✅ CONSOLIDADO
 
-- A trilha `supabase/migrations/` é o **mínimo viável**; a trilha `database/` tem schema completo com módulos agronômicos (pluviômetros, monitoramentos, amostras de solo, armadilhas, equipes, storage buckets). Decidir se consolida tudo em `supabase/migrations/` (canônico do CLI) ou mantém divisão atual com docs claras.
-- Adicionar `pg_stat_statements` ou rodar `explain analyze` nas queries mais pesadas (joins de `v_talhao_resumo`) quando o app escalar.
+- ✅ Trilha única em `database/`. A pasta `supabase/migrations/` foi
+  removida (era incompleta — faltavam as tabelas `pluviometros`,
+  `monitoramentos`, `equipes`, `os_insumos`, `os_talhoes` e a view
+  `v_custo_por_categoria` que o frontend usa).
+- ✅ Trigger `area_total_ha` (que vinha apenas no antigo
+  `004_geometria_e_area_automatica.sql`) portado pra
+  `database/001G_area_trigger.sql`.
+- ✅ Seed de demonstração movido pra `database/seeds/demo_data.sql`
+  — fora do fluxo automático.
+- ✅ `database/README.md` lista ordem de execução exata e idempotência.
+- ✅ README.md raiz simplificado: aponta direto pra `database/README.md`.
+
+Ainda pendente:
+- Adicionar `pg_stat_statements` ou rodar `explain analyze` nas queries
+  mais pesadas quando o app escalar.
+- Considerar Supabase CLI (`supabase db push`) com renaming pra trilha
+  com timestamp (formato `20250101120000_001A.sql`) — só vale fazer
+  quando for adotar workflow CLI completo.
 
 ### Segurança ✅ PARCIAL (código pronto; configs externas pendentes)
 
