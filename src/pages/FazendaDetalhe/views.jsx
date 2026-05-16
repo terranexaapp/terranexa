@@ -4,7 +4,7 @@ import { criarMonitoramento, criarMonitoramentoPonto } from '../../lib/monitoram
 import { DESKTOP_NAV_GROUPS } from './constants'
 import { DesktopIcon } from './DesktopIcon'
 import { SimpleFarmMap } from './maps'
-import { MetricCard, CustoPizzaCard, SmartInsightCard, InsightPanel } from './sharedComponents'
+import { MetricCard, CustoPizzaCard, SmartInsightCard } from './sharedComponents'
 import { formatCultura, normalizeFeature } from './utils'
 import { requestOfflineStorage, saveMonitoringPointOffline } from './offline'
 import {

@@ -39,6 +39,7 @@ export function InsumosPage() {
 
   useEffect(() => {
     if (fazendaId) carregar()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fazendaId])
 
   async function carregar() {

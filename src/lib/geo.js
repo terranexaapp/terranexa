@@ -32,7 +32,7 @@ export function calcularBounds(geojson) {
       [Math.min(...lats), Math.min(...lngs)],
       [Math.max(...lats), Math.max(...lngs)]
     ]
-  } catch (e) {
+  } catch {
     return null
   }
 }

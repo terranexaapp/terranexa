@@ -54,6 +54,7 @@ export function OSPage() {
       .then(({ data }) => setTalhoes(data || []))
     listarInsumos(fazendaId).then(setInsumos)
     listarEquipes(fazendaId).then(setEquipes)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fazendaId])
 
   async function carregar() {

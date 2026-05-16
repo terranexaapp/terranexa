@@ -10,8 +10,6 @@ import {
   eyebrowStyle,
   mapMainPageStyle,
   mapMainPageMobileStyle,
-  mapTopInfoStyle,
-  mapTalhaoChipStyle,
   timelineDockStyle,
   timelineMobileStyle,
   timelineHeaderStyle,
@@ -62,14 +60,11 @@ import {
 const C = theme.normal
 
 export function FazendaMapaPrincipal({
-  fazenda,
   talhoes,
   pluviometros = [],
   monitoramentosResumo = {},
   talhaoSel,
   operacoes,
-  custos,
-  totalCusto,
   loadOps,
   alternarTalhao,
   navigate,

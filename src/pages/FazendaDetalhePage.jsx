@@ -1,27 +1,16 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
-import { listarOperacoes, getCategoriaInfo, resumoCustosPorCategoria } from '../lib/operacoes'
-import { criarTalhao } from '../lib/fazendas'
+import { listarOperacoes, resumoCustosPorCategoria } from '../lib/operacoes'
 import { listarPluviometros, criarPluviometro, atualizarPluviometro, desativarPluviometro } from '../lib/pluviometros'
-import { listarUltimosMonitoramentos, criarMonitoramento, criarMonitoramentoPonto } from '../lib/monitoramentos'
-import { uploadArquivoFazenda } from '../lib/storage'
+import { listarUltimosMonitoramentos } from '../lib/monitoramentos'
 import { NovaOperacaoModal } from '../components/NovaOperacaoModal'
 import { Logo } from '../components/Logo'
 import { theme } from '../styles/theme'
 import { DesktopIcon } from './FazendaDetalhe/DesktopIcon'
-import {
-  TalhaoMiniKpi,
-  TalhaoInsight,
-  MetricCard,
-  Field,
-  CustoPizzaCard,
-  SmartInsightCard,
-  InsightPanel,
-  OperacaoCard,
-  NovoTalhaoModal
-} from './FazendaDetalhe/sharedComponents'
-import { ManagementModulePanel, ConfiguracaoFazendaPanel, RelatoriosView, CustosPanel } from './FazendaDetalhe/panels'
+
+
+import { RelatoriosView } from './FazendaDetalhe/panels'
 import {
   FarmDesktopSidebar,
   DashboardView,
@@ -29,72 +18,19 @@ import {
   MonitoramentoRegistroView,
   InterpolacaoView
 } from './FazendaDetalhe/views'
-import { SimpleFarmMap } from './FazendaDetalhe/maps'
 import { FazendaMapaPrincipal } from './FazendaDetalhe/mapaPrincipal'
 import { GerencialView } from './FazendaDetalhe/gerencial'
 import { TalhaoGeoModal } from './FazendaDetalhe/talhaoGeoModal'
 import {
-  FASE_LABELS,
-  NAV_ITEMS,
-  DESKTOP_NAV_GROUPS,
-  reportTypes,
-  MAP_DEFAULT_BOUNDS,
-  TILE_SIZE,
-  TILE_MIN_ZOOM,
-  TILE_MAX_ZOOM,
-  SATELLITE_TILE_URL,
-  MAPBOX_TOKEN,
-  MAPBOX_SATELLITE_TILE_URL,
-  MAPBOX_ATTRIBUTION,
-  ESRI_ATTRIBUTION,
-  MONITORAMENTO_LEGEND
+  NAV_ITEMS
 } from './FazendaDetalhe/constants'
-import { useMediaQuery, useDevicePosition } from './FazendaDetalhe/hooks'
-import { loadLeafletAssets } from './FazendaDetalhe/leafletLoader'
-import { requestOfflineStorage, saveMonitoringPointOffline } from './FazendaDetalhe/offline'
+import { useMediaQuery } from './FazendaDetalhe/hooks'
 import {
-  formatCultura,
-  money,
-  formatShortDate,
-  formatMonitoramentoDate,
-  daysSinceDate,
   getMonitoramentoMeta,
-  indexMonitoramentosByTalhao,
-  calcularAreaGeo,
-  parseKmlText,
-  featureName,
-  featureCode,
-  getFeatureRing,
-  getMapBounds,
-  projectCoord,
-  clamp,
-  lngLatToWorld,
-  worldToLngLat,
-  getBoundsCenter,
-  getFitZoom,
-  getSatelliteInitialView,
-  getRingLabelCoord,
-  escapeHtml,
-  ringToLatLngs,
-  fitLeafletToFeatures,
-  getLeafletPolygonStyle,
-  leafletLabelHtml,
-  leafletPluviometroHtml,
-  pointInFeatureCoord,
-  findTalhaoForCoord,
-  pointToCoord,
-  pointsToFeature,
-  distanceBetween,
-  midpointBetween,
-  pointInPolygon,
-  normalizeFeature
+  indexMonitoramentosByTalhao
 } from './FazendaDetalhe/utils'
 import {
   eyebrowStyle,
-  viewTitleStyle,
-  viewSubtitleStyle,
-  panelTitleStyle,
-  viewStackStyle,
   desktopTopbarStyle,
   desktopTopbarBrandStyle,
   desktopMenuButtonStyle,
@@ -115,215 +51,9 @@ import {
   drawerBrandStyle,
   drawerReturnButtonStyle,
   farmLayoutStyle,
-  farmSidebarStyle,
   farmLayoutDesktopStyle,
   farmContentDesktopStyle,
-  farmDesktopSidebarStyle,
-  desktopSidebarHeaderStyle,
-  desktopSidebarFarmNameStyle,
-  desktopSidebarFarmMetaStyle,
-  desktopSidebarGroupsStyle,
-  desktopNavGroupStyle,
-  desktopNavGroupTitleStyle,
-  desktopNavButtonStyle,
-  desktopNavIconStyle,
-  desktopNavCodeStyle,
-  desktopNavTextStyle,
-  desktopNavLabelStyle,
-  desktopNavHintStyle,
-  desktopSidebarFooterStyle,
-  desktopSidebarReturnStyle,
-  sidebarEyebrowStyle,
-  sidebarNavButtonStyle,
-  heroPanelStyle,
-  panelStyle,
-  mapMainPageStyle,
-  mapMainPageMobileStyle,
-  mapTopInfoStyle,
-  mapTalhaoChipStyle,
-  timelineDockStyle,
-  timelineMobileStyle,
-  timelineHeaderStyle,
-  timelineHeaderMobileStyle,
-  timelineMobileEyebrowStyle,
-  timelineTitleStyle,
-  timelineMobileTitleStyle,
-  timelineAreaPillStyle,
-  timelineSummaryCardStyle,
-  timelineCardTitleStyle,
-  timelineSummaryRowsStyle,
-  timelineSummaryRowStyle,
-  timelineSummaryLabelStyle,
-  timelineSummaryValueStyle,
-  timelineTextButtonStyle,
-  timelineTableStyle,
-  timelineTableDesktopStyle,
-  timelineCellStyle,
-  timelineTableHorizontalStyle,
-  timelineCellHorizontalStyle,
-  timelineInfoHorizontalCardStyle,
-  timelineMetricHorizontalCardStyle,
-  timelineInputHorizontalCardStyle,
-  timelineCtaHorizontalStyle,
-  timelineScrollEndStyle,
-  timelineMonitoringStatusStyle,
-  timelineLegendGridStyle,
-  timelineLegendItemStyle,
-  timelineLegendDotStyle,
-  timelineLegendRangeStyle,
-  timelineMonitoringHorizontalCardStyle,
-  timelineLegendHorizontalCardStyle,
-  timelineActionsStyle,
-  timelineActionButtonStyle,
-  timelineMobileActionButtonStyle,
-  timelineModeTabsStyle,
-  timelineModeButtonStyle,
-  timelineModeTabsMobileStyle,
-  timelineMobileModeButtonStyle,
-  timelineRainLayoutStyle,
-  timelineDateGridStyle,
-  timelineDateLabelStyle,
-  timelineDateInputStyle,
-  timelinePrimaryButtonStyle,
-  timelineRainGridStyle,
-  timelineRainMetricStyle,
-  timelineRainMapStyle,
-  talhaoHubStyle,
-  talhaoMapColumnStyle,
-  talhaoMapHeaderStyle,
-  talhaoDecisionPanelStyle,
-  emptyTalhaoPanelStyle,
-  talhaoStatusBadgeStyle,
-  talhaoKpiGridStyle,
-  talhaoMiniKpiStyle,
-  talhaoActionGridStyle,
-  talhaoInsightBoxStyle,
-  metricGridStyle,
-  dashboardGridStyle,
-  metricCardStyle,
-  smartCardStyle,
-  smartBadgeStyle,
-  smartInsightRowStyle,
-  smartDotStyle,
-  smartActionStyle,
-  monitoringGridStyle,
-  monitoringActionGridStyle,
-  gpsStatusStyle,
-  gpsCanvasStyle,
-  gpsPathLineStyle,
-  gpsPointStyle,
-  gpsTableStyle,
-  gpsRowStyle,
-  pieChartStyle,
-  pieHoleStyle,
-  primaryActionStyle,
-  secondaryActionStyle,
-  primaryHeaderButtonStyle,
-  smallButtonStyle,
-  iconButtonStyle,
-  inputStyle,
-  formLabelStyle,
-  dateFilterGroupStyle,
-  dateLabelStyle,
-  dateInputStyle,
-  mapShellStyle,
-  mapToolbarStyle,
-  mapPillActiveStyle,
-  mapPillStyle,
-  interpolationMapStyle,
-  soilResultsShellStyle,
-  soilNutrientRowStyle,
-  scoutingMapStyle,
-  plotShapeStyle,
-  legendStyle,
-  gradientBarStyle,
-  managementPageStyle,
-  managementHeroStyle,
-  managementHeroCompactStyle,
-  managementWorkspaceDesktopStyle,
-  managementWorkspaceSingleStyle,
-  managementWorkspaceMobileStyle,
-  managementWorkspaceCompactStyle,
-  managementNavRailStyle,
-  managementNavRailMobileStyle,
-  managementNavRailCompactStyle,
-  managementNavGroupStyle,
-  managementNavGroupCompactStyle,
-  managementNavItemStyle,
-  managementNavItemCompactStyle,
-  managementNavLabelStyle,
-  managementNavLabelCompactStyle,
-  managementNavHintStyle,
-  managementModuleContentStyle,
-  managementMenuGridStyle,
-  managementMenuCardStyle,
-  managementContentPanelStyle,
-  managementSummaryStripStyle,
-  managementSummaryCardStyle,
-  managementSummaryIconStyle,
-  managementSummaryTextStyle,
-  managementSummaryLabelStyle,
-  managementSummaryValueStyle,
-  managementPlaceholderGridStyle,
-  managementPlaceholderCardStyle,
-  farmConfigGridStyle,
-  farmConfigFieldStyle,
-  managerGridStyle,
-  managerCardStyle,
-  reportButtonStyle,
-  reportPreviewStyle,
-  reportCoverArtStyle,
-  mapManagerShellStyle,
-  mapSideMenuStyle,
-  managerBreadcrumbRowStyle,
-  managerBreadcrumbStyle,
-  managerBreadcrumbSepStyle,
-  managerMapActionsStyle,
-  managerMapStageStyle,
-  mapOverlayToolsStyle,
-  mapToolButtonStyle,
-  mapCounterStyle,
-  mapRefreshButtonStyle,
-  modalOverlayStyle,
-  geoModalStyle,
-  geoModalHeaderStyle,
-  geoModalBodyStyle,
-  geoModeMenuStyle,
-  geoModeButtonStyle,
-  geoModeButtonActiveStyle,
-  geoRuleBoxStyle,
-  emptyGeoStateStyle,
-  drawToolsStyle,
-  kmlDropStyle,
-  geoFormStyle,
-  formErrorStyle,
-  simpleMapStyle,
-  simpleMapFullStyle,
-  leafletMapCanvasStyle,
-  satelliteTileLayerStyle,
-  satelliteTileStyle,
-  satelliteShadeStyle,
-  rainInterpolationLayerStyle,
-  rainInterpolationSpotStyle,
-  satelliteSvgStyle,
-  satelliteControlsStyle,
-  satelliteControlsMobileStyle,
-  satelliteControlButtonStyle,
-  satelliteGpsButtonStyle,
-  satelliteBadgeStyle,
-  mapDrawHintStyle,
-  mapEmptyHintStyle,
-  pluviometerShellStyle,
-  pluviometerHeaderStyle,
-  pluviometerMapStageStyle,
-  pluviometerEditorStyle,
-  pluviometerEditorActionsStyle,
-  pluviometerCoordGridStyle,
-  pluviometerHintStyle,
-  pluviometerEditorFooterStyle,
-  dangerGhostButtonStyle,
-  rainMapFrameStyle,
-  rainEmptyOverlayStyle
+  sidebarEyebrowStyle
 } from './FazendaDetalhe/styles'
 
 const C = theme.normal
@@ -339,9 +69,7 @@ export function FazendaDetalhePage() {
   const [loading, setLoading] = useState(true)
   const [showNovo, setShowNovo] = useState(false)
   const [novoTalhaoMode, setNovoTalhaoMode] = useState(null)
-  const [form, setForm] = useState({ codigo: 'T1', cultura: 'soja', area_ha: '', fase: 'preparo' })
-  const [salvando, setSalvando] = useState(false)
-  const [erro, setErro] = useState('')
+  const [form, setForm] = useState({ codigo: 'T1' })
   const [talhaoSel, setTalhaoSel] = useState(null)
   const [operacoes, setOperacoes] = useState([])
   const [custos, setCustos] = useState([])
@@ -354,6 +82,8 @@ export function FazendaDetalhePage() {
 
   useEffect(() => {
     carregar()
+    // carregar é estável dentro deste componente; só queremos refetch quando o id da fazenda muda.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
 
   async function carregar() {
@@ -407,27 +137,6 @@ export function FazendaDetalhePage() {
       return
     }
     await abrirTalhao(talhao)
-  }
-
-  async function salvarTalhao(e) {
-    e.preventDefault()
-    setErro('')
-    setSalvando(true)
-    const { error } = await supabase.from('talhoes').insert({
-      fazenda_id: id,
-      codigo: form.codigo,
-      cultura: form.cultura,
-      area_ha: parseFloat(form.area_ha),
-      fase: form.fase
-    })
-    if (error) {
-      setErro(error.message)
-      setSalvando(false)
-      return
-    }
-    setShowNovo(false)
-    carregar()
-    setSalvando(false)
   }
 
   function abrirCadastroTalhao(mode = null) {
