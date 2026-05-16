@@ -3,7 +3,12 @@ import { theme } from '../../styles/theme'
 import { useMediaQuery } from './hooks'
 import { DesktopIcon } from './DesktopIcon'
 import { SimpleFarmMap } from './maps'
-import { ManagementModulePanel, ConfiguracaoFazendaPanel } from './panels'
+import { ManagementModulePanel, ConfiguracaoFazendaPanel, InsumosShortcut } from './panels'
+import { SafrasManager } from './safrasManager'
+import { EquipeManager } from './equipeManager'
+import { EstoqueManager } from './estoqueManager'
+import { MaquinaManager } from './maquinaManager'
+import { ProdutividadeManager } from './produtividadeManager'
 import { normalizeFeature, findTalhaoForCoord } from './utils'
 import {
   eyebrowStyle,
@@ -498,9 +503,21 @@ export function GerencialView({
             <ConfiguracaoFazendaPanel fazenda={fazenda} talhoes={talhoes} total={total} />
           )}
 
-          {!['talhoes', 'pluviometros', 'configuracao'].includes(activeManager) && (
-            <ManagementModulePanel item={activeItem} navigate={navigate} />
-          )}
+          {activeManager === 'safras' && <SafrasManager fazendaId={fazendaId} />}
+
+          {activeManager === 'equipe' && <EquipeManager fazendaId={fazendaId} />}
+
+          {activeManager === 'estoque' && <EstoqueManager fazendaId={fazendaId} navigate={navigate} />}
+
+          {activeManager === 'insumos' && <InsumosShortcut navigate={navigate} />}
+
+          {activeManager === 'maquinas' && <MaquinaManager fazendaId={fazendaId} />}
+
+          {activeManager === 'produtividade' && <ProdutividadeManager fazendaId={fazendaId} talhoes={talhoes} />}
+
+          {!['talhoes', 'pluviometros', 'configuracao', 'safras', 'equipe', 'estoque', 'insumos', 'maquinas', 'produtividade'].includes(
+            activeManager
+          ) && <ManagementModulePanel item={activeItem} />}
         </div>
       </div>
     </section>
