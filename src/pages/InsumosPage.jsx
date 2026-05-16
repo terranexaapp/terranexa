@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { listarInsumos, criarInsumo, atualizarInsumo, desativarInsumo, atualizarEstoque, popularCatalogoBase, CLASSES_INSUMO, getClasseInfo, statusEstoqueInfo } from '../lib/insumos'
 import { listarFazendas } from '../lib/fazendas'
 import { theme } from '../styles/theme'
+import { ErrorPanel } from '../components/ErrorPanel'
 
 const C = theme.normal
 
@@ -12,6 +13,7 @@ export function InsumosPage() {
   const [fazendaId, setFazendaId] = useState(null)
   const [insumos, setInsumos] = useState([])
   const [loading, setLoading] = useState(true)
+  const [erro, setErro] = useState(null)
   const [popularizando, setPopularizando] = useState(false)
   const [busca, setBusca] = useState('')
   const [filtroClasse, setFiltroClasse] = useState('todas')
@@ -28,9 +30,9 @@ export function InsumosPage() {
   useEffect(() => { if (fazendaId) carregar() }, [fazendaId])
 
   async function carregar() {
-    setLoading(true)
+    setLoading(true); setErro(null)
     try { setInsumos(await listarInsumos(fazendaId)) }
-    catch (e) { console.error(e) }
+    catch (e) { console.error(e); setErro(e) }
     finally { setLoading(false) }
   }
 
@@ -126,6 +128,8 @@ export function InsumosPage() {
 
         {loading ? (
           <p style={{color:C.textDim, textAlign:'center', padding:40, fontFamily:'monospace', fontSize:11}}>CARREGANDO...</p>
+        ) : erro ? (
+          <ErrorPanel error={erro} onRetry={carregar} />
         ) : (
           Object.entries(agrupados).map(([classe, items]) => {
             const info = getClasseInfo(classe)
