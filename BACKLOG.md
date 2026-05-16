@@ -4,33 +4,37 @@ Itens identificados na auditoria de estrutura ([análise completa](https://claud
 
 ---
 
-## 🟡 Refactor estrutural (Fase 3 — deferido)
+## 🟡 Refactor estrutural (Fase 3)
 
-### 1. Quebrar `src/pages/FazendaDetalhePage.jsx` (4071 linhas)
+### 1. Quebrar `src/pages/FazendaDetalhePage.jsx` ✅ CONCLUÍDO
 
-**Por que não foi feito agora:** o arquivo contém 7 visões (mapa, dashboard, chuvas, solo, scouting, gerencial, relatórios), múltiplos modais, navegação desktop e ~100 objetos de estilo inline. Sem rodar o app no navegador e clicar manualmente em cada visão, há risco real de regressão visual silenciosa que o `vite build` não detecta.
+Arquivo original de 4071 linhas foi quebrado em 14 arquivos coesos
+dentro de `src/pages/FazendaDetalhe/`:
 
-**Plano sugerido quando for executar:**
+| Arquivo                | Linhas | Responsabilidade |
+|------------------------|--------|------------------|
+| `constants.js`         |   96 | FASE_LABELS, NAV_ITEMS, DESKTOP_NAV_GROUPS, MAPBOX_*, etc |
+| `hooks.js`             |   43 | useMediaQuery, useDevicePosition |
+| `leafletLoader.js`     |   38 | Carga lazy do Leaflet global |
+| `offline.js`           |   30 | requestOfflineStorage, saveMonitoringPointOffline |
+| `utils.js`             |  357 | 28 funções puras (geo, format, monitoramento) |
+| `styles.js`            |  239 | 234 const *Style |
+| `DesktopIcon.jsx`      |  234 | Componente SVG de ícones do menu |
+| `sharedComponents.jsx` |  249 | MetricCard, Field, SmartInsightCard, OperacaoCard etc |
+| `panels.jsx`           |  156 | ManagementModulePanel, RelatoriosView, CustosPanel etc |
+| `views.jsx`            |  608 | FarmDesktopSidebar, DashboardView, ScoutingView, MonitoramentoRegistroView, InterpolacaoView |
+| `maps.jsx`             |  462 | SimpleFarmMap, LeafletFarmMap, VectorFarmMap |
+| `mapaPrincipal.jsx`    |  335 | FazendaMapaPrincipal (view padrão) |
+| `gerencial.jsx`        |  367 | GerencialView + PluviometroManager + MapaCadastroTalhoes |
+| `talhaoGeoModal.jsx`   |  215 | Modal de cadastro com desenho/KML |
+| `FazendaDetalhePage.jsx` | **702** | Orquestrador (state global, layout, fluxo Supabase) |
 
-```
-src/pages/FazendaDetalhe/
-├── index.jsx              ← container, state global, layout, leaflet bootstrap
-├── constants.js           ← FASE_LABELS, NAV_ITEMS, DESKTOP_NAV_GROUPS, MAPBOX_*, etc
-├── views/
-│   ├── MapView.jsx
-│   ├── DashboardView.jsx
-│   ├── ChuvasView.jsx
-│   ├── SoloView.jsx
-│   ├── ScoutingView.jsx
-│   ├── GerencialView.jsx
-│   └── RelatoriosView.jsx
-└── modals/
-    ├── NovoTalhaoModal.jsx
-    ├── NovoPluviometroModal.jsx
-    └── NovoMonitoramentoModal.jsx
-```
+Bônus: removido ~500 linhas de código morto descoberto na auditoria:
+- `SatelliteFarmMap` (425 linhas) — definido mas nunca chamado
+- `TalhoesCommandCenter` — só era usado dentro de um `{false && ...}`
+- `TalhoesPanel`, `HistoricoPanel` — definidos sem nenhum caller
 
-Recortar arquivo sem mudar lógica — sem renomear props, sem mexer em handlers. Cada commit deve sair com `npm run build` limpo e — idealmente — verificação manual no navegador.
+Build limpo após cada commit; nenhum comportamento de runtime mudou.
 
 ### 2. Extrair estilos inline para CSS Modules ou `theme`
 
