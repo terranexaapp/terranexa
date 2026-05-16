@@ -93,8 +93,19 @@ de `/public/vendor/leaflet/leaflet.js`.
 - A trilha `supabase/migrations/` é o **mínimo viável**; a trilha `database/` tem schema completo com módulos agronômicos (pluviômetros, monitoramentos, amostras de solo, armadilhas, equipes, storage buckets). Decidir se consolida tudo em `supabase/migrations/` (canônico do CLI) ou mantém divisão atual com docs claras.
 - Adicionar `pg_stat_statements` ou rodar `explain analyze` nas queries mais pesadas (joins de `v_talhao_resumo`) quando o app escalar.
 
-### Segurança
+### Segurança ✅ PARCIAL (código pronto; configs externas pendentes)
 
-- **`MAPBOX_TOKEN`** é embutido no client — o que é normal pra tokens públicos do Mapbox, mas restringir o token por **HTTP referrer** no painel do Mapbox antes de subir pra produção.
-- Revisar **CORS / Allowed Origins** no Supabase pra incluir só o domínio do Vercel + localhost.
-- Habilitar **email confirmation** no Supabase quando for pra produção (no dev está desligado conforme README).
+Implementado em código:
+- Headers HTTP em `vercel.json` (CSP, HSTS, nosniff, X-Frame-Options,
+  Referrer-Policy, Permissions-Policy).
+- `console.warn` em produção quando `VITE_MAPBOX_TOKEN` falta.
+
+Pendente — ações manuais documentadas em [`SECURITY.md`](./SECURITY.md):
+- Mapbox: restringir token por HTTP referrer no painel.
+- Supabase: configurar Allowed URLs / CORS pra só liberar o domínio
+  do Vercel + localhost.
+- Supabase: habilitar email confirmation antes da produção.
+- Supabase: rodar query SQL de verificação de RLS antes de cada release.
+- Vercel: garantir que `service_role` não está exposta como env var.
+- `vite@^8` quando houver janela (vuln moderada no dev server, sem
+  impacto em produção).
