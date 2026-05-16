@@ -81,12 +81,27 @@ de `/public/vendor/leaflet/leaflet.js`.
 - **1x mesma classe em `views.jsx`** (MonitoramentoRegistroView) — `addPosition` é recriada a cada render; adicionar à dep array dispararia o useEffect em cascata. Idealmente envolver com `useCallback`.
 - **1x `react-refresh/only-export-components` em `hooks/useAuth.jsx`** — arquivo exporta `AuthProvider` (componente) + `useAuth` (hook). Pra resolver, separar em dois arquivos. Impacta só DX em dev (hot-reload faz full reload em vez de fast-refresh).
 
-### Acessibilidade
+### Acessibilidade ✅ BÁSICO CONCLUÍDO
 
-- Auditoria geral com axe-devtools. Pontos já notados:
-  - Botões com label só visual (`←`, `✕`, `▼`) sem `aria-label`.
-  - Cores de status (`OK`/`BAIXO`/`CRITICO`) precisam de fallback textual além de cor.
-  - `htmlFor`/`id` em labels de form (hoje os `<label>` envolvem visualmente mas não estão associados semanticamente).
+- ✅ `aria-label` adicionado em todos os botões só-com-ícone:
+  - Hamburger ☰ ("Abrir menu"), × dos drawers ("Fechar menu"), × dos
+    modais ("Fechar modal"), × de remover item ("Remover ${nome}"),
+    × de desativar equipe, ✕ de cancelar.
+  - Chevron decorativo `›` em NovaOperacaoModal ganhou `aria-hidden="true"`.
+- ✅ `htmlFor`/`id` em forms via `Field` component com `useId` +
+  `cloneElement` — funciona pro Login, Signup, TalhaoGeoModal e todos
+  os consumidores existentes sem mudar o caller.
+- ✅ Focus visible global (`:focus-visible`) em `global.css` com
+  `!important` pra vencer o `outline: 'none'` inline espalhado.
+  Usuários de teclado agora veem outline verde no foco.
+- ✅ Chips de status (`OK`/`BAIXO`/`CRITICO`/`ESGOTADO`) já incluem
+  texto além de cor — confirmado em `lib/insumos.js > statusEstoqueInfo`.
+
+Ainda em aberto pra auditoria completa com axe-devtools (Fase 5):
+- Contraste de cor automatizado (rodar axe ou Lighthouse).
+- `aria-live` regions para mensagens de erro / loading.
+- Anúncio de mudança de página pelo screen reader.
+- Skip links ("pular pra conteúdo principal").
 
 ### Database
 

@@ -69,6 +69,21 @@ a {
   text-decoration: none;
 }
 
+/* Focus visible — usa !important pra vencer o `outline: 'none'` inline
+   espalhado pelos inputs/buttons. Só dispara em navegação via teclado
+   (Tab), não em clique de mouse — graças à pseudo-classe :focus-visible. */
+:focus-visible {
+  outline: 2px solid #3d8a22 !important;
+  outline-offset: 2px !important;
+  border-radius: 4px;
+}
+
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline-offset: -2px !important;
+}
+
 /* Animations */
 @keyframes spin {
   from {
