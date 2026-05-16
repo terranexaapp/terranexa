@@ -40,7 +40,7 @@ terranexa/
     └── 004_geometria_e_area_automatica.sql       ← NOVO
 ```
 
-> ⚠️ Você pode **deletar** o arquivo antigo `src/pages/HomePage.jsx` — ele foi substituído por `FazendasPage.jsx`.
+> ℹ️ O arquivo antigo `src/pages/HomePage.jsx` foi **removido** — foi substituído por `FazendasPage.jsx`.
 
 ### 2. Instale as novas dependências
 

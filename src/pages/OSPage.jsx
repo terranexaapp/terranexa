@@ -7,6 +7,7 @@ import { listarEquipes, criarEquipe, desativarEquipe } from '../lib/equipes'
 import { calcularCustoInsumo } from '../lib/operacoes'
 import { supabase } from '../lib/supabase'
 import { theme } from '../styles/theme'
+import { ErrorPanel } from '../components/ErrorPanel'
 
 const C = theme.normal
 
@@ -19,6 +20,7 @@ export function OSPage() {
   const [equipes, setEquipes] = useState([])
   const [osList, setOsList] = useState([])
   const [loading, setLoading] = useState(true)
+  const [erro, setErro] = useState(null)
   const [filtro, setFiltro] = useState('pendente')
   const [modal, setModal] = useState(null)
   const [osSel, setOsSel] = useState(null)
@@ -34,8 +36,10 @@ export function OSPage() {
   }, [fazendaId])
 
   async function carregar() {
-    setLoading(true)
-    try { setOsList(await listarOS(fazendaId)) } catch (e) { console.error(e) } finally { setLoading(false) }
+    setLoading(true); setErro(null)
+    try { setOsList(await listarOS(fazendaId)) }
+    catch (e) { console.error(e); setErro(e) }
+    finally { setLoading(false) }
   }
 
   async function handleCancelar(os) {
@@ -75,6 +79,7 @@ export function OSPage() {
           ))}
         </div>
         {loading ? <p style={{color:C.textDim,textAlign:'center',padding:40,fontFamily:'monospace',fontSize:11}}>CARREGANDO...</p>
+        : erro ? <ErrorPanel error={erro} onRetry={carregar} />
         : filtradas.length===0 ? (
           <div style={{background:C.bg,borderRadius:14,padding:'40px 20px',border:`1px dashed ${C.border}`,textAlign:'center'}}>
             <p style={{margin:0,fontSize:14,fontWeight:700,color:C.textDk}}>{filtro==='pendente'?'Nenhuma ordem pendente':'Nenhuma ordem encontrada'}</p>

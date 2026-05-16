@@ -32,13 +32,20 @@
 
 ### Passo 2 — Rodar as migrations do banco
 
+O projeto possui **duas trilhas de migration** com propósitos diferentes:
+
+- **`supabase/migrations/`** — trilha **mínima** (`001` → `004`) com o schema básico (fazendas, talhões, insumos, operações, OS, RLS, geometria). É o suficiente pra rodar **Login / Fazendas / Insumos / OS / Cadastro de talhões via mapa**.
+- **`database/`** — trilha **completa** (`001A` … `004_final_check`) com módulos agronômicos avançados (pluviômetros, monitoramento, scouting, amostras de solo, armadilhas, storage buckets, equipes). Necessária pra usar as visões **Chuvas / Solo / Scouting** dentro de `FazendaDetalhePage`.
+
 Quando o projeto estiver pronto:
 
-1. No menu lateral do Supabase, clique em **SQL Editor**
-2. Clique em **New query**
-3. Cole o conteúdo de `supabase/migrations/001_initial_schema.sql` e clique em **Run**
-4. Confirme que apareceu *"Success. No rows returned"*
-5. Faça o mesmo para `002_rls_policies.sql`
+1. No menu lateral do Supabase, clique em **SQL Editor** → **New query**
+2. Rode os arquivos da trilha mínima **na ordem**:
+   - `supabase/migrations/001_initial_schema.sql`
+   - `supabase/migrations/002_rls_policies.sql`
+   - `supabase/migrations/004_geometria_e_area_automatica.sql`
+3. Confirme que aparece *"Success. No rows returned"* em cada um
+4. Para habilitar os módulos avançados, rode também (na ordem) os arquivos de `database/` — começando por `001_terranexa_schema.sql`, depois `001A` → `001F4`, depois `002_storage_buckets.sql`
 
 > ⚠️ **Não rode o `003_seed_demo_data.sql` ainda** — ele só funciona depois que você criar seu primeiro usuário pelo app.
 
@@ -160,7 +167,8 @@ terranexa/
 │   ├── App.jsx             Roteamento principal
 │   └── main.jsx            Entry point
 ├── supabase/
-│   └── migrations/         Schema SQL e RLS
+│   └── migrations/         Schema mínimo + RLS (trilha base)
+├── database/               Trilha completa: módulos agronômicos avançados
 ├── .env.example            Modelo de variáveis de ambiente
 ├── index.html              HTML base
 ├── package.json

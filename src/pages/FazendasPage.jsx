@@ -4,6 +4,7 @@ import { useAuth } from '../hooks/useAuth'
 import { supabase } from '../lib/supabase'
 import { theme } from '../styles/theme'
 import { Logo } from '../components/Logo'
+import { ErrorPanel } from '../components/ErrorPanel'
 
 const C = theme.normal
 
@@ -32,13 +33,14 @@ export function FazendasPage() {
   const navigate = useNavigate()
   const [fazendas, setFazendas] = useState([])
   const [loading, setLoading] = useState(true)
+  const [erro, setErro] = useState(null)
   const [showNova, setShowNova] = useState(false)
 
   useEffect(() => { carregar() }, [])
 
   async function carregar() {
-    try { setLoading(true); setFazendas(await listarFazendas()) }
-    catch (e) { console.error(e) }
+    try { setLoading(true); setErro(null); setFazendas(await listarFazendas()) }
+    catch (e) { console.error(e); setErro(e) }
     finally { setLoading(false) }
   }
 
@@ -66,6 +68,8 @@ export function FazendasPage() {
         </div>
         {loading ? (
           <p style={{ color: C.textDim, textAlign: 'center', padding: 40, fontFamily: 'monospace', fontSize: 11 }}>CARREGANDO...</p>
+        ) : erro ? (
+          <ErrorPanel error={erro} onRetry={carregar} />
         ) : fazendas.length === 0 ? (
           <div style={{ background: C.bg, borderRadius: 16, padding: '60px 24px', border: `1px dashed ${C.border}`, textAlign: 'center' }}>
             <div style={{ fontSize: 48, marginBottom: 12 }}>🌾</div>
@@ -109,7 +113,8 @@ function NovaFazendaModal({ onClose, onCreated }) {
   async function handleSubmit(e) {
     e.preventDefault(); setError(''); setLoading(true)
     try { onCreated(await criarFazenda({ nome, municipio, estado })) }
-    catch (err) { setError(err.message || 'Erro ao criar fazenda'); setLoading(false) }
+    catch (err) { setError(err.message || 'Erro ao criar fazenda') }
+    finally { setLoading(false) }
   }
 
   return (
