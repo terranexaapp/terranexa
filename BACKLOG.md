@@ -72,23 +72,71 @@ de `/public/vendor/leaflet/leaflet.js`.
 
 - **Testes E2E** com Playwright cobrindo o golden path: cadastro → login → criar fazenda → criar talhão (3 modos) → registrar operação → fechar OS.
 - **Sentry** ou equivalente pra captura de erro em produção (hoje `ErrorBoundary` só mostra a tela; nada é enviado pra ninguém).
-- **Lint + Prettier** — não há `.eslintrc` nem `.prettierrc` no repo. Adicionar pra estabilizar formatação em PRs.
+- **Lint + Prettier** ✅ CONCLUÍDO — ESLint 9 flat config + Prettier 3 + `eslint-plugin-unused-imports`. Scripts: `lint`, `lint:fix`, `format`. Linha de base: 299 warnings + 2 errors → 7 warnings + 0 errors (após cleanup automático e manual). Os 7 warnings restantes estão documentados na próxima seção.
 - **react-hook-form + zod** pra forms maiores (NovaOSModal especialmente — tem 14 estados).
 
-### Acessibilidade
+#### Warnings de lint que ficaram intencionalmente:
 
-- Auditoria geral com axe-devtools. Pontos já notados:
-  - Botões com label só visual (`←`, `✕`, `▼`) sem `aria-label`.
-  - Cores de status (`OK`/`BAIXO`/`CRITICO`) precisam de fallback textual além de cor.
-  - `htmlFor`/`id` em labels de form (hoje os `<label>` envolvem visualmente mas não estão associados semanticamente).
+- **5x `react-hooks/exhaustive-deps` em `FazendaDetalhe/maps.jsx`** — re-fits de mapa e atualização de markers têm deps incompletas de propósito (`normalized`, `fullBleed`, `activePluviometros`, `deviceMarker`). Mexer nessas deps arrisca regressões visuais difíceis de detectar sem rodar e clicar manualmente. Resolver junto com uma revisão visual completa do mapa.
+- **1x mesma classe em `views.jsx`** (MonitoramentoRegistroView) — `addPosition` é recriada a cada render; adicionar à dep array dispararia o useEffect em cascata. Idealmente envolver com `useCallback`.
+- **1x `react-refresh/only-export-components` em `hooks/useAuth.jsx`** — arquivo exporta `AuthProvider` (componente) + `useAuth` (hook). Pra resolver, separar em dois arquivos. Impacta só DX em dev (hot-reload faz full reload em vez de fast-refresh).
 
-### Database
+### Acessibilidade ✅ BÁSICO CONCLUÍDO
 
-- A trilha `supabase/migrations/` é o **mínimo viável**; a trilha `database/` tem schema completo com módulos agronômicos (pluviômetros, monitoramentos, amostras de solo, armadilhas, equipes, storage buckets). Decidir se consolida tudo em `supabase/migrations/` (canônico do CLI) ou mantém divisão atual com docs claras.
-- Adicionar `pg_stat_statements` ou rodar `explain analyze` nas queries mais pesadas (joins de `v_talhao_resumo`) quando o app escalar.
+- ✅ `aria-label` adicionado em todos os botões só-com-ícone:
+  - Hamburger ☰ ("Abrir menu"), × dos drawers ("Fechar menu"), × dos
+    modais ("Fechar modal"), × de remover item ("Remover ${nome}"),
+    × de desativar equipe, ✕ de cancelar.
+  - Chevron decorativo `›` em NovaOperacaoModal ganhou `aria-hidden="true"`.
+- ✅ `htmlFor`/`id` em forms via `Field` component com `useId` +
+  `cloneElement` — funciona pro Login, Signup, TalhaoGeoModal e todos
+  os consumidores existentes sem mudar o caller.
+- ✅ Focus visible global (`:focus-visible`) em `global.css` com
+  `!important` pra vencer o `outline: 'none'` inline espalhado.
+  Usuários de teclado agora veem outline verde no foco.
+- ✅ Chips de status (`OK`/`BAIXO`/`CRITICO`/`ESGOTADO`) já incluem
+  texto além de cor — confirmado em `lib/insumos.js > statusEstoqueInfo`.
 
-### Segurança
+Ainda em aberto pra auditoria completa com axe-devtools (Fase 5):
+- Contraste de cor automatizado (rodar axe ou Lighthouse).
+- `aria-live` regions para mensagens de erro / loading.
+- Anúncio de mudança de página pelo screen reader.
+- Skip links ("pular pra conteúdo principal").
 
-- **`MAPBOX_TOKEN`** é embutido no client — o que é normal pra tokens públicos do Mapbox, mas restringir o token por **HTTP referrer** no painel do Mapbox antes de subir pra produção.
-- Revisar **CORS / Allowed Origins** no Supabase pra incluir só o domínio do Vercel + localhost.
-- Habilitar **email confirmation** no Supabase quando for pra produção (no dev está desligado conforme README).
+### Database ✅ CONSOLIDADO
+
+- ✅ Trilha única em `database/`. A pasta `supabase/migrations/` foi
+  removida (era incompleta — faltavam as tabelas `pluviometros`,
+  `monitoramentos`, `equipes`, `os_insumos`, `os_talhoes` e a view
+  `v_custo_por_categoria` que o frontend usa).
+- ✅ Trigger `area_total_ha` (que vinha apenas no antigo
+  `004_geometria_e_area_automatica.sql`) portado pra
+  `database/001G_area_trigger.sql`.
+- ✅ Seed de demonstração movido pra `database/seeds/demo_data.sql`
+  — fora do fluxo automático.
+- ✅ `database/README.md` lista ordem de execução exata e idempotência.
+- ✅ README.md raiz simplificado: aponta direto pra `database/README.md`.
+
+Ainda pendente:
+- Adicionar `pg_stat_statements` ou rodar `explain analyze` nas queries
+  mais pesadas quando o app escalar.
+- Considerar Supabase CLI (`supabase db push`) com renaming pra trilha
+  com timestamp (formato `20250101120000_001A.sql`) — só vale fazer
+  quando for adotar workflow CLI completo.
+
+### Segurança ✅ PARCIAL (código pronto; configs externas pendentes)
+
+Implementado em código:
+- Headers HTTP em `vercel.json` (CSP, HSTS, nosniff, X-Frame-Options,
+  Referrer-Policy, Permissions-Policy).
+- `console.warn` em produção quando `VITE_MAPBOX_TOKEN` falta.
+
+Pendente — ações manuais documentadas em [`SECURITY.md`](./SECURITY.md):
+- Mapbox: restringir token por HTTP referrer no painel.
+- Supabase: configurar Allowed URLs / CORS pra só liberar o domínio
+  do Vercel + localhost.
+- Supabase: habilitar email confirmation antes da produção.
+- Supabase: rodar query SQL de verificação de RLS antes de cada release.
+- Vercel: garantir que `service_role` não está exposta como env var.
+- `vite@^8` quando houver janela (vuln moderada no dev server, sem
+  impacto em produção).

@@ -9,9 +9,10 @@ export function calcularAreaHectares(geojson) {
     for (let i = 0; i < ring.length - 1; i++) {
       const [lon1, lat1] = ring[i]
       const [lon2, lat2] = ring[i + 1]
-      area += (lon2 - lon1) * Math.PI / 180 * (2 + Math.sin(lat1 * Math.PI / 180) + Math.sin(lat2 * Math.PI / 180))
+      area +=
+        (((lon2 - lon1) * Math.PI) / 180) * (2 + Math.sin((lat1 * Math.PI) / 180) + Math.sin((lat2 * Math.PI) / 180))
     }
-    area = Math.abs(area * R * R / 2)
+    area = Math.abs((area * R * R) / 2)
     return Math.round((area / 10000) * 100) / 100
   } catch (e) {
     console.error('Erro ao calcular área:', e)
@@ -27,8 +28,13 @@ export function calcularBounds(geojson) {
     const ring = coords[0]
     const lats = ring.map(c => c[1])
     const lngs = ring.map(c => c[0])
-    return [[Math.min(...lats), Math.min(...lngs)], [Math.max(...lats), Math.max(...lngs)]]
-  } catch (e) { return null }
+    return [
+      [Math.min(...lats), Math.min(...lngs)],
+      [Math.max(...lats), Math.max(...lngs)]
+    ]
+  } catch {
+    return null
+  }
 }
 
 export async function parseGeoFile(file) {
@@ -50,12 +56,15 @@ async function parseKML(file) {
     if (!coordsEl) return
     const name = placemark.querySelector('name')?.textContent || `Talhão ${idx + 1}`
     const coordText = coordsEl.textContent.trim()
-    const coordinates = coordText.split(/\s+/).map(c => {
-      const parts = c.split(',')
-      return [parseFloat(parts[0]), parseFloat(parts[1])]
-    }).filter(c => !isNaN(c[0]) && !isNaN(c[1]))
+    const coordinates = coordText
+      .split(/\s+/)
+      .map(c => {
+        const parts = c.split(',')
+        return [parseFloat(parts[0]), parseFloat(parts[1])]
+      })
+      .filter(c => !isNaN(c[0]) && !isNaN(c[1]))
     if (coordinates.length < 3) return
-    if (coordinates[0][0] !== coordinates[coordinates.length-1][0]) coordinates.push(coordinates[0])
+    if (coordinates[0][0] !== coordinates[coordinates.length - 1][0]) coordinates.push(coordinates[0])
     features.push({ type: 'Feature', properties: { name }, geometry: { type: 'Polygon', coordinates: [coordinates] } })
   })
   if (features.length === 0) throw new Error('KML não contém polígonos válidos')

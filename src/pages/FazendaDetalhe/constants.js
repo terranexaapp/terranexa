@@ -72,8 +72,8 @@ export const reportTypes = [
 export const MAP_DEFAULT_BOUNDS = {
   minLng: -40.545,
   maxLng: -40.465,
-  minLat: -9.430,
-  maxLat: -9.350
+  minLat: -9.43,
+  maxLat: -9.35
 }
 export const TILE_SIZE = 256
 export const TILE_MIN_ZOOM = 4
@@ -82,15 +82,49 @@ export const SATELLITE_TILE_URL = 'https://server.arcgisonline.com/ArcGIS/rest/s
 export const LEAFLET_SCRIPT_URL = '/vendor/leaflet/leaflet.js'
 export const LEAFLET_STYLESHEET_URL = '/vendor/leaflet/leaflet.css'
 export const MAPBOX_TOKEN = (import.meta.env.VITE_MAPBOX_TOKEN || '').trim()
+if (import.meta.env.PROD && !MAPBOX_TOKEN) {
+  // Sem token o app continua funcionando (cai pro tile satélite do ESRI),
+  // mas o usuário perde a camada Mapbox de melhor qualidade.
+  console.warn('[TerraNexa] VITE_MAPBOX_TOKEN nao configurado; usando ESRI como fallback')
+}
 export const MAPBOX_SATELLITE_TILE_URL = `https://api.mapbox.com/styles/v1/mapbox/satellite-v9/tiles/256/{z}/{x}/{y}?access_token=${MAPBOX_TOKEN}`
-export const MAPBOX_ATTRIBUTION = '&copy; <a href="https://www.mapbox.com/about/maps/">Mapbox</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+export const MAPBOX_ATTRIBUTION =
+  '&copy; <a href="https://www.mapbox.com/about/maps/">Mapbox</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
 export const ESRI_ATTRIBUTION = 'Tiles &copy; Esri'
 
 export const MONITORING_STORAGE_KEY = 'terranexa:monitoramento-offline'
 
 export const MONITORAMENTO_LEGEND = [
-  { key: 'recent', title: 'Recente', range: '<= 5 dias', color: C.greenDp, fill: 'rgba(61,138,34,0.50)', stroke: 'rgba(185,235,160,0.86)' },
-  { key: 'attention', title: 'Atencao', range: '6 a 10 dias', color: C.amberDk, fill: 'rgba(232,168,76,0.54)', stroke: 'rgba(255,225,150,0.90)' },
-  { key: 'late', title: 'Atrasado', range: '> 10 dias', color: C.redDk, fill: 'rgba(232,90,58,0.56)', stroke: 'rgba(255,180,160,0.88)' },
-  { key: 'never', title: 'Nunca', range: 'Sem visita', color: '#8A9070', fill: 'rgba(138,144,112,0.52)', stroke: 'rgba(230,230,215,0.74)' }
+  {
+    key: 'recent',
+    title: 'Recente',
+    range: '<= 5 dias',
+    color: C.greenDp,
+    fill: 'rgba(61,138,34,0.50)',
+    stroke: 'rgba(185,235,160,0.86)'
+  },
+  {
+    key: 'attention',
+    title: 'Atencao',
+    range: '6 a 10 dias',
+    color: C.amberDk,
+    fill: 'rgba(232,168,76,0.54)',
+    stroke: 'rgba(255,225,150,0.90)'
+  },
+  {
+    key: 'late',
+    title: 'Atrasado',
+    range: '> 10 dias',
+    color: C.redDk,
+    fill: 'rgba(232,90,58,0.56)',
+    stroke: 'rgba(255,180,160,0.88)'
+  },
+  {
+    key: 'never',
+    title: 'Nunca',
+    range: 'Sem visita',
+    color: '#8A9070',
+    fill: 'rgba(138,144,112,0.52)',
+    stroke: 'rgba(230,230,215,0.74)'
+  }
 ]

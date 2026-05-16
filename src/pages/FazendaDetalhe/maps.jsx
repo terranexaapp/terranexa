@@ -40,8 +40,28 @@ import {
 
 const C = theme.normal
 
-export function SimpleFarmMap({ features = [], drawPoints = [], onMapClick, onFeatureClick, height = 340, drawing = false, selectedCode = null, selectedMode = 'timeline', fullBleed = false, pluviometros = [], placingPluviometro = false, onMapPoint, onPluviometroClick, devicePosition = null }) {
-  const normalized = features.map((feature, index) => ({ feature: normalizeFeature(feature, feature?.properties?.codigo || `T${index + 1}`), index })).filter(item => item.feature)
+export function SimpleFarmMap({
+  features = [],
+  drawPoints = [],
+  onMapClick,
+  onFeatureClick,
+  height = 340,
+  drawing = false,
+  selectedCode = null,
+  selectedMode = 'timeline',
+  fullBleed = false,
+  pluviometros = [],
+  placingPluviometro = false,
+  onMapPoint,
+  onPluviometroClick,
+  devicePosition = null
+}) {
+  const normalized = features
+    .map((feature, index) => ({
+      feature: normalizeFeature(feature, feature?.properties?.codigo || `T${index + 1}`),
+      index
+    }))
+    .filter(item => item.feature)
   if (drawing || onMapClick) {
     return (
       <VectorFarmMap
@@ -74,7 +94,19 @@ export function SimpleFarmMap({ features = [], drawPoints = [], onMapClick, onFe
   )
 }
 
-function LeafletFarmMap({ normalized = [], onFeatureClick, height = 340, selectedCode = null, selectedMode = 'timeline', fullBleed = false, pluviometros = [], placingPluviometro = false, onMapPoint, onPluviometroClick, devicePosition = null }) {
+function LeafletFarmMap({
+  normalized = [],
+  onFeatureClick,
+  height = 340,
+  selectedCode = null,
+  selectedMode = 'timeline',
+  fullBleed = false,
+  pluviometros = [],
+  placingPluviometro = false,
+  onMapPoint,
+  onPluviometroClick,
+  devicePosition = null
+}) {
   const mapNodeRef = useRef(null)
   const mapRef = useRef(null)
   const featureLayerRef = useRef(null)
@@ -87,10 +119,12 @@ function LeafletFarmMap({ normalized = [], onFeatureClick, height = 340, selecte
   const [manualDevicePosition, setManualDevicePosition] = useState(null)
   const [locatingDevice, setLocatingDevice] = useState(false)
   const controlsOnRight = useMediaQuery('(max-width: 899px)')
-  const featureSignature = normalized.map(({ feature, index }) => {
-    const ring = getFeatureRing(feature) || []
-    return `${feature.properties?.codigo || index}:${ring.map(coord => coord.join(',')).join(';')}`
-  }).join('|')
+  const featureSignature = normalized
+    .map(({ feature, index }) => {
+      const ring = getFeatureRing(feature) || []
+      return `${feature.properties?.codigo || index}:${ring.map(coord => coord.join(',')).join(';')}`
+    })
+    .join('|')
   const activePluviometros = pluviometros
     .map((item, index) => ({
       ...item,
@@ -101,38 +135,45 @@ function LeafletFarmMap({ normalized = [], onFeatureClick, height = 340, selecte
     }))
     .filter(item => item.ativo !== false && Number.isFinite(item.latitude) && Number.isFinite(item.longitude))
   const liveDevicePosition = devicePosition || manualDevicePosition
-  const deviceMarker = Number.isFinite(Number(liveDevicePosition?.latitude)) && Number.isFinite(Number(liveDevicePosition?.longitude))
-    ? { latitude: Number(liveDevicePosition.latitude), longitude: Number(liveDevicePosition.longitude), accuracy: Number(liveDevicePosition.accuracy || 0) }
-    : null
+  const deviceMarker =
+    Number.isFinite(Number(liveDevicePosition?.latitude)) && Number.isFinite(Number(liveDevicePosition?.longitude))
+      ? {
+          latitude: Number(liveDevicePosition.latitude),
+          longitude: Number(liveDevicePosition.longitude),
+          accuracy: Number(liveDevicePosition.accuracy || 0)
+        }
+      : null
 
   useEffect(() => {
     let disposed = false
-    loadLeafletAssets().then(L => {
-      if (disposed || !mapNodeRef.current || mapRef.current) return
-      const map = L.map(mapNodeRef.current, {
-        zoomControl: false,
-        attributionControl: true,
-        preferCanvas: true,
-        dragging: true,
-        touchZoom: true,
-        scrollWheelZoom: true,
-        doubleClickZoom: true,
-        tap: true,
-        inertia: true
+    loadLeafletAssets()
+      .then(L => {
+        if (disposed || !mapNodeRef.current || mapRef.current) return
+        const map = L.map(mapNodeRef.current, {
+          zoomControl: false,
+          attributionControl: true,
+          preferCanvas: true,
+          dragging: true,
+          touchZoom: true,
+          scrollWheelZoom: true,
+          doubleClickZoom: true,
+          tap: true,
+          inertia: true
+        })
+        featureLayerRef.current = L.layerGroup().addTo(map)
+        markerLayerRef.current = L.layerGroup().addTo(map)
+        rainLayerRef.current = L.layerGroup().addTo(map)
+        deviceLayerRef.current = L.layerGroup().addTo(map)
+        mapRef.current = map
+        setLeafletReady(true)
+        window.setTimeout(() => {
+          map.invalidateSize()
+          fitLeafletToFeatures(L, map, normalized, fullBleed)
+        }, 0)
       })
-      featureLayerRef.current = L.layerGroup().addTo(map)
-      markerLayerRef.current = L.layerGroup().addTo(map)
-      rainLayerRef.current = L.layerGroup().addTo(map)
-      deviceLayerRef.current = L.layerGroup().addTo(map)
-      mapRef.current = map
-      setLeafletReady(true)
-      window.setTimeout(() => {
-        map.invalidateSize()
-        fitLeafletToFeatures(L, map, normalized, fullBleed)
-      }, 0)
-    }).catch(error => {
-      if (!disposed) setLeafletError(error.message || 'Nao foi possivel carregar o mapa')
-    })
+      .catch(error => {
+        if (!disposed) setLeafletError(error.message || 'Nao foi possivel carregar o mapa')
+      })
 
     return () => {
       disposed = true
@@ -154,16 +195,13 @@ function LeafletFarmMap({ normalized = [], onFeatureClick, height = 340, selecte
     const map = mapRef.current
     if (tileLayerRef.current) map.removeLayer(tileLayerRef.current)
     const hasMapbox = Boolean(MAPBOX_TOKEN)
-    tileLayerRef.current = L.tileLayer(
-      hasMapbox ? MAPBOX_SATELLITE_TILE_URL : `${SATELLITE_TILE_URL}/{z}/{y}/{x}`,
-      {
-        minZoom: TILE_MIN_ZOOM,
-        maxZoom: hasMapbox ? 22 : TILE_MAX_ZOOM,
-        tileSize: 256,
-        attribution: hasMapbox ? MAPBOX_ATTRIBUTION : ESRI_ATTRIBUTION,
-        crossOrigin: true
-      }
-    ).addTo(map)
+    tileLayerRef.current = L.tileLayer(hasMapbox ? MAPBOX_SATELLITE_TILE_URL : `${SATELLITE_TILE_URL}/{z}/{y}/{x}`, {
+      minZoom: TILE_MIN_ZOOM,
+      maxZoom: hasMapbox ? 22 : TILE_MAX_ZOOM,
+      tileSize: 256,
+      attribution: hasMapbox ? MAPBOX_ATTRIBUTION : ESRI_ATTRIBUTION,
+      crossOrigin: true
+    }).addTo(map)
     return undefined
   }, [leafletReady])
 
@@ -289,7 +327,9 @@ function LeafletFarmMap({ normalized = [], onFeatureClick, height = 340, selecte
   }, [leafletReady, placingPluviometro, onMapPoint])
 
   function rainIntensityForMarker(marker, index) {
-    const seed = String(marker.id || marker.nome || index).split('').reduce((sum, char) => sum + char.charCodeAt(0), 0)
+    const seed = String(marker.id || marker.nome || index)
+      .split('')
+      .reduce((sum, char) => sum + char.charCodeAt(0), 0)
     return 42 + (seed % 86)
   }
 
@@ -302,7 +342,9 @@ function LeafletFarmMap({ normalized = [], onFeatureClick, height = 340, selecte
 
   function centerDeviceMarker(marker) {
     if (!mapRef.current) return
-    mapRef.current.setView([marker.latitude, marker.longitude], Math.max(mapRef.current.getZoom(), 16), { animate: true })
+    mapRef.current.setView([marker.latitude, marker.longitude], Math.max(mapRef.current.getZoom(), 16), {
+      animate: true
+    })
   }
 
   function centerOnDevice(e) {
@@ -331,24 +373,67 @@ function LeafletFarmMap({ normalized = [], onFeatureClick, height = 340, selecte
   }
 
   return (
-    <div style={{ ...(fullBleed ? { ...simpleMapFullStyle, minHeight: height } : simpleMapStyle), height, cursor: placingPluviometro ? 'crosshair' : 'grab' }}>
+    <div
+      style={{
+        ...(fullBleed ? { ...simpleMapFullStyle, minHeight: height } : simpleMapStyle),
+        height,
+        cursor: placingPluviometro ? 'crosshair' : 'grab'
+      }}
+    >
       <div ref={mapNodeRef} style={leafletMapCanvasStyle} />
       <div style={satelliteShadeStyle} />
-      <div style={controlsOnRight ? satelliteControlsMobileStyle : satelliteControlsStyle} onPointerDown={e => e.stopPropagation()} onWheel={e => e.stopPropagation()} onDoubleClick={e => e.stopPropagation()}>
-        <button type="button" aria-label="Aproximar mapa" onClick={e => changeZoom(e, 1)} style={satelliteControlButtonStyle}>+</button>
-        <button type="button" aria-label="Afastar mapa" onClick={e => changeZoom(e, -1)} style={satelliteControlButtonStyle}>-</button>
-        <button type="button" aria-label="Centralizar no GPS" title="Centralizar no GPS" onClick={centerOnDevice} style={satelliteGpsButtonStyle}>
+      <div
+        style={controlsOnRight ? satelliteControlsMobileStyle : satelliteControlsStyle}
+        onPointerDown={e => e.stopPropagation()}
+        onWheel={e => e.stopPropagation()}
+        onDoubleClick={e => e.stopPropagation()}
+      >
+        <button
+          type="button"
+          aria-label="Aproximar mapa"
+          onClick={e => changeZoom(e, 1)}
+          style={satelliteControlButtonStyle}
+        >
+          +
+        </button>
+        <button
+          type="button"
+          aria-label="Afastar mapa"
+          onClick={e => changeZoom(e, -1)}
+          style={satelliteControlButtonStyle}
+        >
+          -
+        </button>
+        <button
+          type="button"
+          aria-label="Centralizar no GPS"
+          title="Centralizar no GPS"
+          onClick={centerOnDevice}
+          style={satelliteGpsButtonStyle}
+        >
           {locatingDevice ? '...' : 'GPS'}
         </button>
       </div>
       <div style={satelliteBadgeStyle}>{MAPBOX_TOKEN ? 'Mapbox Satelite' : 'Satelite'}</div>
       {leafletError && <div style={mapEmptyHintStyle}>{leafletError}</div>}
-      {!leafletError && normalized.length === 0 && <div style={mapEmptyHintStyle}>Nenhum talhão com geometria cadastrada</div>}
+      {!leafletError && normalized.length === 0 && (
+        <div style={mapEmptyHintStyle}>Nenhum talhão com geometria cadastrada</div>
+      )}
     </div>
   )
 }
 
-function VectorFarmMap({ normalized = [], drawPoints = [], onMapClick, onFeatureClick, height = 340, drawing = false, selectedCode = null, selectedMode = 'timeline', fullBleed = false }) {
+function VectorFarmMap({
+  normalized = [],
+  drawPoints = [],
+  onMapClick,
+  onFeatureClick,
+  height = 340,
+  drawing = false,
+  selectedCode = null,
+  selectedMode = 'timeline',
+  fullBleed = false
+}) {
   const bounds = getMapBounds(normalized.map(item => item.feature))
   const [viewTransform, setViewTransform] = useState({ x: 0, y: 0, scale: 1 })
   const dragRef = useRef(null)
@@ -402,7 +487,11 @@ function VectorFarmMap({ normalized = [], drawPoints = [], onMapClick, onFeature
 
   return (
     <div
-      style={{ ...(fullBleed ? { ...simpleMapFullStyle, minHeight: height } : simpleMapStyle), height, cursor: canPan ? 'grab' : 'crosshair' }}
+      style={{
+        ...(fullBleed ? { ...simpleMapFullStyle, minHeight: height } : simpleMapStyle),
+        height,
+        cursor: canPan ? 'grab' : 'crosshair'
+      }}
       onClick={handleClick}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
@@ -426,8 +515,28 @@ function VectorFarmMap({ normalized = [], drawPoints = [], onMapClick, onFeature
         <rect x="0" y="0" width="100" height="100" fill="url(#farmGlowB)" />
         <rect x="0" y="0" width="100" height="100" fill="rgba(0,0,0,0.18)" />
         <g transform={`translate(${viewTransform.x} ${viewTransform.y}) scale(${viewTransform.scale})`}>
-          {Array.from({ length: 11 }).map((_, i) => <line key={`v-${i}`} x1={i * 10} y1="0" x2={i * 10 + 18} y2="100" stroke="rgba(255,255,255,0.08)" strokeWidth="0.2" />)}
-          {Array.from({ length: 8 }).map((_, i) => <line key={`h-${i}`} x1="0" y1={i * 14} x2="100" y2={i * 14 + 8} stroke="rgba(255,255,255,0.07)" strokeWidth="0.2" />)}
+          {Array.from({ length: 11 }).map((_, i) => (
+            <line
+              key={`v-${i}`}
+              x1={i * 10}
+              y1="0"
+              x2={i * 10 + 18}
+              y2="100"
+              stroke="rgba(255,255,255,0.08)"
+              strokeWidth="0.2"
+            />
+          ))}
+          {Array.from({ length: 8 }).map((_, i) => (
+            <line
+              key={`h-${i}`}
+              x1="0"
+              y1={i * 14}
+              x2="100"
+              y2={i * 14 + 8}
+              stroke="rgba(255,255,255,0.07)"
+              strokeWidth="0.2"
+            />
+          ))}
           {normalized.map(({ feature, index }) => {
             const ring = getFeatureRing(feature) || []
             const points = ring.map(coord => projectCoord(coord, bounds).join(',')).join(' ')
@@ -437,26 +546,71 @@ function VectorFarmMap({ normalized = [], drawPoints = [], onMapClick, onFeature
             const monitoramento = feature.properties?.monitoramento || getMonitoramentoMeta(null)
             const monitoringFill = monitoramento.fill || 'rgba(138,144,112,0.52)'
             const monitoringStroke = monitoramento.stroke || 'rgba(230,230,215,0.74)'
-            const selectedFill = selectedMode === 'chuvas' ? 'rgba(70,158,205,0.52)' : selectedMode === 'monitoramento' ? monitoringFill : 'rgba(232,168,76,0.46)'
+            const selectedFill =
+              selectedMode === 'chuvas'
+                ? 'rgba(70,158,205,0.52)'
+                : selectedMode === 'monitoramento'
+                  ? monitoringFill
+                  : 'rgba(232,168,76,0.46)'
             const baseFill = selectedMode === 'monitoramento' ? monitoringFill : 'rgba(61,138,34,0.34)'
             const baseStroke = selectedMode === 'monitoramento' ? monitoringStroke : 'rgba(255,255,255,0.74)'
             return (
-              <g key={`${feature.properties?.codigo || index}-${index}`} onClick={e => { e.stopPropagation(); if (suppressClickRef.current) { suppressClickRef.current = false; return }; onFeatureClick?.(index, feature) }} style={{ cursor: onFeatureClick ? 'pointer' : 'default' }}>
-                <polygon points={points} fill={selected ? selectedFill : baseFill} stroke={selected ? 'rgba(255,255,255,0.98)' : baseStroke} strokeWidth={selected ? '1.4' : '0.7'} vectorEffect="non-scaling-stroke" />
-                <text x={center[0]} y={center[1]} fill="white" fontSize="2.25" fontWeight="800" textAnchor="middle" dominantBaseline="middle" paintOrder="stroke" stroke="rgba(0,0,0,0.58)" strokeWidth="0.55">{feature.properties?.codigo}</text>
+              <g
+                key={`${feature.properties?.codigo || index}-${index}`}
+                onClick={e => {
+                  e.stopPropagation()
+                  if (suppressClickRef.current) {
+                    suppressClickRef.current = false
+                    return
+                  }
+                  onFeatureClick?.(index, feature)
+                }}
+                style={{ cursor: onFeatureClick ? 'pointer' : 'default' }}
+              >
+                <polygon
+                  points={points}
+                  fill={selected ? selectedFill : baseFill}
+                  stroke={selected ? 'rgba(255,255,255,0.98)' : baseStroke}
+                  strokeWidth={selected ? '1.4' : '0.7'}
+                  vectorEffect="non-scaling-stroke"
+                />
+                <text
+                  x={center[0]}
+                  y={center[1]}
+                  fill="white"
+                  fontSize="2.25"
+                  fontWeight="800"
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  paintOrder="stroke"
+                  stroke="rgba(0,0,0,0.58)"
+                  strokeWidth="0.55"
+                >
+                  {feature.properties?.codigo}
+                </text>
               </g>
             )
           })}
           {drawPoints.length > 0 && (
             <>
-              <polyline points={drawPoints.map(point => `${point.x},${point.y}`).join(' ')} fill="none" stroke="white" strokeWidth="0.8" vectorEffect="non-scaling-stroke" />
-              {drawPoints.map((point, index) => <circle key={`${point.x}-${point.y}-${index}`} cx={point.x} cy={point.y} r="1.5" fill="white" />)}
+              <polyline
+                points={drawPoints.map(point => `${point.x},${point.y}`).join(' ')}
+                fill="none"
+                stroke="white"
+                strokeWidth="0.8"
+                vectorEffect="non-scaling-stroke"
+              />
+              {drawPoints.map((point, index) => (
+                <circle key={`${point.x}-${point.y}-${index}`} cx={point.x} cy={point.y} r="1.5" fill="white" />
+              ))}
             </>
           )}
         </g>
       </svg>
       {drawing && <div style={mapDrawHintStyle}>Clique no mapa para marcar os vértices do talhão</div>}
-      {normalized.length === 0 && !drawing && <div style={mapEmptyHintStyle}>Nenhum talhão com geometria cadastrada</div>}
+      {normalized.length === 0 && !drawing && (
+        <div style={mapEmptyHintStyle}>Nenhum talhão com geometria cadastrada</div>
+      )}
     </div>
   )
 }

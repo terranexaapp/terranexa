@@ -36,7 +36,9 @@ export function ManagementModulePanel({ item, navigate }) {
     <div style={managementContentPanelStyle}>
       <p style={eyebrowStyle}>{item.title.toUpperCase()}</p>
       <h3 style={panelTitleStyle}>{item.title}</h3>
-      <p style={viewSubtitleStyle}>{item.text}. Este modulo fica isolado aqui para nao misturar informacoes de cadastro, mapa e operacao.</p>
+      <p style={viewSubtitleStyle}>
+        {item.text}. Este modulo fica isolado aqui para nao misturar informacoes de cadastro, mapa e operacao.
+      </p>
       <div style={managementPlaceholderGridStyle}>
         {['Cadastro', 'Indicadores', 'Historico'].map(label => (
           <div key={label} style={managementPlaceholderCardStyle}>
@@ -45,7 +47,11 @@ export function ManagementModulePanel({ item, navigate }) {
           </div>
         ))}
       </div>
-      {action && <button type="button" onClick={action.run} style={primaryActionStyle}>{action.label}</button>}
+      {action && (
+        <button type="button" onClick={action.run} style={primaryActionStyle}>
+          {action.label}
+        </button>
+      )}
     </div>
   )
 }
@@ -83,7 +89,9 @@ export function RelatoriosView({ talhoes, total }) {
         <div>
           <p style={eyebrowStyle}>RELATORIOS</p>
           <h2 style={viewTitleStyle}>Construtor de relatórios agrícolas</h2>
-          <p style={viewSubtitleStyle}>Modelos executivos, técnicos e financeiros usando dados de operações, solo, chuva, scouting e estoque.</p>
+          <p style={viewSubtitleStyle}>
+            Modelos executivos, técnicos e financeiros usando dados de operações, solo, chuva, scouting e estoque.
+          </p>
         </div>
         <button style={primaryActionStyle}>Exportar PDF</button>
       </div>
@@ -104,8 +112,12 @@ export function RelatoriosView({ talhoes, total }) {
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start' }}>
             <div>
               <p style={{ margin: 0, color: C.greenDp, fontWeight: 900, fontSize: 15 }}>TerraNexa</p>
-              <h3 style={{ margin: '10px 0 6px', color: C.textDk, fontSize: 24, fontFamily: 'Georgia, serif' }}>Relatório Agronômico Completo</h3>
-              <p style={{ margin: 0, color: C.textMid, fontSize: 13 }}>Área total {total.toFixed(2)} ha · {talhoes.length} talhões · Safra atual</p>
+              <h3 style={{ margin: '10px 0 6px', color: C.textDk, fontSize: 24, fontFamily: 'Georgia, serif' }}>
+                Relatório Agronômico Completo
+              </h3>
+              <p style={{ margin: 0, color: C.textMid, fontSize: 13 }}>
+                Área total {total.toFixed(2)} ha · {talhoes.length} talhões · Safra atual
+              </p>
             </div>
             <div style={reportCoverArtStyle} />
           </div>
@@ -123,33 +135,56 @@ export function RelatoriosView({ talhoes, total }) {
 
 export function CustosPanel({ custos, totalCusto }) {
   return (
-    <div style={{ background: C.bg, borderRadius: 14, padding: '12px 14px', marginBottom: 12, border: `1px solid ${C.border}` }}>
+    <div
+      style={{
+        background: C.bg,
+        borderRadius: 14,
+        padding: '12px 14px',
+        marginBottom: 12,
+        border: `1px solid ${C.border}`
+      }}
+    >
       <p style={{ ...eyebrowStyle, marginBottom: 10 }}>CUSTO POR CATEGORIA</p>
-      {custos.sort((a, b) => b.custo_total - a.custo_total).map(c => {
-        const info = getCategoriaInfo(c.categoria)
-        const perc = totalCusto > 0 ? (c.custo_total / totalCusto * 100) : 0
-        return (
-          <div key={c.categoria} style={{ marginBottom: 8 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3, gap: 8 }}>
-              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                <div style={{ width: 8, height: 8, borderRadius: 2, background: info.cor }} />
-                <span style={{ fontSize: 11, color: C.textDk }}>{info.label}</span>
-                <span style={{ fontSize: 9, color: C.textDim, fontFamily: 'monospace' }}>{c.qtd_operacoes} op.</span>
+      {custos
+        .sort((a, b) => b.custo_total - a.custo_total)
+        .map(c => {
+          const info = getCategoriaInfo(c.categoria)
+          const perc = totalCusto > 0 ? (c.custo_total / totalCusto) * 100 : 0
+          return (
+            <div key={c.categoria} style={{ marginBottom: 8 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3, gap: 8 }}>
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <div style={{ width: 8, height: 8, borderRadius: 2, background: info.cor }} />
+                  <span style={{ fontSize: 11, color: C.textDk }}>{info.label}</span>
+                  <span style={{ fontSize: 9, color: C.textDim, fontFamily: 'monospace' }}>{c.qtd_operacoes} op.</span>
+                </div>
+                <div>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: info.cor, fontFamily: 'monospace' }}>
+                    {money(c.custo_total)}
+                  </span>
+                  <span style={{ fontSize: 9, color: C.textDim, fontFamily: 'monospace', marginLeft: 6 }}>
+                    {perc.toFixed(0)}%
+                  </span>
+                </div>
               </div>
-              <div>
-                <span style={{ fontSize: 11, fontWeight: 700, color: info.cor, fontFamily: 'monospace' }}>{money(c.custo_total)}</span>
-                <span style={{ fontSize: 9, color: C.textDim, fontFamily: 'monospace', marginLeft: 6 }}>{perc.toFixed(0)}%</span>
+              <div style={{ background: C.border, borderRadius: 99, height: 5, overflow: 'hidden' }}>
+                <div style={{ width: perc + '%', height: 5, borderRadius: 99, background: info.cor }} />
               </div>
             </div>
-            <div style={{ background: C.border, borderRadius: 99, height: 5, overflow: 'hidden' }}>
-              <div style={{ width: perc + '%', height: 5, borderRadius: 99, background: info.cor }} />
-            </div>
-          </div>
-        )
-      })}
-      <div style={{ paddingTop: 8, borderTop: `1px solid ${C.borderSoft}`, display: 'flex', justifyContent: 'space-between' }}>
+          )
+        })}
+      <div
+        style={{
+          paddingTop: 8,
+          borderTop: `1px solid ${C.borderSoft}`,
+          display: 'flex',
+          justifyContent: 'space-between'
+        }}
+      >
         <span style={{ fontSize: 11, fontWeight: 700, color: C.textDk }}>Total</span>
-        <span style={{ fontSize: 13, fontWeight: 700, color: C.greenDp, fontFamily: 'monospace' }}>{money(totalCusto)}</span>
+        <span style={{ fontSize: 13, fontWeight: 700, color: C.greenDp, fontFamily: 'monospace' }}>
+          {money(totalCusto)}
+        </span>
       </div>
     </div>
   )

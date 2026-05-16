@@ -3,7 +3,7 @@ import { MONITORING_STORAGE_KEY } from './constants'
 export async function requestOfflineStorage() {
   if (typeof navigator === 'undefined') return { ok: false, message: 'Armazenamento offline indisponivel' }
   try {
-    if (navigator.storage?.persisted && await navigator.storage.persisted()) {
+    if (navigator.storage?.persisted && (await navigator.storage.persisted())) {
       return { ok: true, message: 'Armazenamento offline permitido' }
     }
     if (navigator.storage?.persist) {

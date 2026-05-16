@@ -1,5 +1,11 @@
 export function DesktopIcon({ name, size = 22 }) {
-  const common = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.9, strokeLinecap: 'round', strokeLinejoin: 'round' }
+  const common = {
+    fill: 'none',
+    stroke: 'currentColor',
+    strokeWidth: 1.9,
+    strokeLinecap: 'round',
+    strokeLinejoin: 'round'
+  }
   let shape
 
   switch (name) {

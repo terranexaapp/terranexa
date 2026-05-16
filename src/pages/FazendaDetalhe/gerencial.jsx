@@ -63,7 +63,9 @@ import {
 const C = theme.normal
 
 function MapaCadastroTalhoes({ talhoes, total, onOpenCadastro, onSelectTalhao }) {
-  const features = talhoes.map(talhao => ({ talhao, feature: normalizeFeature(talhao.geometria, talhao.codigo) })).filter(item => item.feature)
+  const features = talhoes
+    .map(talhao => ({ talhao, feature: normalizeFeature(talhao.geometria, talhao.codigo) }))
+    .filter(item => item.feature)
 
   return (
     <div style={mapManagerShellStyle}>
@@ -85,21 +87,27 @@ function MapaCadastroTalhoes({ talhoes, total, onOpenCadastro, onSelectTalhao })
 
       <div style={managementSummaryStripStyle}>
         <div style={managementSummaryCardStyle}>
-          <span style={managementSummaryIconStyle}><DesktopIcon name="map" size={25} /></span>
+          <span style={managementSummaryIconStyle}>
+            <DesktopIcon name="map" size={25} />
+          </span>
           <div style={managementSummaryTextStyle}>
             <span style={managementSummaryLabelStyle}>Area total</span>
             <strong style={managementSummaryValueStyle}>{Number(total || 0).toFixed(2)} ha</strong>
           </div>
         </div>
         <div style={managementSummaryCardStyle}>
-          <span style={managementSummaryIconStyle}><DesktopIcon name="dashboard" size={24} /></span>
+          <span style={managementSummaryIconStyle}>
+            <DesktopIcon name="dashboard" size={24} />
+          </span>
           <div style={managementSummaryTextStyle}>
             <span style={managementSummaryLabelStyle}>Talhoes</span>
             <strong style={managementSummaryValueStyle}>{talhoes.length}</strong>
           </div>
         </div>
         <div style={managementSummaryCardStyle}>
-          <span style={managementSummaryIconStyle}><DesktopIcon name="soil" size={25} /></span>
+          <span style={managementSummaryIconStyle}>
+            <DesktopIcon name="soil" size={25} />
+          </span>
           <div style={managementSummaryTextStyle}>
             <span style={managementSummaryLabelStyle}>Com geometria</span>
             <strong style={managementSummaryValueStyle}>{features.length}</strong>
@@ -115,7 +123,11 @@ function MapaCadastroTalhoes({ talhoes, total, onOpenCadastro, onSelectTalhao })
           </button>
           <button onClick={() => onOpenCadastro('kml')} style={mapToolButtonStyle}>
             <DesktopIcon name="upload" size={24} />
-            <span>Importar<br />KML</span>
+            <span>
+              Importar
+              <br />
+              KML
+            </span>
           </button>
           <button onClick={() => onOpenCadastro()} style={mapToolButtonStyle}>
             <DesktopIcon name="plus-circle" size={24} />
@@ -123,9 +135,12 @@ function MapaCadastroTalhoes({ talhoes, total, onOpenCadastro, onSelectTalhao })
           </button>
         </div>
         <SimpleFarmMap
-          features={features.map(item => ({ ...item.feature, properties: { ...item.feature.properties, codigo: item.talhao.codigo } }))}
+          features={features.map(item => ({
+            ...item.feature,
+            properties: { ...item.feature.properties, codigo: item.talhao.codigo }
+          }))}
           height={430}
-          onFeatureClick={(index) => onSelectTalhao(features[index].talhao)}
+          onFeatureClick={index => onSelectTalhao(features[index].talhao)}
         />
       </div>
     </div>
@@ -133,7 +148,9 @@ function MapaCadastroTalhoes({ talhoes, total, onOpenCadastro, onSelectTalhao })
 }
 
 function PluviometroManager({ fazendaId, talhoes, pluviometros, pluviometrosErro, onCreate, onUpdate, onDelete }) {
-  const features = talhoes.map(talhao => ({ talhao, feature: normalizeFeature(talhao.geometria, talhao.codigo) })).filter(item => item.feature)
+  const features = talhoes
+    .map(talhao => ({ talhao, feature: normalizeFeature(talhao.geometria, talhao.codigo) }))
+    .filter(item => item.feature)
   const [mode, setMode] = useState('idle')
   const [selectedId, setSelectedId] = useState(null)
   const [draft, setDraft] = useState({ nome: 'Pluviometro 1', latitude: '', longitude: '' })
@@ -191,11 +208,25 @@ function PluviometroManager({ fazendaId, talhoes, pluviometros, pluviometrosErro
     }
     setSaving(true)
     try {
-      const talhao = draft.longitude && draft.latitude ? findTalhaoForCoord(talhoes, Number(draft.longitude), Number(draft.latitude)) : null
+      const talhao =
+        draft.longitude && draft.latitude
+          ? findTalhaoForCoord(talhoes, Number(draft.longitude), Number(draft.latitude))
+          : null
       if (mode === 'create') {
-        await onCreate({ fazenda_id: fazendaId, nome: draft.nome.trim(), latitude: draft.latitude, longitude: draft.longitude, talhao_id: talhao?.id || null })
+        await onCreate({
+          fazenda_id: fazendaId,
+          nome: draft.nome.trim(),
+          latitude: draft.latitude,
+          longitude: draft.longitude,
+          talhao_id: talhao?.id || null
+        })
       } else if (selected) {
-        await onUpdate(selected.id, { nome: draft.nome.trim(), latitude: draft.latitude, longitude: draft.longitude, talhao_id: talhao?.id || selected.talhao_id || null })
+        await onUpdate(selected.id, {
+          nome: draft.nome.trim(),
+          latitude: draft.latitude,
+          longitude: draft.longitude,
+          talhao_id: talhao?.id || selected.talhao_id || null
+        })
       }
       setMode('idle')
     } catch (err) {
@@ -226,13 +257,18 @@ function PluviometroManager({ fazendaId, talhoes, pluviometros, pluviometrosErro
         <div>
           <p style={eyebrowStyle}>PLUVIOMETROS</p>
           <h3 style={panelTitleStyle}>Mapa de pluviometros</h3>
-          <p style={{ margin: '4px 0 0', color: C.textMid, fontSize: 12 }}>Registre o ponto georreferenciado para alimentar o mapa interpolado de chuvas.</p>
+          <p style={{ margin: '4px 0 0', color: C.textMid, fontSize: 12 }}>
+            Registre o ponto georreferenciado para alimentar o mapa interpolado de chuvas.
+          </p>
         </div>
         <span style={mapCounterStyle}>{pluviometros.length} ativos</span>
       </div>
       <div style={pluviometerMapStageStyle}>
         <SimpleFarmMap
-          features={features.map(item => ({ ...item.feature, properties: { ...item.feature.properties, codigo: item.talhao.codigo } }))}
+          features={features.map(item => ({
+            ...item.feature,
+            properties: { ...item.feature.properties, codigo: item.talhao.codigo }
+          }))}
           height={470}
           pluviometros={pluviometros}
           selectedMode="chuvas"
@@ -243,29 +279,82 @@ function PluviometroManager({ fazendaId, talhoes, pluviometros, pluviometrosErro
         <form onSubmit={handleSave} style={pluviometerEditorStyle}>
           <p style={sidebarEyebrowStyle}>Registrar pluviometro</p>
           <div style={pluviometerEditorActionsStyle}>
-            <button type="button" onClick={startCreate} style={mode === 'create' ? primaryActionStyle : secondaryActionStyle}>Adicionar pluviometro</button>
-            <button type="button" disabled={!selected} onClick={startRename} style={{ ...secondaryActionStyle, opacity: selected ? 1 : 0.45 }}>Renomear</button>
-            <button type="button" disabled={!selected} onClick={startEditPoint} style={{ ...secondaryActionStyle, opacity: selected ? 1 : 0.45 }}>Editar ponto</button>
+            <button
+              type="button"
+              onClick={startCreate}
+              style={mode === 'create' ? primaryActionStyle : secondaryActionStyle}
+            >
+              Adicionar pluviometro
+            </button>
+            <button
+              type="button"
+              disabled={!selected}
+              onClick={startRename}
+              style={{ ...secondaryActionStyle, opacity: selected ? 1 : 0.45 }}
+            >
+              Renomear
+            </button>
+            <button
+              type="button"
+              disabled={!selected}
+              onClick={startEditPoint}
+              style={{ ...secondaryActionStyle, opacity: selected ? 1 : 0.45 }}
+            >
+              Editar ponto
+            </button>
           </div>
           <label style={dateLabelStyle}>
             Nome
-            <input value={draft.nome} onChange={e => setDraft(current => ({ ...current, nome: e.target.value }))} style={dateInputStyle} />
+            <input
+              value={draft.nome}
+              onChange={e => setDraft(current => ({ ...current, nome: e.target.value }))}
+              style={dateInputStyle}
+            />
           </label>
           <div style={pluviometerCoordGridStyle}>
             <label style={dateLabelStyle}>
               Latitude
-              <input value={draft.latitude} onChange={e => setDraft(current => ({ ...current, latitude: e.target.value }))} placeholder="-9.0000000" style={dateInputStyle} />
+              <input
+                value={draft.latitude}
+                onChange={e => setDraft(current => ({ ...current, latitude: e.target.value }))}
+                placeholder="-9.0000000"
+                style={dateInputStyle}
+              />
             </label>
             <label style={dateLabelStyle}>
               Longitude
-              <input value={draft.longitude} onChange={e => setDraft(current => ({ ...current, longitude: e.target.value }))} placeholder="-40.0000000" style={dateInputStyle} />
+              <input
+                value={draft.longitude}
+                onChange={e => setDraft(current => ({ ...current, longitude: e.target.value }))}
+                placeholder="-40.0000000"
+                style={dateInputStyle}
+              />
             </label>
           </div>
-          <p style={pluviometerHintStyle}>{placing ? 'Clique no mapa para marcar ou reposicionar o pluviometro.' : selected ? `Selecionado: ${selected.nome}` : 'Use adicionar pluviometro para marcar um novo ponto.'}</p>
+          <p style={pluviometerHintStyle}>
+            {placing
+              ? 'Clique no mapa para marcar ou reposicionar o pluviometro.'
+              : selected
+                ? `Selecionado: ${selected.nome}`
+                : 'Use adicionar pluviometro para marcar um novo ponto.'}
+          </p>
           {(error || pluviometrosErro) && <div style={formErrorStyle}>{error || pluviometrosErro}</div>}
           <div style={pluviometerEditorFooterStyle}>
-            <button type="submit" disabled={saving || mode === 'idle'} style={{ ...primaryActionStyle, opacity: saving || mode === 'idle' ? 0.55 : 1 }}>{saving ? 'Salvando...' : 'Salvar'}</button>
-            <button type="button" disabled={!selected || saving} onClick={handleDelete} style={{ ...dangerGhostButtonStyle, opacity: !selected || saving ? 0.45 : 1 }}>Desativar</button>
+            <button
+              type="submit"
+              disabled={saving || mode === 'idle'}
+              style={{ ...primaryActionStyle, opacity: saving || mode === 'idle' ? 0.55 : 1 }}
+            >
+              {saving ? 'Salvando...' : 'Salvar'}
+            </button>
+            <button
+              type="button"
+              disabled={!selected || saving}
+              onClick={handleDelete}
+              style={{ ...dangerGhostButtonStyle, opacity: !selected || saving ? 0.45 : 1 }}
+            >
+              Desativar
+            </button>
           </div>
         </form>
       </div>
@@ -273,11 +362,31 @@ function PluviometroManager({ fazendaId, talhoes, pluviometros, pluviometrosErro
   )
 }
 
-export function GerencialView({ fazenda, fazendaId, talhoes, pluviometros = [], pluviometrosErro = '', total, abrirTalhao, setShowNovo, onCreatePluviometro, onUpdatePluviometro, onDeletePluviometro, activeManager, setActiveManager, navigate }) {
+export function GerencialView({
+  fazenda,
+  fazendaId,
+  talhoes,
+  pluviometros = [],
+  pluviometrosErro = '',
+  total,
+  abrirTalhao,
+  setShowNovo,
+  onCreatePluviometro,
+  onUpdatePluviometro,
+  onDeletePluviometro,
+  activeManager,
+  setActiveManager,
+  navigate
+}) {
   const isManagerDesktop = useMediaQuery('(min-width: 900px)')
   const isManagerCompact = useMediaQuery('(max-width: 700px)')
   const managementMenu = [
-    { id: 'talhoes', title: 'Cadastro de Talhao', short: 'Talhoes', text: 'Areas, culturas, fases e limites dos talhoes' },
+    {
+      id: 'talhoes',
+      title: 'Cadastro de Talhao',
+      short: 'Talhoes',
+      text: 'Areas, culturas, fases e limites dos talhoes'
+    },
     { id: 'pluviometros', title: 'Pluviometros', short: 'Chuva', text: 'Pontos georreferenciados e chuva interpolada' },
     { id: 'estoque', title: 'Estoque', short: 'Estoque', text: 'Saldos, entradas, saidas e estoque minimo' },
     { id: 'equipe', title: 'Equipe', short: 'Equipe', text: 'Tecnicos, operadores e responsaveis' },
@@ -285,8 +394,18 @@ export function GerencialView({ fazenda, fazendaId, talhoes, pluviometros = [], 
     { id: 'safras', title: 'Safras e Culturas', short: 'Safras', text: 'Ciclo agricola, variedades e metas' },
     { id: 'maquinas', title: 'Maquinas e Implementos', short: 'Maquinas', text: 'Frota, capacidade e custo hora' },
     { id: 'custos', title: 'Centros de Custo', short: 'Custos', text: 'Custos por fazenda, safra e atividade' },
-    { id: 'produtividade', title: 'Historico de Produtividade', short: 'Produtividade', text: 'Safras, rendimento e comparativos' },
-    { id: 'configuracao', title: 'Configuracao da Fazenda', short: 'Config.', text: 'Nome, municipio, usuarios e preferencias' }
+    {
+      id: 'produtividade',
+      title: 'Historico de Produtividade',
+      short: 'Produtividade',
+      text: 'Safras, rendimento e comparativos'
+    },
+    {
+      id: 'configuracao',
+      title: 'Configuracao da Fazenda',
+      short: 'Config.',
+      text: 'Nome, municipio, usuarios e preferencias'
+    }
   ]
   const managementGroups = [
     { title: 'Campo', ids: ['talhoes', 'pluviometros', 'safras'] },
@@ -303,42 +422,64 @@ export function GerencialView({ fazenda, fazendaId, talhoes, pluviometros = [], 
       <div style={isManagerCompact ? managementHeroCompactStyle : managementHeroStyle}>
         <p style={eyebrowStyle}>GESTAO OPERACIONAL</p>
         <h2 style={viewTitleStyle}>Gerenciamento da fazenda</h2>
-        {!isManagerCompact && <p style={viewSubtitleStyle}>Cadastros administrativos, mapas, equipe, estoque e configuracoes da propriedade.</p>}
+        {!isManagerCompact && (
+          <p style={viewSubtitleStyle}>
+            Cadastros administrativos, mapas, equipe, estoque e configuracoes da propriedade.
+          </p>
+        )}
       </div>
 
-      <div style={isManagerDesktop ? managementWorkspaceSingleStyle : (isManagerCompact ? managementWorkspaceCompactStyle : managementWorkspaceMobileStyle)}>
+      <div
+        style={
+          isManagerDesktop
+            ? managementWorkspaceSingleStyle
+            : isManagerCompact
+              ? managementWorkspaceCompactStyle
+              : managementWorkspaceMobileStyle
+        }
+      >
         {!isManagerDesktop && (
-        <aside style={isManagerCompact ? managementNavRailCompactStyle : managementNavRailMobileStyle}>
-          {managementGroups.map(group => (
-            <div key={group.title} style={isManagerCompact ? managementNavGroupCompactStyle : managementNavGroupStyle}>
-              {!isManagerCompact && <p style={desktopNavGroupTitleStyle}>{group.title.toUpperCase()}</p>}
-              {group.items.map(item => {
-                const active = activeManager === item.id
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => setActiveManager(item.id)}
-                    style={{
-                      ...(isManagerCompact ? managementNavItemCompactStyle : managementNavItemStyle),
-                      background: active ? C.greenLight : C.bg,
-                      borderColor: active ? C.greenDp : C.border,
-                      color: active ? C.textDk : C.textMid
-                    }}
-                  >
-                    <strong style={isManagerCompact ? managementNavLabelCompactStyle : managementNavLabelStyle}>{isManagerCompact ? item.short : item.title}</strong>
-                    {!isManagerCompact && <small style={managementNavHintStyle}>{item.text}</small>}
-                  </button>
-                )
-              })}
-            </div>
-          ))}
-        </aside>
+          <aside style={isManagerCompact ? managementNavRailCompactStyle : managementNavRailMobileStyle}>
+            {managementGroups.map(group => (
+              <div
+                key={group.title}
+                style={isManagerCompact ? managementNavGroupCompactStyle : managementNavGroupStyle}
+              >
+                {!isManagerCompact && <p style={desktopNavGroupTitleStyle}>{group.title.toUpperCase()}</p>}
+                {group.items.map(item => {
+                  const active = activeManager === item.id
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setActiveManager(item.id)}
+                      style={{
+                        ...(isManagerCompact ? managementNavItemCompactStyle : managementNavItemStyle),
+                        background: active ? C.greenLight : C.bg,
+                        borderColor: active ? C.greenDp : C.border,
+                        color: active ? C.textDk : C.textMid
+                      }}
+                    >
+                      <strong style={isManagerCompact ? managementNavLabelCompactStyle : managementNavLabelStyle}>
+                        {isManagerCompact ? item.short : item.title}
+                      </strong>
+                      {!isManagerCompact && <small style={managementNavHintStyle}>{item.text}</small>}
+                    </button>
+                  )
+                })}
+              </div>
+            ))}
+          </aside>
         )}
 
         <div style={managementModuleContentStyle}>
           {activeManager === 'talhoes' && (
-            <MapaCadastroTalhoes talhoes={talhoes} total={total} onOpenCadastro={setShowNovo} onSelectTalhao={abrirTalhao} />
+            <MapaCadastroTalhoes
+              talhoes={talhoes}
+              total={total}
+              onOpenCadastro={setShowNovo}
+              onSelectTalhao={abrirTalhao}
+            />
           )}
 
           {activeManager === 'pluviometros' && (
