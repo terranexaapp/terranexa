@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { cloneElement, isValidElement, useId, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { theme } from '../styles/theme'
@@ -221,9 +221,12 @@ function CenterCard({ children }) {
 }
 
 function Field({ label, children }) {
+  const id = useId()
+  const child = isValidElement(children) && !children.props.id ? cloneElement(children, { id }) : children
   return (
     <div style={{ marginBottom: 14 }}>
       <label
+        htmlFor={id}
         style={{
           display: 'block',
           fontSize: 9,
@@ -236,7 +239,7 @@ function Field({ label, children }) {
       >
         {label}
       </label>
-      {children}
+      {child}
     </div>
   )
 }

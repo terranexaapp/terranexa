@@ -65,18 +65,16 @@ export async function criarOperacao({
     .single()
   if (opErr) throw opErr
   if (insumos_usados && insumos_usados.length > 0) {
-    const { error: insErr } = await supabase
-      .from('operacao_insumos')
-      .insert(
-        insumos_usados.map(i => ({
-          operacao_id: op.id,
-          insumo_id: i.insumo_id,
-          dose: Number(i.dose),
-          dose_unidade: i.dose_unidade,
-          quantidade_total: Number(i.quantidade_total),
-          custo_total: Number(i.custo_total)
-        }))
-      )
+    const { error: insErr } = await supabase.from('operacao_insumos').insert(
+      insumos_usados.map(i => ({
+        operacao_id: op.id,
+        insumo_id: i.insumo_id,
+        dose: Number(i.dose),
+        dose_unidade: i.dose_unidade,
+        quantidade_total: Number(i.quantidade_total),
+        custo_total: Number(i.custo_total)
+      }))
+    )
     if (insErr) throw insErr
   }
   return op

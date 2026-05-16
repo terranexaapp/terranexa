@@ -339,6 +339,7 @@ function NovaFazendaModal({ onClose, onCreated }) {
           </h2>
           <button
             onClick={onClose}
+            aria-label="Fechar modal"
             style={{
               background: C.bgLight,
               border: `1px solid ${C.border}`,

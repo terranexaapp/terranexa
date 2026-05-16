@@ -470,6 +470,7 @@ function OSCard({ os, onExecutar, onCancelar }) {
               </button>
               <button
                 onClick={onCancelar}
+                aria-label="Cancelar"
                 style={{
                   background: C.bgLight,
                   border: `1px solid ${C.border}`,
@@ -807,6 +808,7 @@ function NovaOSModal({ fazendaId, talhoes, insumos, equipes, onClose, onSaved })
           </div>
           <button
             onClick={onClose}
+            aria-label="Fechar modal"
             style={{
               background: C.bgLight,
               border: `1px solid ${C.border}`,
@@ -986,6 +988,7 @@ function NovaOSModal({ fazendaId, talhoes, insumos, equipes, onClose, onSaved })
                     </span>
                     <button
                       onClick={() => toggleTalhao(t.id)}
+                      aria-label={`Remover talhão ${t.codigo}`}
                       style={{
                         background: C.bg,
                         border: `1px solid ${C.border}`,
@@ -1306,6 +1309,7 @@ function NovaOSModal({ fazendaId, talhoes, insumos, equipes, onClose, onSaved })
                     <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: C.textDk }}>{i.nome}</p>
                     <button
                       onClick={() => setInsumosRec(p => p.filter((_, n) => n !== idx))}
+                      aria-label={`Remover ${i.nome}`}
                       style={{ background: 'none', border: 'none', color: C.red, fontSize: 16, cursor: 'pointer' }}
                     >
                       ×
@@ -1604,6 +1608,7 @@ function ExecutarOSModal({ os, onClose, onSaved }) {
           </div>
           <button
             onClick={onClose}
+            aria-label="Fechar modal"
             style={{
               background: C.bgLight,
               border: `1px solid ${C.border}`,
@@ -2033,6 +2038,7 @@ function EquipesModal({ fazendaId, equipes, onClose, onSaved }) {
           </div>
           <button
             onClick={onClose}
+            aria-label="Fechar modal"
             style={{
               background: C.bgLight,
               border: `1px solid ${C.border}`,
@@ -2081,6 +2087,7 @@ function EquipesModal({ fazendaId, equipes, onClose, onSaved }) {
                     </div>
                     <button
                       onClick={() => desativarEquipe(eq.id).then(onSaved)}
+                      aria-label={`Desativar equipe ${eq.nome || ''}`}
                       style={{
                         background: 'none',
                         border: 'none',

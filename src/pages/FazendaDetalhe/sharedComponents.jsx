@@ -1,3 +1,4 @@
+import { cloneElement, isValidElement, useId } from 'react'
 import { theme } from '../../styles/theme'
 import { getCategoriaInfo } from '../../lib/operacoes'
 import { money } from './utils'
@@ -60,10 +61,14 @@ export function MetricCard({ label, value, tone }) {
 }
 
 export function Field({ label, children }) {
+  const id = useId()
+  const child = isValidElement(children) && !children.props.id ? cloneElement(children, { id }) : children
   return (
     <div style={{ minWidth: 0 }}>
-      <label style={formLabelStyle}>{label}</label>
-      {children}
+      <label htmlFor={id} style={formLabelStyle}>
+        {label}
+      </label>
+      {child}
     </div>
   )
 }
@@ -360,7 +365,7 @@ export function NovoTalhaoModal({ form, erro, salvando, setForm, onClose, onSubm
           <h2 style={{ margin: 0, fontSize: 18, color: C.textDk, fontWeight: 700, fontFamily: 'Georgia, serif' }}>
             Novo Talhao
           </h2>
-          <button onClick={onClose} style={iconButtonStyle}>
+          <button onClick={onClose} aria-label="Fechar modal" style={iconButtonStyle}>
             ×
           </button>
         </div>

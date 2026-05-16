@@ -9,7 +9,6 @@ import { Logo } from '../components/Logo'
 import { theme } from '../styles/theme'
 import { DesktopIcon } from './FazendaDetalhe/DesktopIcon'
 
-
 import { RelatoriosView } from './FazendaDetalhe/panels'
 import {
   FarmDesktopSidebar,
@@ -21,14 +20,9 @@ import {
 import { FazendaMapaPrincipal } from './FazendaDetalhe/mapaPrincipal'
 import { GerencialView } from './FazendaDetalhe/gerencial'
 import { TalhaoGeoModal } from './FazendaDetalhe/talhaoGeoModal'
-import {
-  NAV_ITEMS
-} from './FazendaDetalhe/constants'
+import { NAV_ITEMS } from './FazendaDetalhe/constants'
 import { useMediaQuery } from './FazendaDetalhe/hooks'
-import {
-  getMonitoramentoMeta,
-  indexMonitoramentosByTalhao
-} from './FazendaDetalhe/utils'
+import { getMonitoramentoMeta, indexMonitoramentosByTalhao } from './FazendaDetalhe/utils'
 import {
   eyebrowStyle,
   desktopTopbarStyle,
@@ -236,7 +230,7 @@ export function FazendaDetalhePage() {
         )}
         <div style={{ display: showDesktopShell ? 'none' : 'flex', alignItems: 'center', gap: isMapView ? 0 : 8 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: isMapView ? 0 : 8 }}>
-            <button onClick={() => setMenuOpen(open => !open)} style={hamburgerButtonStyle}>
+            <button onClick={() => setMenuOpen(open => !open)} aria-label="Abrir menu" style={hamburgerButtonStyle}>
               ☰
             </button>
             {!isMapView && (
@@ -285,7 +279,7 @@ export function FazendaDetalhePage() {
           <aside style={drawerStyle} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
               <p style={sidebarEyebrowStyle}>MENU</p>
-              <button onClick={() => setMenuOpen(false)} style={drawerCloseButtonStyle}>
+              <button onClick={() => setMenuOpen(false)} aria-label="Fechar menu" style={drawerCloseButtonStyle}>
                 ×
               </button>
             </div>

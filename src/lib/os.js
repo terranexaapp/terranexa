@@ -168,19 +168,17 @@ export async function criarOS({
   if (talhao_ids.length > 0)
     await supabase.from('os_talhoes').insert(talhao_ids.map(tid => ({ os_id: os.id, talhao_id: tid })))
   if (insumos_recomendados?.length > 0) {
-    const { error: insErr } = await supabase
-      .from('os_insumos')
-      .insert(
-        insumos_recomendados.map(i => ({
-          os_id: os.id,
-          insumo_id: i.insumo_id,
-          dose_recomendada: Number(i.dose_recomendada),
-          dose_unidade: i.dose_unidade,
-          dose_real: Number(i.dose_recomendada),
-          quantidade_real: 0,
-          custo_real: 0
-        }))
-      )
+    const { error: insErr } = await supabase.from('os_insumos').insert(
+      insumos_recomendados.map(i => ({
+        os_id: os.id,
+        insumo_id: i.insumo_id,
+        dose_recomendada: Number(i.dose_recomendada),
+        dose_unidade: i.dose_unidade,
+        dose_real: Number(i.dose_recomendada),
+        quantidade_real: 0,
+        custo_real: 0
+      }))
+    )
     if (insErr) throw insErr
   }
   return os

@@ -195,7 +195,9 @@ export function NovaOperacaoModal({ talhao, fazendaId, onClose, onSaved }) {
                   >
                     <div style={{ width: 10, height: 10, borderRadius: 3, background: cat.cor, flexShrink: 0 }} />
                     <span style={{ fontSize: 13, fontWeight: 600, color: C.textDk }}>{cat.label}</span>
-                    <span style={{ marginLeft: 'auto', color: C.textMid, fontSize: 16 }}>›</span>
+                    <span aria-hidden="true" style={{ marginLeft: 'auto', color: C.textMid, fontSize: 16 }}>
+                      ›
+                    </span>
                   </button>
                 ))}
               </div>
@@ -750,6 +752,7 @@ function SeletorInsumos({ catalogo, areaHa, insumosUsados, setInsumosUsados }) {
                 <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: C.textDk }}>{i.nome}</p>
                 <button
                   onClick={() => setInsumosUsados(p => p.filter(x => x.insumo_id !== i.insumo_id))}
+                  aria-label={`Remover ${i.nome}`}
                   style={{ background: 'none', border: 'none', color: C.red, fontSize: 16, cursor: 'pointer' }}
                 >
                   ×

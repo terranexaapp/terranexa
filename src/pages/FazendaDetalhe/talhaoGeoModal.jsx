@@ -132,7 +132,7 @@ export function TalhaoGeoModal({ fazendaId, initialMode, sugerirCodigo, talhoes,
             <p style={eyebrowStyle}>CADASTRO DE TALHÃO</p>
             <h2 style={viewTitleStyle}>Geometria obrigatória</h2>
           </div>
-          <button onClick={onClose} style={iconButtonStyle}>
+          <button onClick={onClose} aria-label="Fechar modal" style={iconButtonStyle}>
             ×
           </button>
         </div>
