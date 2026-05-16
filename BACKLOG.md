@@ -40,9 +40,23 @@ Build limpo após cada commit; nenhum comportamento de runtime mudou.
 
 Há ~100 objetos de estilo inline repetidos. Existe `src/styles/theme.js` com tokens, mas várias cores estão hardcoded em paralelo (`#3D8A22` em vez de `C.greenDp`). Migrar gradualmente quando tocar em cada componente.
 
-### 3. Code-splitting via `manualChunks` no Vite
+### 3. Code-splitting via `manualChunks` no Vite ✅ CONCLUÍDO
 
-Bundle atual: 581 KB (156 KB gzip). O build avisa pra splitar. Sugestão de chunks: `vendor-react`, `vendor-supabase`, `vendor-leaflet`, `vendor-geo` (jszip/shpjs/turf). Reduz tempo de boot e melhora cache entre deploys.
+Bundle quebrado em 4 chunks via `vite.config.js`:
+- `vendor-router` (21 KB / 8 KB gz) — react-router-dom
+- `vendor-react`  (142 KB / 46 KB gz) — react, react-dom, scheduler
+- `vendor-supabase` (207 KB / 53 KB gz) — @supabase/supabase-js
+- `index` (210 KB / 51 KB gz) — código da app + restante
+
+Total ~580 KB igual ao bundle único anterior; o ganho real é em cache
+entre deploys (vendor-* só recriado quando muda a dep) e em paralelismo
+de download (HTTP/2). Warning de "chunk > 500 KB" do Vite sumiu.
+
+Bônus: removidos os pacotes npm `leaflet`, `leaflet-draw` e
+`react-leaflet` do `package.json` — só eram referenciados por código
+morto (`src/components/MapView.jsx` e `NovoTalhaoModal.jsx`) que foi
+deletado. O Leaflet real é carregado dinamicamente via `<script>` tag
+de `/public/vendor/leaflet/leaflet.js`.
 
 ---
 
