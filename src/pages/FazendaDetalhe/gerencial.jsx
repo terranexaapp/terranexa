@@ -4,6 +4,7 @@ import { useMediaQuery } from './hooks'
 import { DesktopIcon } from './DesktopIcon'
 import { SimpleFarmMap } from './maps'
 import { ManagementModulePanel, ConfiguracaoFazendaPanel } from './panels'
+import { SafrasManager } from './safrasManager'
 import { normalizeFeature, findTalhaoForCoord } from './utils'
 import {
   eyebrowStyle,
@@ -498,7 +499,9 @@ export function GerencialView({
             <ConfiguracaoFazendaPanel fazenda={fazenda} talhoes={talhoes} total={total} />
           )}
 
-          {!['talhoes', 'pluviometros', 'configuracao'].includes(activeManager) && (
+          {activeManager === 'safras' && <SafrasManager fazendaId={fazendaId} />}
+
+          {!['talhoes', 'pluviometros', 'configuracao', 'safras'].includes(activeManager) && (
             <ManagementModulePanel item={activeItem} navigate={navigate} />
           )}
         </div>
