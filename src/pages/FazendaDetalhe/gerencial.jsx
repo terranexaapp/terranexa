@@ -3,7 +3,7 @@ import { theme } from '../../styles/theme'
 import { useMediaQuery } from './hooks'
 import { DesktopIcon } from './DesktopIcon'
 import { SimpleFarmMap } from './maps'
-import { ManagementModulePanel, ConfiguracaoFazendaPanel } from './panels'
+import { ManagementModulePanel, ConfiguracaoFazendaPanel, InsumosShortcut } from './panels'
 import { SafrasManager } from './safrasManager'
 import { EquipeManager } from './equipeManager'
 import { EstoqueManager } from './estoqueManager'
@@ -507,9 +507,11 @@ export function GerencialView({
 
           {activeManager === 'estoque' && <EstoqueManager fazendaId={fazendaId} navigate={navigate} />}
 
-          {!['talhoes', 'pluviometros', 'configuracao', 'safras', 'equipe', 'estoque'].includes(activeManager) && (
-            <ManagementModulePanel item={activeItem} navigate={navigate} />
-          )}
+          {activeManager === 'insumos' && <InsumosShortcut navigate={navigate} />}
+
+          {!['talhoes', 'pluviometros', 'configuracao', 'safras', 'equipe', 'estoque', 'insumos'].includes(
+            activeManager
+          ) && <ManagementModulePanel item={activeItem} />}
         </div>
       </div>
     </section>
