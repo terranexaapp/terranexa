@@ -72,8 +72,14 @@ de `/public/vendor/leaflet/leaflet.js`.
 
 - **Testes E2E** com Playwright cobrindo o golden path: cadastro → login → criar fazenda → criar talhão (3 modos) → registrar operação → fechar OS.
 - **Sentry** ou equivalente pra captura de erro em produção (hoje `ErrorBoundary` só mostra a tela; nada é enviado pra ninguém).
-- **Lint + Prettier** — não há `.eslintrc` nem `.prettierrc` no repo. Adicionar pra estabilizar formatação em PRs.
+- **Lint + Prettier** ✅ CONCLUÍDO — ESLint 9 flat config + Prettier 3 + `eslint-plugin-unused-imports`. Scripts: `lint`, `lint:fix`, `format`. Linha de base: 299 warnings + 2 errors → 7 warnings + 0 errors (após cleanup automático e manual). Os 7 warnings restantes estão documentados na próxima seção.
 - **react-hook-form + zod** pra forms maiores (NovaOSModal especialmente — tem 14 estados).
+
+#### Warnings de lint que ficaram intencionalmente:
+
+- **5x `react-hooks/exhaustive-deps` em `FazendaDetalhe/maps.jsx`** — re-fits de mapa e atualização de markers têm deps incompletas de propósito (`normalized`, `fullBleed`, `activePluviometros`, `deviceMarker`). Mexer nessas deps arrisca regressões visuais difíceis de detectar sem rodar e clicar manualmente. Resolver junto com uma revisão visual completa do mapa.
+- **1x mesma classe em `views.jsx`** (MonitoramentoRegistroView) — `addPosition` é recriada a cada render; adicionar à dep array dispararia o useEffect em cascata. Idealmente envolver com `useCallback`.
+- **1x `react-refresh/only-export-components` em `hooks/useAuth.jsx`** — arquivo exporta `AuthProvider` (componente) + `useAuth` (hook). Pra resolver, separar em dois arquivos. Impacta só DX em dev (hot-reload faz full reload em vez de fast-refresh).
 
 ### Acessibilidade
 
