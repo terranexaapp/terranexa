@@ -82,6 +82,11 @@ export const SATELLITE_TILE_URL = 'https://server.arcgisonline.com/ArcGIS/rest/s
 export const LEAFLET_SCRIPT_URL = '/vendor/leaflet/leaflet.js'
 export const LEAFLET_STYLESHEET_URL = '/vendor/leaflet/leaflet.css'
 export const MAPBOX_TOKEN = (import.meta.env.VITE_MAPBOX_TOKEN || '').trim()
+if (import.meta.env.PROD && !MAPBOX_TOKEN) {
+  // Sem token o app continua funcionando (cai pro tile satélite do ESRI),
+  // mas o usuário perde a camada Mapbox de melhor qualidade.
+  console.warn('[TerraNexa] VITE_MAPBOX_TOKEN nao configurado; usando ESRI como fallback')
+}
 export const MAPBOX_SATELLITE_TILE_URL = `https://api.mapbox.com/styles/v1/mapbox/satellite-v9/tiles/256/{z}/{x}/{y}?access_token=${MAPBOX_TOKEN}`
 export const MAPBOX_ATTRIBUTION =
   '&copy; <a href="https://www.mapbox.com/about/maps/">Mapbox</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
