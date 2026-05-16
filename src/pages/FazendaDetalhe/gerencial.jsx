@@ -7,6 +7,7 @@ import { ManagementModulePanel, ConfiguracaoFazendaPanel, InsumosShortcut } from
 import { SafrasManager } from './safrasManager'
 import { EquipeManager } from './equipeManager'
 import { EstoqueManager } from './estoqueManager'
+import { MaquinaManager } from './maquinaManager'
 import { normalizeFeature, findTalhaoForCoord } from './utils'
 import {
   eyebrowStyle,
@@ -509,7 +510,9 @@ export function GerencialView({
 
           {activeManager === 'insumos' && <InsumosShortcut navigate={navigate} />}
 
-          {!['talhoes', 'pluviometros', 'configuracao', 'safras', 'equipe', 'estoque', 'insumos'].includes(
+          {activeManager === 'maquinas' && <MaquinaManager fazendaId={fazendaId} />}
+
+          {!['talhoes', 'pluviometros', 'configuracao', 'safras', 'equipe', 'estoque', 'insumos', 'maquinas'].includes(
             activeManager
           ) && <ManagementModulePanel item={activeItem} />}
         </div>
