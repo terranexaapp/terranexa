@@ -21,12 +21,7 @@ import {
   OperacaoCard,
   NovoTalhaoModal
 } from './FazendaDetalhe/sharedComponents'
-import {
-  ManagementModulePanel,
-  ConfiguracaoFazendaPanel,
-  RelatoriosView,
-  CustosPanel
-} from './FazendaDetalhe/panels'
+import { ManagementModulePanel, ConfiguracaoFazendaPanel, RelatoriosView, CustosPanel } from './FazendaDetalhe/panels'
 import {
   FarmDesktopSidebar,
   DashboardView,
@@ -357,7 +352,9 @@ export function FazendaDetalhePage() {
   const [showNovaOp, setShowNovaOp] = useState(false)
   const [opSel, setOpSel] = useState(null)
 
-  useEffect(() => { carregar() }, [id])
+  useEffect(() => {
+    carregar()
+  }, [id])
 
   async function carregar() {
     setLoading(true)
@@ -482,14 +479,24 @@ export function FazendaDetalhePage() {
 
   if (loading) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: C.bgSoft }}>
+      <div
+        style={{
+          minHeight: '100vh',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: C.bgSoft
+        }}
+      >
         <p style={{ color: C.textDim, fontFamily: 'monospace' }}>CARREGANDO...</p>
       </div>
     )
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: isMapView ? '#102316' : C.bg, display: 'flex', flexDirection: 'column' }}>
+    <div
+      style={{ minHeight: '100vh', background: isMapView ? '#102316' : C.bg, display: 'flex', flexDirection: 'column' }}
+    >
       <header style={showDesktopShell ? desktopTopbarStyle : floatingHeaderStyle}>
         {showDesktopShell && (
           <>
@@ -509,7 +516,9 @@ export function FazendaDetalhePage() {
               <button type="button" style={desktopUtilityButtonStyle} aria-label="Ajuda">
                 <DesktopIcon name="help" size={20} />
               </button>
-              <button type="button" style={desktopAvatarButtonStyle}>AG</button>
+              <button type="button" style={desktopAvatarButtonStyle}>
+                AG
+              </button>
               <button type="button" style={desktopChevronButtonStyle} aria-label="Abrir perfil">
                 <DesktopIcon name="chevron-down" size={18} />
               </button>
@@ -518,12 +527,24 @@ export function FazendaDetalhePage() {
         )}
         <div style={{ display: showDesktopShell ? 'none' : 'flex', alignItems: 'center', gap: isMapView ? 0 : 8 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: isMapView ? 0 : 8 }}>
-            <button onClick={() => setMenuOpen(open => !open)} style={hamburgerButtonStyle}>☰</button>
+            <button onClick={() => setMenuOpen(open => !open)} style={hamburgerButtonStyle}>
+              ☰
+            </button>
             {!isMapView && (
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={eyebrowStyle}>FAZENDA</p>
-              <h1 style={{ margin: '2px 0 0', fontSize: 20, color: C.textDk, fontWeight: 700, fontFamily: 'Georgia, serif' }}>{fazenda?.nome}</h1>
-            </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={eyebrowStyle}>FAZENDA</p>
+                <h1
+                  style={{
+                    margin: '2px 0 0',
+                    fontSize: 20,
+                    color: C.textDk,
+                    fontWeight: 700,
+                    fontFamily: 'Georgia, serif'
+                  }}
+                >
+                  {fazenda?.nome}
+                </h1>
+              </div>
             )}
           </div>
           <nav style={{ display: 'none', gap: 8, overflowX: 'auto', paddingBottom: 2 }}>
@@ -555,12 +576,17 @@ export function FazendaDetalhePage() {
           <aside style={drawerStyle} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
               <p style={sidebarEyebrowStyle}>MENU</p>
-              <button onClick={() => setMenuOpen(false)} style={drawerCloseButtonStyle}>×</button>
+              <button onClick={() => setMenuOpen(false)} style={drawerCloseButtonStyle}>
+                ×
+              </button>
             </div>
             {NAV_ITEMS.map(item => (
               <button
                 key={item.id}
-                onClick={() => { setActiveView(item.id); setMenuOpen(false) }}
+                onClick={() => {
+                  setActiveView(item.id)
+                  setMenuOpen(false)
+                }}
                 style={{
                   ...drawerNavButtonStyle,
                   background: activeView === item.id ? C.greenDp : C.bg,
@@ -575,14 +601,37 @@ export function FazendaDetalhePage() {
               <div style={drawerFarmInfoStyle}>
                 <p style={eyebrowStyle}>FAZENDA</p>
                 <strong style={{ color: C.textDk, fontSize: 15, fontFamily: 'Georgia, serif' }}>{fazenda?.nome}</strong>
-                <span style={{ color: C.textMid, fontSize: 11 }}>{Number(total || 0).toFixed(2)} ha · {talhoes.length} talhoes</span>
+                <span style={{ color: C.textMid, fontSize: 11 }}>
+                  {Number(total || 0).toFixed(2)} ha · {talhoes.length} talhoes
+                </span>
               </div>
-              <button onClick={() => { setMenuOpen(false); navigate('/') }} style={drawerReturnButtonStyle}>← Voltar para Fazendas</button>
+              <button
+                onClick={() => {
+                  setMenuOpen(false)
+                  navigate('/')
+                }}
+                style={drawerReturnButtonStyle}
+              >
+                ← Voltar para Fazendas
+              </button>
               <div style={drawerBrandStyle}>
                 <Logo size={30} />
                 <div>
-                  <p style={{ margin: 0, color: C.greenDp, fontWeight: 900, fontSize: 15, fontFamily: 'Georgia, serif', lineHeight: 1 }}>Terra<span style={{ color: C.amber }}>Nexa</span></p>
-                  <small style={{ color: C.textDim, fontSize: 8, fontFamily: 'monospace', letterSpacing: '1.4px' }}>GESTAO AGRICOLA</small>
+                  <p
+                    style={{
+                      margin: 0,
+                      color: C.greenDp,
+                      fontWeight: 900,
+                      fontSize: 15,
+                      fontFamily: 'Georgia, serif',
+                      lineHeight: 1
+                    }}
+                  >
+                    Terra<span style={{ color: C.amber }}>Nexa</span>
+                  </p>
+                  <small style={{ color: C.textDim, fontSize: 8, fontFamily: 'monospace', letterSpacing: '1.4px' }}>
+                    GESTAO AGRICOLA
+                  </small>
                 </div>
               </div>
             </div>
@@ -590,7 +639,16 @@ export function FazendaDetalhePage() {
         </div>
       )}
 
-      <main style={{ flex: 1, width: '100%', maxWidth: isMapView ? 'none' : (showDesktopShell ? 'none' : 1360), margin: showDesktopShell ? 0 : '0 auto', padding: isMapView ? 0 : (showDesktopShell ? 0 : 16), paddingTop: isMapView ? 0 : (showDesktopShell ? 76 : 98) }}>
+      <main
+        style={{
+          flex: 1,
+          width: '100%',
+          maxWidth: isMapView ? 'none' : showDesktopShell ? 'none' : 1360,
+          margin: showDesktopShell ? 0 : '0 auto',
+          padding: isMapView ? 0 : showDesktopShell ? 0 : 16,
+          paddingTop: isMapView ? 0 : showDesktopShell ? 76 : 98
+        }}
+      >
         <div style={showDesktopShell ? farmLayoutDesktopStyle : farmLayoutStyle}>
           {showDesktopShell && (
             <FarmDesktopSidebar
@@ -605,77 +663,89 @@ export function FazendaDetalhePage() {
             />
           )}
           <section style={showDesktopShell ? farmContentDesktopStyle : { flex: 1, minWidth: 0 }}>
-        {activeView === 'mapa' && (
-          <FazendaMapaPrincipal
-            fazenda={fazenda}
-            talhoes={talhoes}
-            pluviometros={pluviometros}
-            monitoramentosResumo={monitoramentosResumo}
-            talhaoSel={talhaoSel}
-            operacoes={operacoes}
-            custos={custos}
-            totalCusto={totalCusto}
-            loadOps={loadOps}
-            alternarTalhao={alternarTalhao}
-            navigate={navigate}
-            setActiveView={setActiveView}
-            setShowNovaOp={setShowNovaOp}
-          />
-        )}
-        {activeView === 'dashboard' && (
-          <DashboardView
-            total={total}
-            talhoes={talhoes}
-            talhaoSel={talhaoSel}
-            operacoes={operacoes}
-            custos={custos}
-            totalCusto={totalCusto}
-            loadOps={loadOps}
-            abrirTalhao={abrirTalhao}
-            talhoesSemMonitoramento={talhoesSemMonitoramento}
-            navigate={navigate}
-            setActiveView={setActiveView}
-          />
-        )}
-        {activeView === 'chuvas' && <InterpolacaoView tipo="chuvas" talhoes={talhoes} total={total} pluviometros={pluviometros} />}
-        {activeView === 'solo' && <InterpolacaoView tipo="solo" talhoes={talhoes} total={total} pluviometros={pluviometros} />}
-        {activeView === 'scouting' && <ScoutingView talhoes={talhoes} talhaoSel={talhaoSel} abrirTalhao={abrirTalhao} />}
-        {activeView === 'gerencial' && (
-          <GerencialView
-            fazenda={fazenda}
-            talhoes={talhoes}
-            talhaoSel={talhaoSel}
-            operacoes={operacoes}
-            custos={custos}
-            total={total}
-            totalCusto={totalCusto}
-            fazendaId={id}
-            pluviometros={pluviometros}
-            pluviometrosErro={pluviometrosErro}
-            activeManager={activeManager}
-            setActiveManager={setActiveManager}
-            loadOps={loadOps}
-            opSel={opSel}
-            setOpSel={setOpSel}
-            abrirTalhao={abrirTalhao}
-            excluirTalhao={excluirTalhao}
-            setShowNovo={abrirCadastroTalhao}
-            setShowNovaOp={setShowNovaOp}
-            onCreatePluviometro={salvarPluviometro}
-            onUpdatePluviometro={editarPluviometro}
-            onDeletePluviometro={excluirPluviometro}
-            navigate={navigate}
-          />
-        )}
-        {activeView === 'relatorios' && <RelatoriosView talhoes={talhoes} total={total} />}
-        {activeView === 'monitoramento' && (
-          <MonitoramentoRegistroView
-            fazenda={fazenda}
-            fazendaId={id}
-            talhao={talhaoSel}
-            onBack={async () => { try { await carregar() } finally { setActiveView('mapa') } }}
-          />
-        )}
+            {activeView === 'mapa' && (
+              <FazendaMapaPrincipal
+                fazenda={fazenda}
+                talhoes={talhoes}
+                pluviometros={pluviometros}
+                monitoramentosResumo={monitoramentosResumo}
+                talhaoSel={talhaoSel}
+                operacoes={operacoes}
+                custos={custos}
+                totalCusto={totalCusto}
+                loadOps={loadOps}
+                alternarTalhao={alternarTalhao}
+                navigate={navigate}
+                setActiveView={setActiveView}
+                setShowNovaOp={setShowNovaOp}
+              />
+            )}
+            {activeView === 'dashboard' && (
+              <DashboardView
+                total={total}
+                talhoes={talhoes}
+                talhaoSel={talhaoSel}
+                operacoes={operacoes}
+                custos={custos}
+                totalCusto={totalCusto}
+                loadOps={loadOps}
+                abrirTalhao={abrirTalhao}
+                talhoesSemMonitoramento={talhoesSemMonitoramento}
+                navigate={navigate}
+                setActiveView={setActiveView}
+              />
+            )}
+            {activeView === 'chuvas' && (
+              <InterpolacaoView tipo="chuvas" talhoes={talhoes} total={total} pluviometros={pluviometros} />
+            )}
+            {activeView === 'solo' && (
+              <InterpolacaoView tipo="solo" talhoes={talhoes} total={total} pluviometros={pluviometros} />
+            )}
+            {activeView === 'scouting' && (
+              <ScoutingView talhoes={talhoes} talhaoSel={talhaoSel} abrirTalhao={abrirTalhao} />
+            )}
+            {activeView === 'gerencial' && (
+              <GerencialView
+                fazenda={fazenda}
+                talhoes={talhoes}
+                talhaoSel={talhaoSel}
+                operacoes={operacoes}
+                custos={custos}
+                total={total}
+                totalCusto={totalCusto}
+                fazendaId={id}
+                pluviometros={pluviometros}
+                pluviometrosErro={pluviometrosErro}
+                activeManager={activeManager}
+                setActiveManager={setActiveManager}
+                loadOps={loadOps}
+                opSel={opSel}
+                setOpSel={setOpSel}
+                abrirTalhao={abrirTalhao}
+                excluirTalhao={excluirTalhao}
+                setShowNovo={abrirCadastroTalhao}
+                setShowNovaOp={setShowNovaOp}
+                onCreatePluviometro={salvarPluviometro}
+                onUpdatePluviometro={editarPluviometro}
+                onDeletePluviometro={excluirPluviometro}
+                navigate={navigate}
+              />
+            )}
+            {activeView === 'relatorios' && <RelatoriosView talhoes={talhoes} total={total} />}
+            {activeView === 'monitoramento' && (
+              <MonitoramentoRegistroView
+                fazenda={fazenda}
+                fazendaId={id}
+                talhao={talhaoSel}
+                onBack={async () => {
+                  try {
+                    await carregar()
+                  } finally {
+                    setActiveView('mapa')
+                  }
+                }}
+              />
+            )}
           </section>
         </div>
       </main>
@@ -692,11 +762,16 @@ export function FazendaDetalhePage() {
       )}
 
       {showNovaOp && talhaoSel && (
-        <NovaOperacaoModal talhao={talhaoSel} fazendaId={id} onClose={() => setShowNovaOp(false)} onSaved={async () => { setShowNovaOp(false); await abrirTalhao(talhaoSel) }} />
+        <NovaOperacaoModal
+          talhao={talhaoSel}
+          fazendaId={id}
+          onClose={() => setShowNovaOp(false)}
+          onSaved={async () => {
+            setShowNovaOp(false)
+            await abrirTalhao(talhaoSel)
+          }}
+        />
       )}
     </div>
   )
 }
-
-
-

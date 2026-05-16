@@ -3,7 +3,9 @@ import { supabase } from './supabase'
 export async function listarFazendas() {
   const { data, error } = await supabase
     .from('fazendas')
-    .select('id, nome, municipio, estado, area_total_ha, ativa, talhoes:talhoes(id, codigo, cultura, area_ha, fase, saude, ativo)')
+    .select(
+      'id, nome, municipio, estado, area_total_ha, ativa, talhoes:talhoes(id, codigo, cultura, area_ha, fase, saude, ativo)'
+    )
     .eq('ativa', true)
     .order('created_at', { ascending: false })
   if (error) throw error
@@ -17,48 +19,68 @@ export async function buscarFazenda(id) {
 }
 
 export async function criarFazenda({ nome, municipio, estado, endereco }) {
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user }
+  } = await supabase.auth.getUser()
   if (!user) throw new Error('Não autenticado')
-  const { data, error } = await supabase.from('fazendas')
+  const { data, error } = await supabase
+    .from('fazendas')
     .insert({ proprietario_id: user.id, nome, municipio, estado, endereco })
-    .select().single()
+    .select()
+    .single()
   if (error) throw error
   return data
 }
 
 export async function listarTalhoes(fazendaId) {
-  const { data, error } = await supabase.from('talhoes')
-    .select('*').eq('fazenda_id', fazendaId).eq('ativo', true).order('codigo')
+  const { data, error } = await supabase
+    .from('talhoes')
+    .select('*')
+    .eq('fazenda_id', fazendaId)
+    .eq('ativo', true)
+    .order('codigo')
   if (error) throw error
   return data || []
 }
 
-export async function criarTalhao({ fazenda_id, codigo, nome, cultura, area_ha, fase, geometria, arquivo_origem_bucket, arquivo_origem_path, arquivo_origem_nome }) {
+export async function criarTalhao({
+  fazenda_id,
+  codigo,
+  nome,
+  cultura,
+  area_ha,
+  fase,
+  geometria,
+  arquivo_origem_bucket,
+  arquivo_origem_path,
+  arquivo_origem_nome
+}) {
   const payload = { fazenda_id, codigo, nome, cultura, area_ha, fase: fase || 'preparo', geometria }
   if (arquivo_origem_bucket) payload.arquivo_origem_bucket = arquivo_origem_bucket
   if (arquivo_origem_path) payload.arquivo_origem_path = arquivo_origem_path
   if (arquivo_origem_nome) payload.arquivo_origem_nome = arquivo_origem_nome
-  const { data, error } = await supabase.from('talhoes')
-    .insert(payload)
-    .select().single()
+  const { data, error } = await supabase.from('talhoes').insert(payload).select().single()
   if (error) throw error
   return data
 }
 
 export async function criarTalhoesEmLote(fazenda_id, talhoes) {
-  const { data, error } = await supabase.from('talhoes')
-    .insert(talhoes.map(t => ({
-      fazenda_id,
-      codigo: t.codigo,
-      nome: t.nome,
-      cultura: t.cultura,
-      area_ha: t.area_ha,
-      fase: t.fase || 'preparo',
-      geometria: t.geometria,
-      arquivo_origem_bucket: t.arquivo_origem_bucket || null,
-      arquivo_origem_path: t.arquivo_origem_path || null,
-      arquivo_origem_nome: t.arquivo_origem_nome || null
-    })))
+  const { data, error } = await supabase
+    .from('talhoes')
+    .insert(
+      talhoes.map(t => ({
+        fazenda_id,
+        codigo: t.codigo,
+        nome: t.nome,
+        cultura: t.cultura,
+        area_ha: t.area_ha,
+        fase: t.fase || 'preparo',
+        geometria: t.geometria,
+        arquivo_origem_bucket: t.arquivo_origem_bucket || null,
+        arquivo_origem_path: t.arquivo_origem_path || null,
+        arquivo_origem_nome: t.arquivo_origem_nome || null
+      }))
+    )
     .select()
   if (error) throw error
   return data

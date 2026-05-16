@@ -7,7 +7,14 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png', 'og-terranexa.png'],
+      includeAssets: [
+        'favicon.svg',
+        'apple-touch-icon.png',
+        'icon-192.png',
+        'icon-512.png',
+        'icon-maskable-512.png',
+        'og-terranexa.png'
+      ],
       manifest: {
         id: '/',
         name: 'TerraNexa',
@@ -80,7 +87,8 @@ export default defineConfig({
           if (id.includes('/react/') || id.includes('/react-dom/') || id.includes('/scheduler/')) return 'vendor-react'
           if (id.includes('@supabase')) return 'vendor-supabase'
           if (id.includes('leaflet')) return 'vendor-leaflet'
-          if (id.includes('@turf') || id.includes('jszip') || id.includes('shpjs') || id.includes('@tmcw')) return 'vendor-geo'
+          if (id.includes('@turf') || id.includes('jszip') || id.includes('shpjs') || id.includes('@tmcw'))
+            return 'vendor-geo'
         }
       }
     }

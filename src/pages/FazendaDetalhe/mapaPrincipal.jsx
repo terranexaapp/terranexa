@@ -5,13 +5,7 @@ import { MONITORAMENTO_LEGEND } from './constants'
 import { useMediaQuery, useDevicePosition } from './hooks'
 import { SimpleFarmMap } from './maps'
 import { requestOfflineStorage } from './offline'
-import {
-  normalizeFeature,
-  getMonitoramentoMeta,
-  formatCultura,
-  formatShortDate,
-  money
-} from './utils'
+import { normalizeFeature, getMonitoramentoMeta, formatCultura, formatShortDate, money } from './utils'
 import {
   eyebrowStyle,
   mapMainPageStyle,
@@ -67,13 +61,29 @@ import {
 
 const C = theme.normal
 
-export function FazendaMapaPrincipal({ fazenda, talhoes, pluviometros = [], monitoramentosResumo = {}, talhaoSel, operacoes, custos, totalCusto, loadOps, alternarTalhao, navigate, setActiveView, setShowNovaOp }) {
+export function FazendaMapaPrincipal({
+  fazenda,
+  talhoes,
+  pluviometros = [],
+  monitoramentosResumo = {},
+  talhaoSel,
+  operacoes,
+  custos,
+  totalCusto,
+  loadOps,
+  alternarTalhao,
+  navigate,
+  setActiveView,
+  setShowNovaOp
+}) {
   const timelineIsDocked = useMediaQuery('(min-width: 900px)')
   const devicePosition = useDevicePosition(!timelineIsDocked)
   const [timelineMode, setTimelineMode] = useState('resumo')
   const [chuvaInicio, setChuvaInicio] = useState('2026-05-01')
   const [chuvaFim, setChuvaFim] = useState('2026-05-15')
-  const features = talhoes.map(talhao => ({ talhao, feature: normalizeFeature(talhao.geometria, talhao.codigo) })).filter(item => item.feature)
+  const features = talhoes
+    .map(talhao => ({ talhao, feature: normalizeFeature(talhao.geometria, talhao.codigo) }))
+    .filter(item => item.feature)
   const selected = talhaoSel || null
   const selectedMonitoring = getMonitoramentoMeta(selected ? monitoramentosResumo[selected.id] : null)
   const mapFeatures = features.map(item => {
@@ -87,8 +97,12 @@ export function FazendaMapaPrincipal({ fazenda, talhoes, pluviometros = [], moni
       }
     }
   })
-  const chuvaSeed = selected ? String(selected.codigo || '').split('').reduce((sum, char) => sum + char.charCodeAt(0), 0) : 0
-  const chuvaAcumulada = selected ? (82 + (chuvaSeed % 88) + Number(selected.area_ha || 0) % 18).toFixed(1) : '0.0'
+  const chuvaSeed = selected
+    ? String(selected.codigo || '')
+        .split('')
+        .reduce((sum, char) => sum + char.charCodeAt(0), 0)
+    : 0
+  const chuvaAcumulada = selected ? (82 + (chuvaSeed % 88) + (Number(selected.area_ha || 0) % 18)).toFixed(1) : '0.0'
   const chuvaMediaDia = selected ? (Number(chuvaAcumulada) / 15).toFixed(1) : '0.0'
   const maiorChuva = selected ? (18 + (chuvaSeed % 24)).toFixed(1) : '0.0'
   const menorChuva = selected ? (2 + (chuvaSeed % 9)).toFixed(1) : '0.0'
@@ -96,28 +110,47 @@ export function FazendaMapaPrincipal({ fazenda, talhoes, pluviometros = [], moni
   const ultimaOperacaoInfo = ultimaOperacao ? getCategoriaInfo(ultimaOperacao.categoria) : null
   const activePluviometros = pluviometros.filter(p => p.ativo !== false)
   const resumoRows = [
-    { label: 'Situacao atual', value: loadOps ? 'Carregando operacoes' : operacoes.length ? 'Com historico registrado' : 'Sem operacoes registradas' },
+    {
+      label: 'Situacao atual',
+      value: loadOps
+        ? 'Carregando operacoes'
+        : operacoes.length
+          ? 'Com historico registrado'
+          : 'Sem operacoes registradas'
+    },
     { label: 'Proxima acao', value: operacoes.length ? 'Revisar monitoramento de campo' : 'Monitoramento de campo' },
-    { label: 'Ultima chuva', value: activePluviometros.length ? `${chuvaAcumulada} mm no periodo` : 'Sem registro no periodo' },
-    { label: 'Ultima operacao', value: ultimaOperacao ? `${formatShortDate(ultimaOperacao.data_operacao)} · ${ultimaOperacaoInfo.label}` : 'Nenhuma operacao cadastrada' }
+    {
+      label: 'Ultima chuva',
+      value: activePluviometros.length ? `${chuvaAcumulada} mm no periodo` : 'Sem registro no periodo'
+    },
+    {
+      label: 'Ultima operacao',
+      value: ultimaOperacao
+        ? `${formatShortDate(ultimaOperacao.data_operacao)} · ${ultimaOperacaoInfo.label}`
+        : 'Nenhuma operacao cadastrada'
+    }
   ]
-  const timeline = operacoes.length > 0
-    ? operacoes.map(op => ({
-      data: formatShortDate(op.data_operacao),
-      titulo: getCategoriaInfo(op.categoria).label,
-      status: 'Executada',
-      valor: money((op.insumos || []).reduce((s, i) => s + Number(i.custo_total || 0), 0) + Number(op.custo_aplicacao || 0))
-    }))
-    : [
-      { data: 'Hoje', titulo: 'Sem operacoes', status: 'Pendente', valor: 'Adicionar registro' },
-      { data: 'Proximo passo', titulo: 'Monitoramento', status: 'Aberta', valor: 'Scouting' },
-      { data: 'Proximo passo', titulo: 'Ordem servico', status: 'Aberta', valor: 'Planejar' }
-    ]
+  const timeline =
+    operacoes.length > 0
+      ? operacoes.map(op => ({
+          data: formatShortDate(op.data_operacao),
+          titulo: getCategoriaInfo(op.categoria).label,
+          status: 'Executada',
+          valor: money(
+            (op.insumos || []).reduce((s, i) => s + Number(i.custo_total || 0), 0) + Number(op.custo_aplicacao || 0)
+          )
+        }))
+      : [
+          { data: 'Hoje', titulo: 'Sem operacoes', status: 'Pendente', valor: 'Adicionar registro' },
+          { data: 'Proximo passo', titulo: 'Monitoramento', status: 'Aberta', valor: 'Scouting' },
+          { data: 'Proximo passo', titulo: 'Ordem servico', status: 'Aberta', valor: 'Planejar' }
+        ]
 
   async function handleFeatureClick(index) {
     const talhao = features[index]?.talhao
     if (!talhao) return
-    if (talhaoSel?.id !== talhao.id && timelineMode !== 'monitoramento') setTimelineMode(timelineIsDocked ? 'resumo' : 'historico')
+    if (talhaoSel?.id !== talhao.id && timelineMode !== 'monitoramento')
+      setTimelineMode(timelineIsDocked ? 'resumo' : 'historico')
     await alternarTalhao(talhao)
   }
 
@@ -133,38 +166,40 @@ export function FazendaMapaPrincipal({ fazenda, talhoes, pluviometros = [], moni
         height={timelineIsDocked ? '100vh' : '100dvh'}
         fullBleed
         selectedCode={selected?.codigo}
-        selectedMode={timelineMode === 'chuvas' ? 'chuvas' : timelineMode === 'monitoramento' ? 'monitoramento' : 'timeline'}
+        selectedMode={
+          timelineMode === 'chuvas' ? 'chuvas' : timelineMode === 'monitoramento' ? 'monitoramento' : 'timeline'
+        }
         pluviometros={[]}
         devicePosition={devicePosition}
         onFeatureClick={handleFeatureClick}
       />
 
-      <div style={{ display: 'none', ...mapTopInfoStyle }}>
-        <p style={eyebrowStyle}>MAPA DA FAZENDA</p>
-        <h2 style={{ margin: '3px 0 0', color: C.bg, fontSize: 24, fontFamily: 'Georgia, serif' }}>{fazenda?.nome}</h2>
-        <p style={{ margin: '6px 0 0', color: 'rgba(255,255,255,0.78)', fontSize: 12 }}>{talhoes.length} talhoes · clique no mapa para abrir a linha do tempo</p>
-      </div>
-
-      {false && selected && (
-        <div style={mapTalhaoChipStyle}>
-          <p style={eyebrowStyle}>TALHAO</p>
-          <strong>{selected.codigo}</strong>
-          <span>{Number(selected.area_ha || 0).toFixed(2)} ha · {formatCultura(selected.cultura)}</span>
-        </div>
-      )}
-
       {selected && (
         <div style={timelineIsDocked ? timelineDockStyle : timelineMobileStyle}>
           <div style={timelineIsDocked ? timelineHeaderStyle : timelineHeaderMobileStyle}>
             <div>
-              <p style={timelineIsDocked ? eyebrowStyle : timelineMobileEyebrowStyle}>{timelineIsDocked ? 'TALHAO SELECIONADO' : 'TALHAO'}</p>
-              <h3 style={timelineIsDocked ? timelineTitleStyle : timelineMobileTitleStyle}>{selected.codigo} · {formatCultura(selected.cultura)}</h3>
+              <p style={timelineIsDocked ? eyebrowStyle : timelineMobileEyebrowStyle}>
+                {timelineIsDocked ? 'TALHAO SELECIONADO' : 'TALHAO'}
+              </p>
+              <h3 style={timelineIsDocked ? timelineTitleStyle : timelineMobileTitleStyle}>
+                {selected.codigo} · {formatCultura(selected.cultura)}
+              </h3>
             </div>
             <span style={timelineAreaPillStyle}>{Number(selected.area_ha || 0).toFixed(2)} ha</span>
           </div>
           <div style={timelineActionsStyle}>
-            <button onClick={abrirMonitoramento} style={timelineIsDocked ? timelineActionButtonStyle : timelineMobileActionButtonStyle}>Monitorar</button>
-            <button onClick={() => navigate('/os')} style={timelineIsDocked ? timelineActionButtonStyle : timelineMobileActionButtonStyle}>Criar ordem</button>
+            <button
+              onClick={abrirMonitoramento}
+              style={timelineIsDocked ? timelineActionButtonStyle : timelineMobileActionButtonStyle}
+            >
+              Monitorar
+            </button>
+            <button
+              onClick={() => navigate('/os')}
+              style={timelineIsDocked ? timelineActionButtonStyle : timelineMobileActionButtonStyle}
+            >
+              Criar ordem
+            </button>
           </div>
           <div style={timelineIsDocked ? timelineModeTabsStyle : timelineModeTabsMobileStyle}>
             {[
@@ -188,8 +223,8 @@ export function FazendaMapaPrincipal({ fazenda, talhoes, pluviometros = [], moni
               </button>
             ))}
           </div>
-          {timelineMode === 'resumo' && (
-            timelineIsDocked ? (
+          {timelineMode === 'resumo' &&
+            (timelineIsDocked ? (
               <div style={timelineSummaryCardStyle}>
                 <h4 style={timelineCardTitleStyle}>Resumo do talhao</h4>
                 <div style={timelineSummaryRowsStyle}>
@@ -200,7 +235,9 @@ export function FazendaMapaPrincipal({ fazenda, talhoes, pluviometros = [], moni
                     </div>
                   ))}
                 </div>
-                <button onClick={() => setShowNovaOp(true)} style={timelineTextButtonStyle}>{operacoes.length ? 'Registrar nova operacao' : 'Adicionar primeiro registro'}</button>
+                <button onClick={() => setShowNovaOp(true)} style={timelineTextButtonStyle}>
+                  {operacoes.length ? 'Registrar nova operacao' : 'Adicionar primeiro registro'}
+                </button>
               </div>
             ) : (
               <div style={timelineTableHorizontalStyle}>
@@ -210,18 +247,21 @@ export function FazendaMapaPrincipal({ fazenda, talhoes, pluviometros = [], moni
                     <strong>{item.value}</strong>
                   </div>
                 ))}
-                <button onClick={() => setShowNovaOp(true)} style={timelineCtaHorizontalStyle}>{operacoes.length ? 'Nova operacao' : 'Adicionar registro'}</button>
+                <button onClick={() => setShowNovaOp(true)} style={timelineCtaHorizontalStyle}>
+                  {operacoes.length ? 'Nova operacao' : 'Adicionar registro'}
+                </button>
                 <div aria-hidden="true" style={timelineScrollEndStyle} />
               </div>
-            )
-          )}
-          {timelineMode === 'monitoramento' && (
-            timelineIsDocked ? (
+            ))}
+          {timelineMode === 'monitoramento' &&
+            (timelineIsDocked ? (
               <div style={timelineSummaryCardStyle}>
                 <h4 style={timelineCardTitleStyle}>Dias sem monitoramento</h4>
                 <div style={{ ...timelineMonitoringStatusStyle, borderColor: selectedMonitoring.color }}>
                   <span style={timelineSummaryLabelStyle}>Talhao selecionado</span>
-                  <strong style={{ ...timelineSummaryValueStyle, fontSize: 16, color: selectedMonitoring.color }}>{selectedMonitoring.title}</strong>
+                  <strong style={{ ...timelineSummaryValueStyle, fontSize: 16, color: selectedMonitoring.color }}>
+                    {selectedMonitoring.title}
+                  </strong>
                   <small style={{ color: C.textMid, fontWeight: 800 }}>{selectedMonitoring.detail}</small>
                 </div>
                 <div style={timelineLegendGridStyle}>
@@ -233,7 +273,9 @@ export function FazendaMapaPrincipal({ fazenda, talhoes, pluviometros = [], moni
                     </div>
                   ))}
                 </div>
-                <button onClick={abrirMonitoramento} style={timelineTextButtonStyle}>Registrar monitoramento</button>
+                <button onClick={abrirMonitoramento} style={timelineTextButtonStyle}>
+                  Registrar monitoramento
+                </button>
               </div>
             ) : (
               <div style={timelineTableHorizontalStyle}>
@@ -249,15 +291,19 @@ export function FazendaMapaPrincipal({ fazenda, talhoes, pluviometros = [], moni
                     <small style={timelineLegendRangeStyle}>{item.range}</small>
                   </div>
                 ))}
-                <button onClick={abrirMonitoramento} style={timelineCtaHorizontalStyle}>Registrar visita</button>
+                <button onClick={abrirMonitoramento} style={timelineCtaHorizontalStyle}>
+                  Registrar visita
+                </button>
                 <div aria-hidden="true" style={timelineScrollEndStyle} />
               </div>
-            )
-          )}
+            ))}
           {timelineMode === 'historico' && (
             <div style={timelineIsDocked ? timelineTableDesktopStyle : timelineTableHorizontalStyle}>
               {timeline.map((item, index) => (
-                <button key={`${item.data}-${item.titulo}-${index}`} style={timelineIsDocked ? timelineCellStyle : timelineCellHorizontalStyle}>
+                <button
+                  key={`${item.data}-${item.titulo}-${index}`}
+                  style={timelineIsDocked ? timelineCellStyle : timelineCellHorizontalStyle}
+                >
                   <span>{item.data}</span>
                   <strong>{item.titulo}</strong>
                   <em>{item.status}</em>
@@ -267,67 +313,135 @@ export function FazendaMapaPrincipal({ fazenda, talhoes, pluviometros = [], moni
               {!timelineIsDocked && <div aria-hidden="true" style={timelineScrollEndStyle} />}
             </div>
           )}
-          {timelineMode === 'chuvas' && (
-            timelineIsDocked ? (
+          {timelineMode === 'chuvas' &&
+            (timelineIsDocked ? (
               <div style={timelineRainLayoutStyle}>
                 <div style={timelineDateGridStyle}>
                   <label style={timelineDateLabelStyle}>
                     Data inicial
-                    <input type="date" value={chuvaInicio} onChange={e => setChuvaInicio(e.target.value)} style={timelineDateInputStyle} />
+                    <input
+                      type="date"
+                      value={chuvaInicio}
+                      onChange={e => setChuvaInicio(e.target.value)}
+                      style={timelineDateInputStyle}
+                    />
                   </label>
                   <label style={timelineDateLabelStyle}>
                     Data final
-                    <input type="date" value={chuvaFim} onChange={e => setChuvaFim(e.target.value)} style={timelineDateInputStyle} />
+                    <input
+                      type="date"
+                      value={chuvaFim}
+                      onChange={e => setChuvaFim(e.target.value)}
+                      style={timelineDateInputStyle}
+                    />
                   </label>
-                  <button onClick={() => setActiveView('chuvas')} style={timelinePrimaryButtonStyle}>Abrir mapa interpolado</button>
+                  <button onClick={() => setActiveView('chuvas')} style={timelinePrimaryButtonStyle}>
+                    Abrir mapa interpolado
+                  </button>
                 </div>
                 <div style={timelineRainGridStyle}>
-                  <div style={timelineRainMetricStyle}><span>Acumulado no talhao</span><strong>{chuvaAcumulada} mm</strong></div>
-                  <div style={timelineRainMetricStyle}><span>Media diaria</span><strong>{chuvaMediaDia} mm</strong></div>
-                  <div style={timelineRainMetricStyle}><span>Maior precipitacao</span><strong>{maiorChuva} mm</strong></div>
-                  <div style={timelineRainMetricStyle}><span>Menor precipitacao</span><strong>{menorChuva} mm</strong></div>
+                  <div style={timelineRainMetricStyle}>
+                    <span>Acumulado no talhao</span>
+                    <strong>{chuvaAcumulada} mm</strong>
+                  </div>
+                  <div style={timelineRainMetricStyle}>
+                    <span>Media diaria</span>
+                    <strong>{chuvaMediaDia} mm</strong>
+                  </div>
+                  <div style={timelineRainMetricStyle}>
+                    <span>Maior precipitacao</span>
+                    <strong>{maiorChuva} mm</strong>
+                  </div>
+                  <div style={timelineRainMetricStyle}>
+                    <span>Menor precipitacao</span>
+                    <strong>{menorChuva} mm</strong>
+                  </div>
                 </div>
               </div>
             ) : (
               <div style={timelineTableHorizontalStyle}>
                 <label style={timelineInputHorizontalCardStyle}>
                   <span>Data inicial</span>
-                  <input type="date" value={chuvaInicio} onChange={e => setChuvaInicio(e.target.value)} style={timelineDateInputStyle} />
+                  <input
+                    type="date"
+                    value={chuvaInicio}
+                    onChange={e => setChuvaInicio(e.target.value)}
+                    style={timelineDateInputStyle}
+                  />
                 </label>
                 <label style={timelineInputHorizontalCardStyle}>
                   <span>Data final</span>
-                  <input type="date" value={chuvaFim} onChange={e => setChuvaFim(e.target.value)} style={timelineDateInputStyle} />
+                  <input
+                    type="date"
+                    value={chuvaFim}
+                    onChange={e => setChuvaFim(e.target.value)}
+                    style={timelineDateInputStyle}
+                  />
                 </label>
-                <button onClick={() => setActiveView('chuvas')} style={timelineCtaHorizontalStyle}>Abrir mapa de chuvas</button>
-                <div style={timelineMetricHorizontalCardStyle}><span>Acumulado</span><strong>{chuvaAcumulada} mm</strong></div>
-                <div style={timelineMetricHorizontalCardStyle}><span>Media diaria</span><strong>{chuvaMediaDia} mm</strong></div>
-                <div style={timelineMetricHorizontalCardStyle}><span>Maior chuva</span><strong>{maiorChuva} mm</strong></div>
-                <div style={timelineMetricHorizontalCardStyle}><span>Menor chuva</span><strong>{menorChuva} mm</strong></div>
+                <button onClick={() => setActiveView('chuvas')} style={timelineCtaHorizontalStyle}>
+                  Abrir mapa de chuvas
+                </button>
+                <div style={timelineMetricHorizontalCardStyle}>
+                  <span>Acumulado</span>
+                  <strong>{chuvaAcumulada} mm</strong>
+                </div>
+                <div style={timelineMetricHorizontalCardStyle}>
+                  <span>Media diaria</span>
+                  <strong>{chuvaMediaDia} mm</strong>
+                </div>
+                <div style={timelineMetricHorizontalCardStyle}>
+                  <span>Maior chuva</span>
+                  <strong>{maiorChuva} mm</strong>
+                </div>
+                <div style={timelineMetricHorizontalCardStyle}>
+                  <span>Menor chuva</span>
+                  <strong>{menorChuva} mm</strong>
+                </div>
                 <div aria-hidden="true" style={timelineScrollEndStyle} />
               </div>
-            )
-          )}
-          {timelineMode === 'solo' && (
-            timelineIsDocked ? (
+            ))}
+          {timelineMode === 'solo' &&
+            (timelineIsDocked ? (
               <div style={timelineSummaryCardStyle}>
                 <h4 style={timelineCardTitleStyle}>Solo do talhao</h4>
                 <div style={timelineSummaryRowsStyle}>
-                  <div style={timelineSummaryRowStyle}><span style={timelineSummaryLabelStyle}>Camada atual</span><strong style={timelineSummaryValueStyle}>Mapa de solo disponivel</strong></div>
-                  <div style={timelineSummaryRowStyle}><span style={timelineSummaryLabelStyle}>Fertilidade</span><strong style={timelineSummaryValueStyle}>Aguardando leitura recente</strong></div>
-                  <div style={timelineSummaryRowStyle}><span style={timelineSummaryLabelStyle}>Recomendacao</span><strong style={timelineSummaryValueStyle}>Conferir pagina Solo</strong></div>
+                  <div style={timelineSummaryRowStyle}>
+                    <span style={timelineSummaryLabelStyle}>Camada atual</span>
+                    <strong style={timelineSummaryValueStyle}>Mapa de solo disponivel</strong>
+                  </div>
+                  <div style={timelineSummaryRowStyle}>
+                    <span style={timelineSummaryLabelStyle}>Fertilidade</span>
+                    <strong style={timelineSummaryValueStyle}>Aguardando leitura recente</strong>
+                  </div>
+                  <div style={timelineSummaryRowStyle}>
+                    <span style={timelineSummaryLabelStyle}>Recomendacao</span>
+                    <strong style={timelineSummaryValueStyle}>Conferir pagina Solo</strong>
+                  </div>
                 </div>
-                <button onClick={() => setActiveView('solo')} style={timelineTextButtonStyle}>Abrir pagina Solo</button>
+                <button onClick={() => setActiveView('solo')} style={timelineTextButtonStyle}>
+                  Abrir pagina Solo
+                </button>
               </div>
             ) : (
               <div style={timelineTableHorizontalStyle}>
-                <div style={timelineInfoHorizontalCardStyle}><span>Camada atual</span><strong>Mapa de solo disponivel</strong></div>
-                <div style={timelineInfoHorizontalCardStyle}><span>Fertilidade</span><strong>Aguardando leitura recente</strong></div>
-                <div style={timelineInfoHorizontalCardStyle}><span>Recomendacao</span><strong>Conferir pagina Solo</strong></div>
-                <button onClick={() => setActiveView('solo')} style={timelineCtaHorizontalStyle}>Abrir Solo</button>
+                <div style={timelineInfoHorizontalCardStyle}>
+                  <span>Camada atual</span>
+                  <strong>Mapa de solo disponivel</strong>
+                </div>
+                <div style={timelineInfoHorizontalCardStyle}>
+                  <span>Fertilidade</span>
+                  <strong>Aguardando leitura recente</strong>
+                </div>
+                <div style={timelineInfoHorizontalCardStyle}>
+                  <span>Recomendacao</span>
+                  <strong>Conferir pagina Solo</strong>
+                </div>
+                <button onClick={() => setActiveView('solo')} style={timelineCtaHorizontalStyle}>
+                  Abrir Solo
+                </button>
                 <div aria-hidden="true" style={timelineScrollEndStyle} />
               </div>
-            )
-          )}
+            ))}
         </div>
       )}
     </section>

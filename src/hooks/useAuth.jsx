@@ -10,32 +10,36 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     // Pega sessão atual
-    supabase.auth.getSession().then(async ({ data: { session }, error }) => {
-      if (error) {
-        await clearLocalAuth()
-        return
-      }
-      setSession(session)
-      if (session?.user) loadProfile(session.user.id)
-      else setLoading(false)
-    }).catch(() => clearLocalAuth())
+    supabase.auth
+      .getSession()
+      .then(async ({ data: { session }, error }) => {
+        if (error) {
+          await clearLocalAuth()
+          return
+        }
+        setSession(session)
+        if (session?.user) loadProfile(session.user.id)
+        else setLoading(false)
+      })
+      .catch(() => clearLocalAuth())
 
     // Escuta mudanças de auth
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const {
+      data: { subscription }
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session)
       if (session?.user) loadProfile(session.user.id)
-      else { setProfile(null); setLoading(false) }
+      else {
+        setProfile(null)
+        setLoading(false)
+      }
     })
 
     return () => subscription.unsubscribe()
   }, [])
 
   async function loadProfile(userId) {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single()
+    const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single()
 
     if (!error) setProfile(data)
     setLoading(false)
@@ -45,7 +49,9 @@ export function AuthProvider({ children }) {
     try {
       await supabase.auth.signOut({ scope: 'local' })
     } catch {
-      try { await supabase.auth.signOut() } catch {}
+      try {
+        await supabase.auth.signOut()
+      } catch {}
     }
     setSession(null)
     setProfile(null)
@@ -56,7 +62,7 @@ export function AuthProvider({ children }) {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { nome } },
+      options: { data: { nome } }
     })
     return { data, error }
   }

@@ -20,7 +20,13 @@ export async function listarUltimosMonitoramentos(talhaoIds = []) {
   })
 }
 
-export async function criarMonitoramento({ talhao_id, observacoes, dano = 'sem_dano_economico', severidade = 'baixa', status = 'realizado' }) {
+export async function criarMonitoramento({
+  talhao_id,
+  observacoes,
+  dano = 'sem_dano_economico',
+  severidade = 'baixa',
+  status = 'realizado'
+}) {
   const { data, error } = await supabase
     .from('monitoramentos')
     .insert({
@@ -38,7 +44,14 @@ export async function criarMonitoramento({ talhao_id, observacoes, dano = 'sem_d
   return data
 }
 
-export async function criarMonitoramentoPonto({ monitoramento_id, tipo, latitude, longitude, precisao_m, observacoes }) {
+export async function criarMonitoramentoPonto({
+  monitoramento_id,
+  tipo,
+  latitude,
+  longitude,
+  precisao_m,
+  observacoes
+}) {
   const { data, error } = await supabase
     .from('monitoramento_pontos')
     .insert({

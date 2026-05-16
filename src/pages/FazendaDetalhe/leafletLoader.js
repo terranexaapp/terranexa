@@ -21,7 +21,9 @@ export function loadLeafletAssets() {
       const existing = document.getElementById('leaflet-js')
       if (existing) {
         existing.addEventListener('load', () => resolve(window.L), { once: true })
-        existing.addEventListener('error', () => reject(new Error('Nao foi possivel carregar o Leaflet')), { once: true })
+        existing.addEventListener('error', () => reject(new Error('Nao foi possivel carregar o Leaflet')), {
+          once: true
+        })
         return
       }
       const script = document.createElement('script')

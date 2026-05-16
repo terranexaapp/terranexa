@@ -1,0 +1,9 @@
+dist
+node_modules
+public/vendor
+database
+supabase
+imports
+docs
+package-lock.json
+*.md

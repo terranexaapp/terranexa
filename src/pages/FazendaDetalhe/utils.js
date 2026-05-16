@@ -1,11 +1,5 @@
 import { theme } from '../../styles/theme'
-import {
-  MAP_DEFAULT_BOUNDS,
-  TILE_SIZE,
-  TILE_MIN_ZOOM,
-  TILE_MAX_ZOOM,
-  MONITORAMENTO_LEGEND
-} from './constants'
+import { MAP_DEFAULT_BOUNDS, TILE_SIZE, TILE_MIN_ZOOM, TILE_MAX_ZOOM, MONITORAMENTO_LEGEND } from './constants'
 
 const C = theme.normal
 
@@ -59,7 +53,8 @@ export function getMonitoramentoMeta(registro) {
   if (days === null) return getMonitoramentoMeta(null)
   const key = days <= 5 ? 'recent' : days <= 10 ? 'attention' : 'late'
   const tone = MONITORAMENTO_LEGEND.find(item => item.key === key) || MONITORAMENTO_LEGEND[3]
-  const dayText = days === 0 ? 'Monitorado hoje' : days === 1 ? '1 dia sem monitoramento' : `${days} dias sem monitoramento`
+  const dayText =
+    days === 0 ? 'Monitorado hoje' : days === 1 ? '1 dia sem monitoramento' : `${days} dias sem monitoramento`
 
   return {
     ...tone,
@@ -87,9 +82,10 @@ export function calcularAreaGeo(feature) {
     for (let i = 0; i < ring.length - 1; i++) {
       const [lon1, lat1] = ring[i]
       const [lon2, lat2] = ring[i + 1]
-      area += (lon2 - lon1) * Math.PI / 180 * (2 + Math.sin(lat1 * Math.PI / 180) + Math.sin(lat2 * Math.PI / 180))
+      area +=
+        (((lon2 - lon1) * Math.PI) / 180) * (2 + Math.sin((lat1 * Math.PI) / 180) + Math.sin((lat2 * Math.PI) / 180))
     }
-    return Math.round(Math.abs(area * R * R / 2 / 10000) * 100) / 100
+    return Math.round(Math.abs((area * R * R) / 2 / 10000) * 100) / 100
   } catch {
     return 0
   }
@@ -104,10 +100,14 @@ export function parseKmlText(text) {
     const coordsEl = placemark.querySelector('coordinates')
     if (!coordsEl) return
     const name = placemark.querySelector('name')?.textContent || `Talhão ${idx + 1}`
-    const coordinates = coordsEl.textContent.trim().split(/\s+/).map(item => {
-      const [lng, lat] = item.split(',').map(Number)
-      return [lng, lat]
-    }).filter(([lng, lat]) => !Number.isNaN(lng) && !Number.isNaN(lat))
+    const coordinates = coordsEl.textContent
+      .trim()
+      .split(/\s+/)
+      .map(item => {
+        const [lng, lat] = item.split(',').map(Number)
+        return [lng, lat]
+      })
+      .filter(([lng, lat]) => !Number.isNaN(lng) && !Number.isNaN(lat))
     if (coordinates.length < 3) return
     const first = coordinates[0]
     const last = coordinates[coordinates.length - 1]
@@ -125,7 +125,10 @@ export function featureName(feature, index = 0) {
 
 export function featureCode(feature, index = 0) {
   const name = featureName(feature, index)
-  const clean = String(name).replace(/\.[a-z0-9]+$/i, '').replace(/[^a-zA-Z0-9_-]/g, '').toUpperCase()
+  const clean = String(name)
+    .replace(/\.[a-z0-9]+$/i, '')
+    .replace(/[^a-zA-Z0-9_-]/g, '')
+    .toUpperCase()
   return clean || `T${index + 1}`
 }
 
@@ -153,7 +156,7 @@ export function getMapBounds(features) {
 
 export function projectCoord([lng, lat], bounds) {
   const x = ((lng - bounds.minLng) / (bounds.maxLng - bounds.minLng)) * 100
-  const y = (1 - ((lat - bounds.minLat) / (bounds.maxLat - bounds.minLat))) * 100
+  const y = (1 - (lat - bounds.minLat) / (bounds.maxLat - bounds.minLat)) * 100
   return [x, y]
 }
 
@@ -162,7 +165,7 @@ export function clamp(value, min, max) {
 }
 
 export function lngLatToWorld([lng, lat], zoom) {
-  const scale = TILE_SIZE * (2 ** zoom)
+  const scale = TILE_SIZE * 2 ** zoom
   const safeLat = clamp(Number(lat) || 0, -85.05112878, 85.05112878)
   const safeLng = Number(lng) || 0
   const sin = Math.sin((safeLat * Math.PI) / 180)
@@ -173,7 +176,7 @@ export function lngLatToWorld([lng, lat], zoom) {
 }
 
 export function worldToLngLat(x, y, zoom) {
-  const scale = TILE_SIZE * (2 ** zoom)
+  const scale = TILE_SIZE * 2 ** zoom
   const safeY = clamp(y, 0, scale)
   const lng = (((x / scale) * 360 - 180 + 540) % 360) - 180
   const n = Math.PI - (2 * Math.PI * safeY) / scale
@@ -207,20 +210,21 @@ export function getRingLabelCoord(ring) {
   if (!ring?.length) return null
   const lngs = ring.map(([lng]) => lng)
   const lats = ring.map(([, lat]) => lat)
-  return [
-    (Math.min(...lngs) + Math.max(...lngs)) / 2,
-    (Math.min(...lats) + Math.max(...lats)) / 2
-  ]
+  return [(Math.min(...lngs) + Math.max(...lngs)) / 2, (Math.min(...lats) + Math.max(...lats)) / 2]
 }
 
 export function escapeHtml(value) {
-  return String(value ?? '').replace(/[&<>"']/g, char => ({
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#39;'
-  }[char]))
+  return String(value ?? '').replace(
+    /[&<>"']/g,
+    char =>
+      ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      })[char]
+  )
 }
 
 export function ringToLatLngs(ring) {
@@ -246,13 +250,14 @@ export function fitLeafletToFeatures(L, map, normalized, fullBleed) {
 
 export function getLeafletPolygonStyle(feature, selected, selectedMode) {
   const monitoramento = feature.properties?.monitoramento || getMonitoramentoMeta(null)
-  const fillColor = selectedMode === 'chuvas'
-    ? '#3791d2'
-    : selectedMode === 'monitoramento'
-      ? monitoramento.color
-      : selected
-        ? C.amber
-        : C.greenDp
+  const fillColor =
+    selectedMode === 'chuvas'
+      ? '#3791d2'
+      : selectedMode === 'monitoramento'
+        ? monitoramento.color
+        : selected
+          ? C.amber
+          : C.greenDp
   const baseFillOpacity = selectedMode === 'monitoramento' ? 0.54 : 0.28
 
   return {
@@ -265,7 +270,7 @@ export function getLeafletPolygonStyle(feature, selected, selectedMode) {
 }
 
 export function leafletLabelHtml(label, selected, fullBleed) {
-  const fontSize = selected ? (fullBleed ? 12 : 11) : (fullBleed ? 10 : 9)
+  const fontSize = selected ? (fullBleed ? 12 : 11) : fullBleed ? 10 : 9
   return `<span style="
     display:inline-block;
     color:#fff;
@@ -279,7 +284,10 @@ export function leafletLabelHtml(label, selected, fullBleed) {
 }
 
 export function leafletPluviometroHtml(marker, selectedMode, intensity) {
-  const rain = selectedMode === 'chuvas' ? `<small style="display:block;font-size:9px;font-weight:900;margin-top:3px;">${intensity.toFixed(0)} mm</small>` : ''
+  const rain =
+    selectedMode === 'chuvas'
+      ? `<small style="display:block;font-size:9px;font-weight:900;margin-top:3px;">${intensity.toFixed(0)} mm</small>`
+      : ''
   return `<span style="
     display:grid;
     place-items:center;
@@ -313,7 +321,7 @@ export function pointInPolygon(point, polygon) {
     const yi = polygon[i].y
     const xj = polygon[j].x
     const yj = polygon[j].y
-    const intersects = ((yi > point.y) !== (yj > point.y)) && (point.x < ((xj - xi) * (point.y - yi)) / ((yj - yi) || 1) + xi)
+    const intersects = yi > point.y !== yj > point.y && point.x < ((xj - xi) * (point.y - yi)) / (yj - yi || 1) + xi
     if (intersects) inside = !inside
   }
   return inside
@@ -323,7 +331,11 @@ export function normalizeFeature(raw, codigo = 'T1') {
   if (!raw) return null
   let feature = raw
   if (typeof raw === 'string') {
-    try { feature = JSON.parse(raw) } catch { return null }
+    try {
+      feature = JSON.parse(raw)
+    } catch {
+      return null
+    }
   }
   if (feature.type === 'FeatureCollection') feature = feature.features?.[0]
   if (feature.type !== 'Feature' && feature.type) feature = { type: 'Feature', properties: {}, geometry: feature }
@@ -333,14 +345,19 @@ export function normalizeFeature(raw, codigo = 'T1') {
 
 export function pointInFeatureCoord([lng, lat], feature) {
   const ring = getFeatureRing(feature) || []
-  return pointInPolygon({ x: lng, y: lat }, ring.map(([ringLng, ringLat]) => ({ x: ringLng, y: ringLat })))
+  return pointInPolygon(
+    { x: lng, y: lat },
+    ring.map(([ringLng, ringLat]) => ({ x: ringLng, y: ringLat }))
+  )
 }
 
 export function findTalhaoForCoord(talhoes, lng, lat) {
-  return talhoes.find(talhao => {
-    const feature = normalizeFeature(talhao.geometria, talhao.codigo)
-    return feature ? pointInFeatureCoord([lng, lat], feature) : false
-  }) || null
+  return (
+    talhoes.find(talhao => {
+      const feature = normalizeFeature(talhao.geometria, talhao.codigo)
+      return feature ? pointInFeatureCoord([lng, lat], feature) : false
+    }) || null
+  )
 }
 
 export function pointToCoord(point) {
@@ -353,5 +370,9 @@ export function pointsToFeature(points, codigo = 'Novo talhão') {
   if (points.length < 3) return null
   const coordinates = points.map(pointToCoord)
   coordinates.push(coordinates[0])
-  return { type: 'Feature', properties: { codigo, name: codigo }, geometry: { type: 'Polygon', coordinates: [coordinates] } }
+  return {
+    type: 'Feature',
+    properties: { codigo, name: codigo },
+    geometry: { type: 'Polygon', coordinates: [coordinates] }
+  }
 }

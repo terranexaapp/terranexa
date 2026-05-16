@@ -34,20 +34,12 @@ export async function atualizarPluviometro(id, payload) {
   if (payload.longitude !== undefined) update.longitude = Number(payload.longitude)
   if (payload.talhao_id !== undefined) update.talhao_id = payload.talhao_id || null
 
-  const { data, error } = await supabase
-    .from('pluviometros')
-    .update(update)
-    .eq('id', id)
-    .select()
-    .single()
+  const { data, error } = await supabase.from('pluviometros').update(update).eq('id', id).select().single()
   if (error) throw error
   return data
 }
 
 export async function desativarPluviometro(id) {
-  const { error } = await supabase
-    .from('pluviometros')
-    .update({ ativo: false })
-    .eq('id', id)
+  const { error } = await supabase.from('pluviometros').update({ ativo: false }).eq('id', id)
   if (error) throw error
 }

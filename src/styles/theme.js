@@ -34,7 +34,7 @@ export const theme = {
     redDk: '#B83820',
 
     blue: '#4A8AB8',
-    blueLight: '#E0EEF6',
+    blueLight: '#E0EEF6'
   },
   highContrast: {
     bg: '#FFFFFF',
@@ -66,12 +66,12 @@ export const theme = {
     redDk: '#702018',
 
     blue: '#1A5080',
-    blueLight: '#D8E4F0',
-  },
+    blueLight: '#D8E4F0'
+  }
 }
 
 export const fonts = {
   serif: "Georgia, 'Times New Roman', serif",
   mono: "'SF Mono', Monaco, 'Courier New', monospace",
-  sans: "system-ui, -apple-system, 'Segoe UI', sans-serif",
+  sans: "system-ui, -apple-system, 'Segoe UI', sans-serif"
 }
