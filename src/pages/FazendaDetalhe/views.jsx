@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { theme } from '../../styles/theme'
 import {
   criarMonitoramento,
@@ -439,6 +440,7 @@ export function MonitoramentoDashboardView({ fazendaId, talhoes, monitoramentosR
 }
 
 export function MonitoramentoRegistroView({ fazenda, fazendaId, talhao, onBack }) {
+  const navigate = useNavigate()
   const [points, setPoints] = useState([])
   const [tracking, setTracking] = useState(false)
   const [gpsStatus, setGpsStatus] = useState('Aguardando GPS')
@@ -627,6 +629,28 @@ export function MonitoramentoRegistroView({ fazenda, fazendaId, talhao, onBack }
     }
   }
 
+  function gerarOSdoPonto(point) {
+    const praga = point.praga_doenca_id ? catalogoPragas.find(p => p.id === point.praga_doenca_id) : null
+    navigate('/os', {
+      state: {
+        fromMonitoramento: {
+          talhaoId: talhao?.id || null,
+          talhaoCodigo: talhao?.codigo || '',
+          fazendaId: fazendaId || null,
+          insumoSugeridoId: praga?.insumo_sugerido_id || null,
+          recomendacao:
+            point.recomendacao ||
+            praga?.manejo_recomendado ||
+            (praga ? `Manejo de ${praga.nome_comum}` : '') ||
+            '',
+          severidade: point.severidade || null,
+          pragaDoencaId: praga?.id || null,
+          pragaNome: praga?.nome_comum || ''
+        }
+      }
+    })
+  }
+
   async function confirmarDetalhes() {
     if (!detailDraft) return
     setDetailDraft(curr => (curr ? { ...curr, saving: true, error: '' } : curr))
@@ -775,8 +799,16 @@ export function MonitoramentoRegistroView({ fazenda, fazendaId, talhao, onBack }
               const praga = point.praga_doenca_id
                 ? catalogoPragas.find(p => p.id === point.praga_doenca_id)
                 : null
+              const podeGerarOS = point.severidade === 'severa' || point.severidade === 'nde' || point.recomendacao
               return (
-                <div key={`${point.hora}-${index}`} style={{ ...gpsRowStyle, alignItems: 'flex-start' }}>
+                <div
+                  key={`${point.hora}-${index}`}
+                  style={{
+                    ...gpsRowStyle,
+                    alignItems: 'flex-start',
+                    gridTemplateColumns: '1.5fr 0.8fr 1.2fr 70px 110px'
+                  }}
+                >
                   <div style={{ display: 'grid', gap: 2, minWidth: 0 }}>
                     <strong style={{ color: C.textDk, fontSize: 13 }}>
                       {TIPOS_PONTO.find(t => t.id === point.tipo)?.label || point.tipo}
@@ -813,6 +845,26 @@ export function MonitoramentoRegistroView({ fazenda, fazendaId, talhao, onBack }
                   <span style={{ color: C.textDim, fontSize: 11, fontFamily: 'monospace' }}>
                     {Math.round(point.precisao || 0)} m
                   </span>
+                  {podeGerarOS ? (
+                    <button
+                      type="button"
+                      onClick={() => gerarOSdoPonto(point)}
+                      style={{
+                        background: C.greenDp,
+                        color: C.bg,
+                        border: 'none',
+                        borderRadius: 8,
+                        padding: '6px 10px',
+                        fontSize: 11,
+                        fontWeight: 900,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Gerar OS
+                    </button>
+                  ) : (
+                    <span />
+                  )}
                 </div>
               )
             })
