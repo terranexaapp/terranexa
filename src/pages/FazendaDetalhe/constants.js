@@ -20,7 +20,7 @@ export const NAV_ITEMS = [
   { id: 'dashboard', label: 'Dashboard' },
   { id: 'chuvas', label: 'Chuvas' },
   { id: 'solo', label: 'Solo' },
-  { id: 'scouting', label: 'Scouting' },
+  { id: 'monitoramento', label: 'Monitoramento' },
   { id: 'gerencial', label: 'Gerenciamento' },
   { id: 'relatorios', label: 'Relatórios' }
 ]
@@ -33,7 +33,7 @@ export const DESKTOP_NAV_GROUPS = [
       { key: 'talhoes', view: 'gerencial', manager: 'talhoes', label: 'Talhoes', icon: 'map' },
       { key: 'chuvas', view: 'chuvas', label: 'Chuvas', icon: 'cloud-rain' },
       { key: 'solo', view: 'solo', label: 'Solo', icon: 'soil' },
-      { key: 'scouting', view: 'scouting', label: 'Scouting', icon: 'search' }
+      { key: 'monitoramento', view: 'monitoramento', label: 'Monitoramento', icon: 'search' }
     ]
   },
   {

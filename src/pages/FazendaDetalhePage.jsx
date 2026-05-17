@@ -13,7 +13,7 @@ import { RelatoriosView } from './FazendaDetalhe/panels'
 import {
   FarmDesktopSidebar,
   DashboardView,
-  ScoutingView,
+  MonitoramentoDashboardView,
   MonitoramentoRegistroView,
   InterpolacaoView
 } from './FazendaDetalhe/views'
@@ -404,8 +404,14 @@ export function FazendaDetalhePage() {
             {activeView === 'solo' && (
               <InterpolacaoView tipo="solo" talhoes={talhoes} total={total} pluviometros={pluviometros} />
             )}
-            {activeView === 'scouting' && (
-              <ScoutingView talhoes={talhoes} talhaoSel={talhaoSel} abrirTalhao={abrirTalhao} />
+            {activeView === 'monitoramento' && (
+              <MonitoramentoDashboardView
+                fazendaId={id}
+                talhoes={talhoes}
+                monitoramentosResumo={monitoramentosResumo}
+                abrirTalhao={abrirTalhao}
+                setActiveView={setActiveView}
+              />
             )}
             {activeView === 'gerencial' && (
               <GerencialView
@@ -435,7 +441,7 @@ export function FazendaDetalhePage() {
               />
             )}
             {activeView === 'relatorios' && <RelatoriosView fazendaId={id} talhoes={talhoes} total={total} />}
-            {activeView === 'monitoramento' && (
+            {activeView === 'monitoramento-registro' && (
               <MonitoramentoRegistroView
                 fazenda={fazenda}
                 fazendaId={id}

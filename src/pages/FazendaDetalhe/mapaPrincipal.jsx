@@ -151,7 +151,7 @@ export function FazendaMapaPrincipal({
 
   async function abrirMonitoramento() {
     await requestOfflineStorage()
-    setActiveView('monitoramento')
+    setActiveView('monitoramento-registro')
   }
 
   return (

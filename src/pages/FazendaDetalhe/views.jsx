@@ -1,6 +1,12 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { theme } from '../../styles/theme'
-import { criarMonitoramento, criarMonitoramentoPonto } from '../../lib/monitoramentos'
+import {
+  criarMonitoramento,
+  criarMonitoramentoPonto,
+  listarMonitoramentosFazenda,
+  listarPontosFazenda,
+  getSeveridadeInfo
+} from '../../lib/monitoramentos'
 import { DESKTOP_NAV_GROUPS } from './constants'
 import { DesktopIcon } from './DesktopIcon'
 import { SimpleFarmMap } from './maps'
@@ -23,8 +29,6 @@ import {
   mapToolbarStyle,
   mapPillStyle,
   mapPillActiveStyle,
-  scoutingMapStyle,
-  plotShapeStyle,
   monitoringGridStyle,
   monitoringActionGridStyle,
   gpsStatusStyle,
@@ -139,8 +143,8 @@ export function DashboardView({ total, talhoes, talhoesSemMonitoramento, navigat
     {
       title: 'Alertas de monitoramento',
       status: talhoesSemMonitoramento > 0 ? 'atencao' : 'estavel',
-      actionLabel: 'Ver scouting',
-      onAction: () => setActiveView('scouting'),
+      actionLabel: 'Ver monitoramento',
+      onAction: () => setActiveView('monitoramento'),
       insights: [
         {
           label: 'Talhoes sem visita recente',
@@ -216,86 +220,211 @@ export function DashboardView({ total, talhoes, talhoesSemMonitoramento, navigat
   )
 }
 
-export function ScoutingView({ talhoes, talhaoSel, abrirTalhao }) {
-  const timeline = [
-    {
-      data: 'Hoje · 08:30',
-      titulo: 'Visita em andamento',
-      talhao: talhaoSel?.codigo || 'T04',
-      dano: 'Controle',
-      cor: C.amberDk
-    },
-    { data: 'Ontem · 16:40', titulo: 'Visita realizada', talhao: 'T02', dano: 'Sem dano econômico', cor: C.greenDp },
-    { data: '13 de maio · 10:20', titulo: 'Visita realizada', talhao: 'T07', dano: 'Dano econômico', cor: C.redDk }
-  ]
+export function MonitoramentoDashboardView({ fazendaId, talhoes, monitoramentosResumo, abrirTalhao, setActiveView }) {
+  const [historicos, setHistoricos] = useState([])
+  const [pontos, setPontos] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
+  const [periodoDias, setPeriodoDias] = useState(30)
+
+  async function carregar() {
+    setLoading(true)
+    setLoadError('')
+    try {
+      const dataInicio = new Date(Date.now() - periodoDias * 86400000).toISOString().slice(0, 10)
+      const [{ monitoramentos }, ptsArr] = await Promise.all([
+        listarMonitoramentosFazenda(fazendaId, { dataInicio }),
+        listarPontosFazenda(fazendaId, { dataInicio })
+      ])
+      setHistoricos(monitoramentos)
+      setPontos(ptsArr)
+    } catch (err) {
+      setLoadError(err.message || 'Nao foi possivel carregar histórico de monitoramento')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (fazendaId) carregar()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fazendaId, periodoDias])
+
+  const kpis = useMemo(() => {
+    const ultimaVisita = historicos[0] || null
+    const talhoesComMonitoramento = new Set(historicos.map(m => m.talhao_id)).size
+    const talhoesEmAtraso = talhoes.filter(t => {
+      const reg = monitoramentosResumo[t.id]
+      if (!reg?.visitado_em) return true
+      const dias = Math.floor((Date.now() - new Date(reg.visitado_em).getTime()) / 86400000)
+      return dias > 10
+    }).length
+    const ocorrenciasCriticas = pontos.filter(p => ['severa', 'nde'].includes(p.severidade)).length
+    return { ultimaVisita, talhoesComMonitoramento, talhoesEmAtraso, ocorrenciasCriticas }
+  }, [historicos, pontos, talhoes, monitoramentosResumo])
+
+  const talhoesMap = useMemo(() => new Map(talhoes.map(t => [t.id, t])), [talhoes])
+  const visitasOrdenadas = useMemo(() => historicos.slice(0, 8), [historicos])
 
   return (
     <section style={viewStackStyle}>
       <div style={heroPanelStyle}>
         <div>
           <p style={eyebrowStyle}>MONITORAMENTO</p>
-          <h2 style={viewTitleStyle}>Scouting dos talhoes</h2>
+          <h2 style={viewTitleStyle}>Painel de monitoramento</h2>
           <p style={viewSubtitleStyle}>
-            Mapa da fazenda com filtros por último monitoramento, dano e histórico por talhão.
+            Visão consolidada das visitas a campo, ocorrências e talhões em atraso. Use o mapa principal pra iniciar
+            uma nova visita.
           </p>
         </div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {['Último monitoramento', 'Sem dano econômico', 'Controle', 'Dano econômico'].map((item, index) => (
-            <button key={item} style={index === 0 ? primaryActionStyle : secondaryActionStyle}>
-              {item}
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          {[7, 30, 90].map(d => (
+            <button
+              key={d}
+              onClick={() => setPeriodoDias(d)}
+              style={periodoDias === d ? primaryActionStyle : secondaryActionStyle}
+            >
+              {d} dias
             </button>
           ))}
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 330px', gap: 14 }}>
-        <div style={mapShellStyle}>
-          <div style={scoutingMapStyle}>
-            {talhoes.slice(0, 9).map((talhao, index) => (
-              <button
-                key={talhao.id}
-                onClick={() => abrirTalhao(talhao)}
-                style={{
-                  ...plotShapeStyle,
-                  borderColor: talhaoSel?.id === talhao.id ? C.bg : 'rgba(255,255,255,0.78)',
-                  left: `${10 + (index % 3) * 27}%`,
-                  top: `${13 + Math.floor(index / 3) * 27}%`,
-                  width: `${20 + (index % 2) * 5}%`,
-                  height: `${22 + (index % 3) * 4}%`,
-                  background:
-                    index % 4 === 0
-                      ? 'rgba(232,90,58,0.78)'
-                      : index % 3 === 0
-                        ? 'rgba(232,168,76,0.78)'
-                        : 'rgba(61,138,34,0.78)'
-                }}
-              >
-                <strong>{talhao.codigo}</strong>
-                <span>{Number(talhao.area_ha || 0).toFixed(1)} ha</span>
-              </button>
-            ))}
+      {loadError && (
+        <div
+          style={{
+            background: C.redLight,
+            color: C.redDk,
+            borderRadius: 10,
+            padding: '10px 12px',
+            fontSize: 12,
+            border: `1px solid ${C.red}33`
+          }}
+        >
+          {loadError}
+        </div>
+      )}
+
+      <div style={metricGridStyle}>
+        <MetricCard label="Talhões monitorados" value={kpis.talhoesComMonitoramento} tone={C.greenDp} />
+        <MetricCard
+          label="Talhões em atraso"
+          value={kpis.talhoesEmAtraso}
+          tone={kpis.talhoesEmAtraso > 0 ? C.redDk : C.greenDp}
+        />
+        <MetricCard label="Ocorrências críticas" value={kpis.ocorrenciasCriticas} tone={C.amberDk} />
+        <MetricCard
+          label="Última visita"
+          value={
+            kpis.ultimaVisita?.visitado_em
+              ? new Date(kpis.ultimaVisita.visitado_em).toLocaleDateString('pt-BR')
+              : 'Nenhuma'
+          }
+          tone={C.textDk}
+        />
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1.4fr) minmax(280px, 1fr)', gap: 14 }}>
+        <div style={panelStyle}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+            <div>
+              <p style={eyebrowStyle}>STATUS POR TALHÃO</p>
+              <h3 style={panelTitleStyle}>Quanto tempo cada talhão está sem visita</h3>
+            </div>
+            <button onClick={() => setActiveView('mapa')} style={secondaryActionStyle}>
+              Abrir mapa
+            </button>
+          </div>
+          <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
+            {talhoes.length === 0 ? (
+              <p style={{ color: C.textDim, fontSize: 12 }}>Nenhum talhão cadastrado.</p>
+            ) : (
+              talhoes.map(t => {
+                const reg = monitoramentosResumo[t.id]
+                const dias = reg?.visitado_em
+                  ? Math.floor((Date.now() - new Date(reg.visitado_em).getTime()) / 86400000)
+                  : null
+                const tone = dias === null ? C.textDim : dias <= 5 ? C.greenDp : dias <= 10 ? C.amberDk : C.redDk
+                const label = dias === null ? 'Nunca monitorado' : dias === 0 ? 'Hoje' : `${dias} dia(s)`
+                return (
+                  <button
+                    key={t.id}
+                    onClick={() => abrirTalhao(t)}
+                    style={{
+                      background: C.bg,
+                      border: `1px solid ${C.border}`,
+                      borderRadius: 10,
+                      padding: '10px 12px',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      gap: 10,
+                      cursor: 'pointer',
+                      textAlign: 'left'
+                    }}
+                  >
+                    <div style={{ display: 'flex', gap: 10, alignItems: 'center', minWidth: 0 }}>
+                      <span
+                        aria-hidden="true"
+                        style={{ width: 10, height: 10, borderRadius: 99, background: tone, flexShrink: 0 }}
+                      />
+                      <div style={{ minWidth: 0 }}>
+                        <strong style={{ color: C.textDk, fontSize: 13, display: 'block' }}>
+                          {t.codigo} · {formatCultura(t.cultura)}
+                        </strong>
+                        <span style={{ color: C.textMid, fontSize: 11 }}>
+                          {Number(t.area_ha || 0).toFixed(2)} ha
+                        </span>
+                      </div>
+                    </div>
+                    <span style={{ color: tone, fontSize: 12, fontWeight: 800, fontFamily: 'monospace' }}>{label}</span>
+                  </button>
+                )
+              })
+            )}
           </div>
         </div>
 
         <aside style={panelStyle}>
           <p style={eyebrowStyle}>LINHA DO TEMPO</p>
-          <h3 style={panelTitleStyle}>{talhaoSel ? `Talhão ${talhaoSel.codigo}` : 'Últimos monitoramentos'}</h3>
+          <h3 style={panelTitleStyle}>Últimas visitas ({periodoDias}d)</h3>
           <div style={{ display: 'grid', gap: 10, marginTop: 14 }}>
-            {timeline.map(item => (
-              <div
-                key={`${item.data}-${item.titulo}`}
-                style={{ display: 'grid', gridTemplateColumns: '12px 1fr', gap: 10 }}
-              >
-                <div style={{ width: 8, height: 8, borderRadius: 99, background: item.cor, marginTop: 4 }} />
-                <div>
-                  <p style={{ margin: 0, fontSize: 11, color: C.textDim, fontFamily: 'monospace' }}>{item.data}</p>
-                  <p style={{ margin: '2px 0 0', color: C.textDk, fontWeight: 800, fontSize: 13 }}>{item.titulo}</p>
-                  <p style={{ margin: '3px 0 0', color: C.textMid, fontSize: 12 }}>
-                    Talhão {item.talhao} · {item.dano}
-                  </p>
-                </div>
-              </div>
-            ))}
+            {loading ? (
+              <p style={{ color: C.textDim, fontFamily: 'monospace', fontSize: 11 }}>Carregando…</p>
+            ) : visitasOrdenadas.length === 0 ? (
+              <p style={{ color: C.textMid, fontSize: 12 }}>Nenhuma visita registrada no período.</p>
+            ) : (
+              visitasOrdenadas.map(v => {
+                const t = talhoesMap.get(v.talhao_id)
+                const sev = getSeveridadeInfo(v.severidade)
+                const cor = sev?.cor || C.textMid
+                return (
+                  <div
+                    key={v.id}
+                    style={{ display: 'grid', gridTemplateColumns: '12px 1fr', gap: 10, alignItems: 'flex-start' }}
+                  >
+                    <div style={{ width: 8, height: 8, borderRadius: 99, background: cor, marginTop: 4 }} />
+                    <div>
+                      <p style={{ margin: 0, fontSize: 11, color: C.textDim, fontFamily: 'monospace' }}>
+                        {new Date(v.visitado_em).toLocaleString('pt-BR', {
+                          day: '2-digit',
+                          month: 'short',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </p>
+                      <p style={{ margin: '2px 0 0', color: C.textDk, fontWeight: 800, fontSize: 13 }}>
+                        Talhão {t?.codigo || '—'}
+                      </p>
+                      <p style={{ margin: '3px 0 0', color: C.textMid, fontSize: 12 }}>
+                        {sev?.label || 'Sem severidade'}
+                        {v.observacoes ? ` · ${v.observacoes.slice(0, 60)}` : ''}
+                      </p>
+                    </div>
+                  </div>
+                )
+              })
+            )}
           </div>
         </aside>
       </div>
