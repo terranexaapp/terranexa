@@ -38,3 +38,20 @@ export async function uploadArquivoFazenda({ fazendaId, file, bucket = 'mapas', 
     nome: file.name
   }
 }
+
+export async function uploadFotoMonitoramento({ fazendaId, file }) {
+  return uploadArquivoFazenda({ fazendaId, file, bucket: 'mapas', folder: 'monitoramento' })
+}
+
+export function getPublicUrl({ bucket, path }) {
+  if (!bucket || !path) return null
+  const { data } = supabase.storage.from(bucket).getPublicUrl(path)
+  return data?.publicUrl || null
+}
+
+export async function getSignedUrl({ bucket, path, expiresIn = 3600 }) {
+  if (!bucket || !path) return null
+  const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, expiresIn)
+  if (error) throw error
+  return data?.signedUrl || null
+}

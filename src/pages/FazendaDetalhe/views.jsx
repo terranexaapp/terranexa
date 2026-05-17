@@ -5,8 +5,12 @@ import {
   criarMonitoramentoPonto,
   listarMonitoramentosFazenda,
   listarPontosFazenda,
-  getSeveridadeInfo
+  getSeveridadeInfo,
+  ESCALAS_SEVERIDADE,
+  TIPOS_PONTO
 } from '../../lib/monitoramentos'
+import { listarPragasDoencas } from '../../lib/pragasDoencas'
+import { uploadFotoMonitoramento, getPublicUrl } from '../../lib/storage'
 import { DESKTOP_NAV_GROUPS } from './constants'
 import { DesktopIcon } from './DesktopIcon'
 import { SimpleFarmMap } from './maps'
@@ -31,6 +35,8 @@ import {
   mapPillActiveStyle,
   monitoringGridStyle,
   monitoringActionGridStyle,
+  inputStyle,
+  formLabelStyle,
   gpsStatusStyle,
   gpsCanvasStyle,
   gpsPathLineStyle,
@@ -437,6 +443,9 @@ export function MonitoramentoRegistroView({ fazenda, fazendaId, talhao, onBack }
   const [tracking, setTracking] = useState(false)
   const [gpsStatus, setGpsStatus] = useState('Aguardando GPS')
   const [storageStatus, setStorageStatus] = useState('Preparando modo offline')
+  const [catalogoPragas, setCatalogoPragas] = useState([])
+  const [detailDraft, setDetailDraft] = useState(null) // { tipo, gps, draft, saving, error }
+  const [uploading, setUploading] = useState(false)
   const watchRef = useRef(null)
   const monitoramentoIdRef = useRef(null)
   const monitoramentoCreateRef = useRef(null)
@@ -496,7 +505,15 @@ export function MonitoramentoRegistroView({ fazenda, fazendaId, talhao, onBack }
     return monitoramentoCreateRef.current
   }
 
-  async function addPosition(position, tipo) {
+  // Carrega o catálogo de pragas/doenças pra usar no modal de detalhes.
+  useEffect(() => {
+    if (!fazendaId) return
+    listarPragasDoencas(fazendaId)
+      .then(setCatalogoPragas)
+      .catch(() => setCatalogoPragas([]))
+  }, [fazendaId])
+
+  async function addPosition(position, tipo, extras = {}) {
     const coords = position.coords || {}
     const lat = Number(coords.latitude)
     const lng = Number(coords.longitude)
@@ -505,7 +522,8 @@ export function MonitoramentoRegistroView({ fazenda, fazendaId, talhao, onBack }
       lat,
       lng,
       precisao: coords.accuracy,
-      hora: new Date().toLocaleString('pt-BR')
+      hora: new Date().toLocaleString('pt-BR'),
+      ...extras
     }
     saveMonitoringPointOffline(registro, {
       fazendaId,
@@ -524,7 +542,14 @@ export function MonitoramentoRegistroView({ fazenda, fazendaId, talhao, onBack }
           tipo,
           latitude: lat,
           longitude: lng,
-          precisao_m: coords.accuracy
+          precisao_m: coords.accuracy,
+          praga_doenca_id: extras.praga_doenca_id || null,
+          estadio_fenologico: extras.estadio_fenologico || null,
+          severidade: extras.severidade || null,
+          percentual_dano: extras.percentual_dano,
+          recomendacao: extras.recomendacao || null,
+          foto_url: extras.foto_url || null,
+          observacoes: extras.observacoes || null
         })
         setStorageStatus('Ponto sincronizado com a fazenda')
       }
@@ -533,7 +558,7 @@ export function MonitoramentoRegistroView({ fazenda, fazendaId, talhao, onBack }
     }
   }
 
-  function capturarPonto(tipo = 'Ponto de scouting') {
+  function capturarPonto(tipo = 'ponto') {
     if (!navigator.geolocation) {
       setGpsStatus('GPS indisponivel neste navegador')
       return
@@ -544,6 +569,89 @@ export function MonitoramentoRegistroView({ fazenda, fazendaId, talhao, onBack }
       error => setGpsStatus(error.message || 'Nao foi possivel capturar o GPS'),
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 }
     )
+  }
+
+  function abrirDetalhes(tipo = 'ponto') {
+    if (!navigator.geolocation) {
+      setGpsStatus('GPS indisponivel neste navegador')
+      return
+    }
+    setGpsStatus('Capturando GPS para detalhar...')
+    navigator.geolocation.getCurrentPosition(
+      position => {
+        const coords = position.coords || {}
+        setGpsStatus('GPS pronto — preencha os detalhes')
+        setDetailDraft({
+          tipo,
+          gps: {
+            lat: Number(coords.latitude),
+            lng: Number(coords.longitude),
+            precisao: coords.accuracy
+          },
+          draft: {
+            praga_doenca_id: '',
+            estadio_fenologico: '',
+            severidade: '',
+            percentual_dano: '',
+            recomendacao: '',
+            observacoes: '',
+            foto_file: null,
+            foto_url: null
+          },
+          saving: false,
+          error: ''
+        })
+      },
+      error => setGpsStatus(error.message || 'Nao foi possivel capturar o GPS'),
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 }
+    )
+  }
+
+  function updateDetailDraft(patch) {
+    setDetailDraft(curr => (curr ? { ...curr, draft: { ...curr.draft, ...patch }, error: '' } : curr))
+  }
+
+  async function handleFotoChange(file) {
+    if (!file || !fazendaId) return
+    setUploading(true)
+    try {
+      const result = await uploadFotoMonitoramento({ fazendaId, file })
+      const url = getPublicUrl({ bucket: result.bucket, path: result.path }) || result.path
+      updateDetailDraft({ foto_file: file, foto_url: url })
+    } catch (err) {
+      setDetailDraft(curr =>
+        curr ? { ...curr, error: err.message || 'Nao foi possivel enviar a foto' } : curr
+      )
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  async function confirmarDetalhes() {
+    if (!detailDraft) return
+    setDetailDraft(curr => (curr ? { ...curr, saving: true, error: '' } : curr))
+    try {
+      const fakePosition = {
+        coords: {
+          latitude: detailDraft.gps.lat,
+          longitude: detailDraft.gps.lng,
+          accuracy: detailDraft.gps.precisao
+        }
+      }
+      const extras = {
+        praga_doenca_id: detailDraft.draft.praga_doenca_id || null,
+        estadio_fenologico: detailDraft.draft.estadio_fenologico || null,
+        severidade: detailDraft.draft.severidade || null,
+        percentual_dano: detailDraft.draft.percentual_dano ? Number(detailDraft.draft.percentual_dano) : null,
+        recomendacao: detailDraft.draft.recomendacao || null,
+        observacoes: detailDraft.draft.observacoes || null,
+        foto_url: detailDraft.draft.foto_url || null
+      }
+      await addPosition(fakePosition, detailDraft.tipo, extras)
+      setDetailDraft(null)
+    } catch (err) {
+      setDetailDraft(curr => (curr ? { ...curr, saving: false, error: err.message || 'Erro ao salvar' } : curr))
+    }
   }
 
   function iniciarCaminhamento() {
@@ -600,11 +708,18 @@ export function MonitoramentoRegistroView({ fazenda, fazendaId, talhao, onBack }
 
           <div style={monitoringActionGridStyle}>
             <button
-              onClick={() => capturarPonto('Ponto de scouting')}
+              onClick={() => abrirDetalhes('ocorrencia')}
               disabled={!talhao}
               style={{ ...primaryActionStyle, opacity: talhao ? 1 : 0.5 }}
             >
-              Registrar ponto
+              Registrar com detalhes
+            </button>
+            <button
+              onClick={() => capturarPonto('ponto')}
+              disabled={!talhao}
+              style={{ ...secondaryActionStyle, opacity: talhao ? 1 : 0.5 }}
+            >
+              Ponto rápido
             </button>
             <button
               onClick={tracking ? finalizarCaminhamento : iniciarCaminhamento}
@@ -614,18 +729,11 @@ export function MonitoramentoRegistroView({ fazenda, fazendaId, talhao, onBack }
               {tracking ? 'Finalizar caminhamento' : 'Iniciar caminhamento'}
             </button>
             <button
-              onClick={() => capturarPonto('Armadilha')}
+              onClick={() => abrirDetalhes('armadilha')}
               disabled={!talhao}
               style={{ ...secondaryActionStyle, opacity: talhao ? 1 : 0.5 }}
             >
-              Marcar armadilha
-            </button>
-            <button
-              onClick={() => capturarPonto('Ocorrencia')}
-              disabled={!talhao}
-              style={{ ...secondaryActionStyle, opacity: talhao ? 1 : 0.5 }}
-            >
-              Marcar ocorrencia
+              Armadilha
             </button>
           </div>
 
@@ -662,20 +770,263 @@ export function MonitoramentoRegistroView({ fazenda, fazendaId, talhao, onBack }
           {points.length === 0 ? (
             <p style={{ margin: 0, color: C.textMid, fontSize: 13 }}>Nenhum ponto registrado ainda.</p>
           ) : (
-            points.map((point, index) => (
-              <div key={`${point.hora}-${index}`} style={gpsRowStyle}>
-                <strong>{point.tipo}</strong>
-                <span>{point.hora}</span>
-                <span>
-                  {point.lat?.toFixed(6)}, {point.lng?.toFixed(6)}
-                </span>
-                <span>{Math.round(point.precisao || 0)} m</span>
-              </div>
-            ))
+            points.map((point, index) => {
+              const sev = getSeveridadeInfo(point.severidade)
+              const praga = point.praga_doenca_id
+                ? catalogoPragas.find(p => p.id === point.praga_doenca_id)
+                : null
+              return (
+                <div key={`${point.hora}-${index}`} style={{ ...gpsRowStyle, alignItems: 'flex-start' }}>
+                  <div style={{ display: 'grid', gap: 2, minWidth: 0 }}>
+                    <strong style={{ color: C.textDk, fontSize: 13 }}>
+                      {TIPOS_PONTO.find(t => t.id === point.tipo)?.label || point.tipo}
+                    </strong>
+                    {praga && (
+                      <span style={{ color: C.textMid, fontSize: 11 }}>
+                        {praga.nome_comum}
+                        {point.estadio_fenologico ? ` · ${point.estadio_fenologico}` : ''}
+                      </span>
+                    )}
+                    {sev && (
+                      <span
+                        style={{
+                          alignSelf: 'flex-start',
+                          color: sev.cor,
+                          background: `${sev.cor}22`,
+                          borderRadius: 999,
+                          padding: '2px 8px',
+                          fontSize: 9,
+                          fontFamily: 'monospace',
+                          fontWeight: 900,
+                          marginTop: 2
+                        }}
+                      >
+                        {sev.label.toUpperCase()}
+                        {point.percentual_dano ? ` · ${point.percentual_dano}%` : ''}
+                      </span>
+                    )}
+                  </div>
+                  <span style={{ color: C.textDim, fontSize: 11, fontFamily: 'monospace' }}>{point.hora}</span>
+                  <span style={{ color: C.textMid, fontSize: 11, fontFamily: 'monospace' }}>
+                    {point.lat?.toFixed(6)}, {point.lng?.toFixed(6)}
+                  </span>
+                  <span style={{ color: C.textDim, fontSize: 11, fontFamily: 'monospace' }}>
+                    {Math.round(point.precisao || 0)} m
+                  </span>
+                </div>
+              )
+            })
           )}
         </div>
       </div>
+
+      {detailDraft && (
+        <DetalheModal
+          state={detailDraft}
+          catalogoPragas={catalogoPragas}
+          uploading={uploading}
+          onUpdate={updateDetailDraft}
+          onFoto={handleFotoChange}
+          onCancel={() => setDetailDraft(null)}
+          onConfirm={confirmarDetalhes}
+        />
+      )}
     </section>
+  )
+}
+
+function DetalheModal({ state, catalogoPragas, uploading, onUpdate, onFoto, onCancel, onConfirm }) {
+  const { draft, saving, error, tipo, gps } = state
+  return (
+    <div
+      onClick={onCancel}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(0,0,0,0.55)',
+        zIndex: 1000,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 14
+      }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          background: C.bg,
+          borderRadius: 16,
+          padding: 18,
+          width: '100%',
+          maxWidth: 540,
+          maxHeight: '90vh',
+          overflowY: 'auto',
+          display: 'grid',
+          gap: 12
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+          <div>
+            <p style={eyebrowStyle}>{TIPOS_PONTO.find(t => t.id === tipo)?.label || tipo}</p>
+            <h3 style={{ margin: '4px 0 0', color: C.textDk, fontSize: 18, fontFamily: 'Georgia, serif' }}>
+              Detalhes do ponto
+            </h3>
+            <p style={{ margin: '4px 0 0', color: C.textDim, fontSize: 11, fontFamily: 'monospace' }}>
+              GPS: {gps.lat?.toFixed(6)}, {gps.lng?.toFixed(6)} · ±{Math.round(gps.precisao || 0)}m
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onCancel}
+            aria-label="Fechar"
+            style={{
+              background: C.bgLight,
+              border: `1px solid ${C.border}`,
+              borderRadius: 8,
+              width: 30,
+              height: 30,
+              cursor: 'pointer'
+            }}
+          >
+            ×
+          </button>
+        </div>
+
+        <div>
+          <label style={formLabelStyle}>PRAGA / DOENÇA / DEFICIÊNCIA</label>
+          <select
+            value={draft.praga_doenca_id}
+            onChange={e => onUpdate({ praga_doenca_id: e.target.value })}
+            style={inputStyle}
+          >
+            <option value="">Não identificado</option>
+            {catalogoPragas.map(p => (
+              <option key={p.id} value={p.id}>
+                {p.nome_comum} ({p.tipo})
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <div>
+            <label style={formLabelStyle}>ESTÁDIO FENOLÓGICO</label>
+            <input
+              value={draft.estadio_fenologico}
+              onChange={e => onUpdate({ estadio_fenologico: e.target.value })}
+              placeholder="V3, R1, etc."
+              style={inputStyle}
+            />
+          </div>
+          <div>
+            <label style={formLabelStyle}>% DE DANO</label>
+            <input
+              type="number"
+              min="0"
+              max="100"
+              step="0.1"
+              value={draft.percentual_dano}
+              onChange={e => onUpdate({ percentual_dano: e.target.value })}
+              placeholder="0-100"
+              style={inputStyle}
+            />
+          </div>
+        </div>
+
+        <div>
+          <label style={formLabelStyle}>SEVERIDADE</label>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {ESCALAS_SEVERIDADE.map(s => (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => onUpdate({ severidade: draft.severidade === s.id ? '' : s.id })}
+                style={{
+                  border: `1.5px solid ${draft.severidade === s.id ? s.cor : C.border}`,
+                  background: draft.severidade === s.id ? `${s.cor}22` : C.bg,
+                  color: draft.severidade === s.id ? s.cor : C.textMid,
+                  borderRadius: 999,
+                  padding: '7px 12px',
+                  fontSize: 11,
+                  fontWeight: 800,
+                  cursor: 'pointer'
+                }}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <label style={formLabelStyle}>RECOMENDAÇÃO</label>
+          <textarea
+            rows={2}
+            value={draft.recomendacao}
+            onChange={e => onUpdate({ recomendacao: e.target.value })}
+            placeholder="Ação sugerida (vira sugestão da OS)..."
+            style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }}
+          />
+        </div>
+
+        <div>
+          <label style={formLabelStyle}>OBSERVAÇÕES</label>
+          <textarea
+            rows={2}
+            value={draft.observacoes}
+            onChange={e => onUpdate({ observacoes: e.target.value })}
+            placeholder="Notas livres..."
+            style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }}
+          />
+        </div>
+
+        <div>
+          <label style={formLabelStyle}>FOTO</label>
+          <input
+            type="file"
+            accept="image/*"
+            capture="environment"
+            onChange={e => e.target.files?.[0] && onFoto(e.target.files[0])}
+            style={{ ...inputStyle, padding: '8px 10px' }}
+          />
+          {uploading && <p style={{ margin: '4px 0 0', color: C.amberDk, fontSize: 11 }}>Enviando foto…</p>}
+          {draft.foto_url && (
+            <p style={{ margin: '6px 0 0', color: C.greenDp, fontSize: 11, fontFamily: 'monospace' }}>
+              ✓ Foto anexada
+            </p>
+          )}
+        </div>
+
+        {error && (
+          <div
+            style={{
+              background: C.redLight,
+              color: C.redDk,
+              borderRadius: 10,
+              padding: '8px 10px',
+              fontSize: 12,
+              border: `1px solid ${C.red}33`
+            }}
+          >
+            {error}
+          </div>
+        )}
+
+        <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+          <button type="button" onClick={onCancel} style={{ ...secondaryActionStyle, flex: 1 }}>
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={saving || uploading}
+            style={{ ...primaryActionStyle, flex: 2, opacity: saving || uploading ? 0.6 : 1 }}
+          >
+            {saving ? 'Salvando…' : 'Salvar ponto'}
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }
 
