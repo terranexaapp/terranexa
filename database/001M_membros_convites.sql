@@ -11,7 +11,8 @@
 --  6. Políticas RLS de escrita para gerente em tabelas de gestão
 --  7. Políticas RLS de escrita para operador em monitoramento e OS
 --
--- Rodar APÓS 001A..001L.
+-- Idempotente. Políticas em tabelas opcionais (001D, 001J em diante)
+-- só são criadas se a tabela existir — seguro rodar parcialmente.
 -- ════════════════════════════════════════════════════════════════
 
 -- ── 1. Tabela de membros e convites ─────────────────────────────
@@ -38,7 +39,6 @@ create index if not exists fazenda_membros_email_idx    on public.fazenda_membro
 
 -- ── 2. Funções helper de acesso ──────────────────────────────────
 
--- Qualquer membro aceito (gerente ou operador)
 create or replace function public.usuario_membro_fazenda(
   p_fazenda_id uuid,
   p_papel      text default null
@@ -58,7 +58,6 @@ as $$
   )
 $$;
 
--- Acessa fazenda: owner OU qualquer membro aceito
 create or replace function public.usuario_acessa_fazenda(p_fazenda_id uuid)
 returns boolean
 language sql
@@ -70,7 +69,6 @@ as $$
       or public.usuario_membro_fazenda(p_fazenda_id)
 $$;
 
--- Gerente de fazenda: owner OU membro com papel 'gerente'
 create or replace function public.usuario_gerente_fazenda(p_fazenda_id uuid)
 returns boolean
 language sql
@@ -82,7 +80,6 @@ as $$
       or public.usuario_membro_fazenda(p_fazenda_id, 'gerente')
 $$;
 
--- Acessa talhão via fazenda membro
 create or replace function public.usuario_acessa_talhao(p_talhao_id uuid)
 returns boolean
 language sql
@@ -97,7 +94,6 @@ as $$
   )
 $$;
 
--- Gerente acessa talhão
 create or replace function public.usuario_gerente_talhao(p_talhao_id uuid)
 returns boolean
 language sql
@@ -114,7 +110,6 @@ $$;
 
 -- ── 3. Função pública para buscar info do convite ────────────────
 -- Callable sem autenticação (security definer).
--- Retorna só nome da fazenda e papel — sem expor emails ou IDs.
 
 create or replace function public.buscar_convite_info(p_token uuid)
 returns json
@@ -141,7 +136,6 @@ as $$
 $$;
 
 -- ── 4. Função segura para aceitar convite ────────────────────────
--- Só aceita se email do usuário logado == email do convite.
 
 create or replace function public.aceitar_convite(p_token uuid)
 returns json
@@ -194,14 +188,12 @@ $$;
 
 alter table public.fazenda_membros enable row level security;
 
--- Dono gerencia todos os membros da fazenda
 drop policy if exists membros_owner_all on public.fazenda_membros;
 create policy membros_owner_all on public.fazenda_membros
 for all
 using  (public.usuario_dono_fazenda(fazenda_id))
 with check (public.usuario_dono_fazenda(fazenda_id));
 
--- Usuário logado vê os convites com seu email OU com seu user_id
 drop policy if exists membros_own_select on public.fazenda_membros;
 create policy membros_own_select on public.fazenda_membros
 for select
@@ -210,39 +202,51 @@ using (
   or user_id = auth.uid()
 );
 
--- ── 6. Políticas SELECT para membros em tabelas da fazenda ───────
+-- ── 6. Helper procedure para criar política só se tabela existir ─
 
--- fazendas: membro pode ver
+create or replace function public._aplicar_policy_se_existe(
+  p_tabela text,
+  p_policy text,
+  p_sql    text
+)
+returns void
+language plpgsql
+as $$
+begin
+  if to_regclass('public.' || p_tabela) is not null then
+    execute format('drop policy if exists %I on public.%I', p_policy, p_tabela);
+    execute p_sql;
+  end if;
+end;
+$$;
+
+-- ── 7. Políticas SELECT para membros (tabelas core) ──────────────
+
 drop policy if exists fazendas_member_select on public.fazendas;
 create policy fazendas_member_select on public.fazendas
 for select
 using (public.usuario_membro_fazenda(id));
 
--- talhoes: SELECT todos os membros
 drop policy if exists talhoes_member_select on public.talhoes;
 create policy talhoes_member_select on public.talhoes
 for select
 using (public.usuario_membro_fazenda(fazenda_id));
 
--- safras
 drop policy if exists safras_member_select on public.safras;
 create policy safras_member_select on public.safras
 for select
 using (public.usuario_membro_fazenda(fazenda_id));
 
--- equipes
 drop policy if exists equipes_member_select on public.equipes;
 create policy equipes_member_select on public.equipes
 for select
 using (public.usuario_membro_fazenda(fazenda_id));
 
--- insumos
 drop policy if exists insumos_member_select on public.insumos;
 create policy insumos_member_select on public.insumos
 for select
 using (public.usuario_membro_fazenda(fazenda_id));
 
--- estoque (via insumo)
 drop policy if exists estoque_member_select on public.estoque;
 create policy estoque_member_select on public.estoque
 for select
@@ -254,106 +258,11 @@ using (
   )
 );
 
--- pluviometros
-drop policy if exists pluviometros_member_select on public.pluviometros;
-create policy pluviometros_member_select on public.pluviometros
-for select
-using (public.usuario_membro_fazenda(fazenda_id));
-
--- chuva_registros (via pluviometro)
-drop policy if exists chuva_registros_member_select on public.chuva_registros;
-create policy chuva_registros_member_select on public.chuva_registros
-for select
-using (
-  exists (
-    select 1 from public.pluviometros p
-    where p.id = pluviometro_id
-      and public.usuario_membro_fazenda(p.fazenda_id)
-  )
-);
-
--- amostras_solo (via talhao)
-drop policy if exists amostras_solo_member_select on public.amostras_solo;
-create policy amostras_solo_member_select on public.amostras_solo
-for select
-using (public.usuario_membro_fazenda((select fazenda_id from public.talhoes where id = talhao_id)));
-
--- monitoramentos (via talhao)
-drop policy if exists monitoramentos_member_select on public.monitoramentos;
-create policy monitoramentos_member_select on public.monitoramentos
-for select
-using (public.usuario_acessa_talhao(talhao_id));
-
--- monitoramento_pontos (via monitoramento)
-drop policy if exists monitoramento_pontos_member_select on public.monitoramento_pontos;
-create policy monitoramento_pontos_member_select on public.monitoramento_pontos
-for select
-using (
-  exists (
-    select 1 from public.monitoramentos m
-    where m.id = monitoramento_id
-      and public.usuario_acessa_talhao(m.talhao_id)
-  )
-);
-
--- monitoramento_caminhamentos (via monitoramento)
-drop policy if exists monitoramento_caminhamentos_member_select on public.monitoramento_caminhamentos;
-create policy monitoramento_caminhamentos_member_select on public.monitoramento_caminhamentos
-for select
-using (
-  exists (
-    select 1 from public.monitoramentos m
-    where m.id = monitoramento_id
-      and public.usuario_acessa_talhao(m.talhao_id)
-  )
-);
-
--- armadilhas (via talhao, pode ser null)
-drop policy if exists armadilhas_member_select on public.armadilhas;
-create policy armadilhas_member_select on public.armadilhas
-for select
-using (
-  talhao_id is null
-  or public.usuario_acessa_talhao(talhao_id)
-);
-
--- ordens_servico
-drop policy if exists ordens_servico_member_select on public.ordens_servico;
-create policy ordens_servico_member_select on public.ordens_servico
-for select
-using (public.usuario_membro_fazenda(fazenda_id));
-
--- os_talhoes (via os)
-drop policy if exists os_talhoes_member_select on public.os_talhoes;
-create policy os_talhoes_member_select on public.os_talhoes
-for select
-using (
-  exists (
-    select 1 from public.ordens_servico o
-    where o.id = os_id
-      and public.usuario_membro_fazenda(o.fazenda_id)
-  )
-);
-
--- os_insumos (via os)
-drop policy if exists os_insumos_member_select on public.os_insumos;
-create policy os_insumos_member_select on public.os_insumos
-for select
-using (
-  exists (
-    select 1 from public.ordens_servico o
-    where o.id = os_id
-      and public.usuario_membro_fazenda(o.fazenda_id)
-  )
-);
-
--- operacoes (via talhao)
 drop policy if exists operacoes_member_select on public.operacoes;
 create policy operacoes_member_select on public.operacoes
 for select
 using (public.usuario_acessa_talhao(talhao_id));
 
--- operacao_insumos (via operacao)
 drop policy if exists operacao_insumos_member_select on public.operacao_insumos;
 create policy operacao_insumos_member_select on public.operacao_insumos
 for select
@@ -365,195 +274,282 @@ using (
   )
 );
 
--- relatorios
-drop policy if exists relatorios_member_select on public.relatorios;
-create policy relatorios_member_select on public.relatorios
+drop policy if exists ordens_servico_member_select on public.ordens_servico;
+create policy ordens_servico_member_select on public.ordens_servico
 for select
 using (public.usuario_membro_fazenda(fazenda_id));
 
--- centros_custo
-drop policy if exists centros_custo_member_select on public.centros_custo;
-create policy centros_custo_member_select on public.centros_custo
+drop policy if exists os_talhoes_member_select on public.os_talhoes;
+create policy os_talhoes_member_select on public.os_talhoes
 for select
-using (public.usuario_membro_fazenda(fazenda_id));
+using (
+  exists (
+    select 1 from public.ordens_servico o
+    where o.id = os_id
+      and public.usuario_membro_fazenda(o.fazenda_id)
+  )
+);
 
--- ── 7. Políticas WRITE para gerente (tudo exceto deletar fazenda) ─
+drop policy if exists os_insumos_member_select on public.os_insumos;
+create policy os_insumos_member_select on public.os_insumos
+for select
+using (
+  exists (
+    select 1 from public.ordens_servico o
+    where o.id = os_id
+      and public.usuario_membro_fazenda(o.fazenda_id)
+  )
+);
 
--- talhoes: gerente pode INSERT/UPDATE/DELETE
+-- ── 8. Políticas SELECT para tabelas opcionais (001D, 001J+) ─────
+
+select public._aplicar_policy_se_existe(
+  'pluviometros', 'pluviometros_member_select',
+  'create policy pluviometros_member_select on public.pluviometros
+   for select using (public.usuario_membro_fazenda(fazenda_id))'
+);
+
+select public._aplicar_policy_se_existe(
+  'chuva_registros', 'chuva_registros_member_select',
+  'create policy chuva_registros_member_select on public.chuva_registros
+   for select using (
+     exists (select 1 from public.pluviometros p
+             where p.id = pluviometro_id
+               and public.usuario_membro_fazenda(p.fazenda_id))
+   )'
+);
+
+select public._aplicar_policy_se_existe(
+  'amostras_solo', 'amostras_solo_member_select',
+  'create policy amostras_solo_member_select on public.amostras_solo
+   for select using (public.usuario_acessa_talhao(talhao_id))'
+);
+
+select public._aplicar_policy_se_existe(
+  'monitoramentos', 'monitoramentos_member_select',
+  'create policy monitoramentos_member_select on public.monitoramentos
+   for select using (public.usuario_acessa_talhao(talhao_id))'
+);
+
+select public._aplicar_policy_se_existe(
+  'monitoramento_pontos', 'monitoramento_pontos_member_select',
+  'create policy monitoramento_pontos_member_select on public.monitoramento_pontos
+   for select using (
+     exists (select 1 from public.monitoramentos m
+             where m.id = monitoramento_id
+               and public.usuario_acessa_talhao(m.talhao_id))
+   )'
+);
+
+select public._aplicar_policy_se_existe(
+  'monitoramento_caminhamentos', 'monitoramento_caminhamentos_member_select',
+  'create policy monitoramento_caminhamentos_member_select on public.monitoramento_caminhamentos
+   for select using (
+     exists (select 1 from public.monitoramentos m
+             where m.id = monitoramento_id
+               and public.usuario_acessa_talhao(m.talhao_id))
+   )'
+);
+
+select public._aplicar_policy_se_existe(
+  'armadilhas', 'armadilhas_member_select',
+  'create policy armadilhas_member_select on public.armadilhas
+   for select using (talhao_id is null or public.usuario_acessa_talhao(talhao_id))'
+);
+
+select public._aplicar_policy_se_existe(
+  'relatorios', 'relatorios_member_select',
+  'create policy relatorios_member_select on public.relatorios
+   for select using (public.usuario_membro_fazenda(fazenda_id))'
+);
+
+select public._aplicar_policy_se_existe(
+  'centros_custo', 'centros_custo_member_select',
+  'create policy centros_custo_member_select on public.centros_custo
+   for select using (public.usuario_membro_fazenda(fazenda_id))'
+);
+
+select public._aplicar_policy_se_existe(
+  'maquinas', 'maquinas_member_select',
+  'create policy maquinas_member_select on public.maquinas
+   for select using (public.usuario_membro_fazenda(fazenda_id))'
+);
+
+select public._aplicar_policy_se_existe(
+  'produtividades', 'produtividades_member_select',
+  'create policy produtividades_member_select on public.produtividades
+   for select using (public.usuario_acessa_talhao(talhao_id))'
+);
+
+-- ── 9. Políticas WRITE para gerente (tabelas core) ───────────────
+
 drop policy if exists talhoes_gerente_write on public.talhoes;
 create policy talhoes_gerente_write on public.talhoes
 for all
 using  (public.usuario_membro_fazenda(fazenda_id, 'gerente'))
 with check (public.usuario_membro_fazenda(fazenda_id, 'gerente'));
 
--- safras
 drop policy if exists safras_gerente_write on public.safras;
 create policy safras_gerente_write on public.safras
 for all
 using  (public.usuario_membro_fazenda(fazenda_id, 'gerente'))
 with check (public.usuario_membro_fazenda(fazenda_id, 'gerente'));
 
--- equipes
 drop policy if exists equipes_gerente_write on public.equipes;
 create policy equipes_gerente_write on public.equipes
 for all
 using  (public.usuario_membro_fazenda(fazenda_id, 'gerente'))
 with check (public.usuario_membro_fazenda(fazenda_id, 'gerente'));
 
--- insumos
 drop policy if exists insumos_gerente_write on public.insumos;
 create policy insumos_gerente_write on public.insumos
 for all
 using  (public.usuario_membro_fazenda(fazenda_id, 'gerente'))
 with check (public.usuario_membro_fazenda(fazenda_id, 'gerente'));
 
--- estoque (gerente via insumo)
 drop policy if exists estoque_gerente_write on public.estoque;
 create policy estoque_gerente_write on public.estoque
 for all
 using (
-  exists (
-    select 1 from public.insumos i
-    where i.id = insumo_id
-      and public.usuario_membro_fazenda(i.fazenda_id, 'gerente')
-  )
+  exists (select 1 from public.insumos i
+          where i.id = insumo_id
+            and public.usuario_membro_fazenda(i.fazenda_id, 'gerente'))
 )
 with check (
-  exists (
-    select 1 from public.insumos i
-    where i.id = insumo_id
-      and public.usuario_membro_fazenda(i.fazenda_id, 'gerente')
-  )
+  exists (select 1 from public.insumos i
+          where i.id = insumo_id
+            and public.usuario_membro_fazenda(i.fazenda_id, 'gerente'))
 );
 
--- pluviometros
-drop policy if exists pluviometros_gerente_write on public.pluviometros;
-create policy pluviometros_gerente_write on public.pluviometros
-for all
-using  (public.usuario_membro_fazenda(fazenda_id, 'gerente'))
-with check (public.usuario_membro_fazenda(fazenda_id, 'gerente'));
-
--- centros_custo
-drop policy if exists centros_custo_gerente_write on public.centros_custo;
-create policy centros_custo_gerente_write on public.centros_custo
-for all
-using  (public.usuario_membro_fazenda(fazenda_id, 'gerente'))
-with check (public.usuario_membro_fazenda(fazenda_id, 'gerente'));
-
--- ── 8. Políticas WRITE para operador e gerente em campo ──────────
-
--- monitoramentos: todos os membros podem criar e atualizar
-drop policy if exists monitoramentos_member_write on public.monitoramentos;
-create policy monitoramentos_member_write on public.monitoramentos
-for all
-using  (public.usuario_acessa_talhao(talhao_id))
-with check (public.usuario_acessa_talhao(talhao_id));
-
--- monitoramento_pontos
-drop policy if exists monitoramento_pontos_member_write on public.monitoramento_pontos;
-create policy monitoramento_pontos_member_write on public.monitoramento_pontos
-for all
-using (
-  exists (
-    select 1 from public.monitoramentos m
-    where m.id = monitoramento_id
-      and public.usuario_acessa_talhao(m.talhao_id)
-  )
-)
-with check (
-  exists (
-    select 1 from public.monitoramentos m
-    where m.id = monitoramento_id
-      and public.usuario_acessa_talhao(m.talhao_id)
-  )
-);
-
--- monitoramento_caminhamentos
-drop policy if exists monitoramento_caminhamentos_member_write on public.monitoramento_caminhamentos;
-create policy monitoramento_caminhamentos_member_write on public.monitoramento_caminhamentos
-for all
-using (
-  exists (
-    select 1 from public.monitoramentos m
-    where m.id = monitoramento_id
-      and public.usuario_acessa_talhao(m.talhao_id)
-  )
-)
-with check (
-  exists (
-    select 1 from public.monitoramentos m
-    where m.id = monitoramento_id
-      and public.usuario_acessa_talhao(m.talhao_id)
-  )
-);
-
--- ordens_servico: gerente pode criar OS
 drop policy if exists ordens_servico_gerente_write on public.ordens_servico;
 create policy ordens_servico_gerente_write on public.ordens_servico
 for all
 using  (public.usuario_membro_fazenda(fazenda_id, 'gerente'))
 with check (public.usuario_membro_fazenda(fazenda_id, 'gerente'));
 
--- os_talhoes: gerente via os
 drop policy if exists os_talhoes_gerente_write on public.os_talhoes;
 create policy os_talhoes_gerente_write on public.os_talhoes
 for all
 using (
-  exists (
-    select 1 from public.ordens_servico o
-    where o.id = os_id
-      and public.usuario_membro_fazenda(o.fazenda_id, 'gerente')
-  )
+  exists (select 1 from public.ordens_servico o
+          where o.id = os_id
+            and public.usuario_membro_fazenda(o.fazenda_id, 'gerente'))
 )
 with check (
-  exists (
-    select 1 from public.ordens_servico o
-    where o.id = os_id
-      and public.usuario_membro_fazenda(o.fazenda_id, 'gerente')
-  )
+  exists (select 1 from public.ordens_servico o
+          where o.id = os_id
+            and public.usuario_membro_fazenda(o.fazenda_id, 'gerente'))
 );
 
--- os_insumos: gerente via os
 drop policy if exists os_insumos_gerente_write on public.os_insumos;
 create policy os_insumos_gerente_write on public.os_insumos
 for all
 using (
-  exists (
-    select 1 from public.ordens_servico o
-    where o.id = os_id
-      and public.usuario_membro_fazenda(o.fazenda_id, 'gerente')
-  )
+  exists (select 1 from public.ordens_servico o
+          where o.id = os_id
+            and public.usuario_membro_fazenda(o.fazenda_id, 'gerente'))
 )
 with check (
-  exists (
-    select 1 from public.ordens_servico o
-    where o.id = os_id
-      and public.usuario_membro_fazenda(o.fazenda_id, 'gerente')
-  )
+  exists (select 1 from public.ordens_servico o
+          where o.id = os_id
+            and public.usuario_membro_fazenda(o.fazenda_id, 'gerente'))
 );
 
--- operacoes: gerente via talhao
 drop policy if exists operacoes_gerente_write on public.operacoes;
 create policy operacoes_gerente_write on public.operacoes
 for all
 using  (public.usuario_gerente_talhao(talhao_id))
 with check (public.usuario_gerente_talhao(talhao_id));
 
--- operacao_insumos: gerente via operacao
 drop policy if exists operacao_insumos_gerente_write on public.operacao_insumos;
 create policy operacao_insumos_gerente_write on public.operacao_insumos
 for all
 using (
-  exists (
-    select 1 from public.operacoes op
-    where op.id = operacao_id
-      and public.usuario_gerente_talhao(op.talhao_id)
-  )
+  exists (select 1 from public.operacoes op
+          where op.id = operacao_id
+            and public.usuario_gerente_talhao(op.talhao_id))
 )
 with check (
-  exists (
-    select 1 from public.operacoes op
-    where op.id = operacao_id
-      and public.usuario_gerente_talhao(op.talhao_id)
-  )
+  exists (select 1 from public.operacoes op
+          where op.id = operacao_id
+            and public.usuario_gerente_talhao(op.talhao_id))
 );
+
+-- ── 10. Políticas WRITE para tabelas opcionais ───────────────────
+
+select public._aplicar_policy_se_existe(
+  'pluviometros', 'pluviometros_gerente_write',
+  'create policy pluviometros_gerente_write on public.pluviometros
+   for all
+   using (public.usuario_membro_fazenda(fazenda_id, ''gerente''))
+   with check (public.usuario_membro_fazenda(fazenda_id, ''gerente''))'
+);
+
+select public._aplicar_policy_se_existe(
+  'centros_custo', 'centros_custo_gerente_write',
+  'create policy centros_custo_gerente_write on public.centros_custo
+   for all
+   using (public.usuario_membro_fazenda(fazenda_id, ''gerente''))
+   with check (public.usuario_membro_fazenda(fazenda_id, ''gerente''))'
+);
+
+select public._aplicar_policy_se_existe(
+  'maquinas', 'maquinas_gerente_write',
+  'create policy maquinas_gerente_write on public.maquinas
+   for all
+   using (public.usuario_membro_fazenda(fazenda_id, ''gerente''))
+   with check (public.usuario_membro_fazenda(fazenda_id, ''gerente''))'
+);
+
+select public._aplicar_policy_se_existe(
+  'produtividades', 'produtividades_gerente_write',
+  'create policy produtividades_gerente_write on public.produtividades
+   for all
+   using (public.usuario_gerente_talhao(talhao_id))
+   with check (public.usuario_gerente_talhao(talhao_id))'
+);
+
+-- Monitoramentos: TODOS os membros (gerente + operador) podem escrever
+select public._aplicar_policy_se_existe(
+  'monitoramentos', 'monitoramentos_member_write',
+  'create policy monitoramentos_member_write on public.monitoramentos
+   for all
+   using (public.usuario_acessa_talhao(talhao_id))
+   with check (public.usuario_acessa_talhao(talhao_id))'
+);
+
+select public._aplicar_policy_se_existe(
+  'monitoramento_pontos', 'monitoramento_pontos_member_write',
+  'create policy monitoramento_pontos_member_write on public.monitoramento_pontos
+   for all
+   using (
+     exists (select 1 from public.monitoramentos m
+             where m.id = monitoramento_id
+               and public.usuario_acessa_talhao(m.talhao_id))
+   )
+   with check (
+     exists (select 1 from public.monitoramentos m
+             where m.id = monitoramento_id
+               and public.usuario_acessa_talhao(m.talhao_id))
+   )'
+);
+
+select public._aplicar_policy_se_existe(
+  'monitoramento_caminhamentos', 'monitoramento_caminhamentos_member_write',
+  'create policy monitoramento_caminhamentos_member_write on public.monitoramento_caminhamentos
+   for all
+   using (
+     exists (select 1 from public.monitoramentos m
+             where m.id = monitoramento_id
+               and public.usuario_acessa_talhao(m.talhao_id))
+   )
+   with check (
+     exists (select 1 from public.monitoramentos m
+             where m.id = monitoramento_id
+               and public.usuario_acessa_talhao(m.talhao_id))
+   )'
+);
+
+-- ── 11. Limpeza do helper ────────────────────────────────────────
+
+drop function if exists public._aplicar_policy_se_existe(text, text, text);
