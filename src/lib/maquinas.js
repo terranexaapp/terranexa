@@ -60,7 +60,19 @@ export async function reativarMaquina(id) {
   if (error) throw error
 }
 
-function normalizePayload({ fazenda_id, nome, tipo, marca, modelo, ano, capacidade, custo_hora, horimetro_atual, observacoes }) {
+function normalizePayload({
+  fazenda_id,
+  nome,
+  tipo,
+  marca,
+  modelo,
+  ano,
+  capacidade,
+  custo_hora,
+  horimetro_atual,
+  observacoes,
+  centro_custo_padrao_id
+}) {
   return {
     ...(fazenda_id !== undefined && { fazenda_id }),
     nome: (nome || '').trim(),
@@ -71,6 +83,7 @@ function normalizePayload({ fazenda_id, nome, tipo, marca, modelo, ano, capacida
     capacidade: capacidade?.trim() || null,
     custo_hora: Number(custo_hora) || 0,
     horimetro_atual: Number(horimetro_atual) || 0,
-    observacoes: observacoes?.trim() || null
+    observacoes: observacoes?.trim() || null,
+    centro_custo_padrao_id: centro_custo_padrao_id || null
   }
 }

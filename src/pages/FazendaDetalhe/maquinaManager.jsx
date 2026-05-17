@@ -9,6 +9,7 @@ import {
   getTipoMaquinaInfo,
   TIPOS_MAQUINA
 } from '../../lib/maquinas'
+import { listarCentrosCusto } from '../../lib/centrosCusto'
 import { money } from './utils'
 import {
   eyebrowStyle,
@@ -35,12 +36,14 @@ function emptyDraft() {
     capacidade: '',
     custo_hora: '',
     horimetro_atual: '',
-    observacoes: ''
+    observacoes: '',
+    centro_custo_padrao_id: ''
   }
 }
 
 export function MaquinaManager({ fazendaId }) {
   const [maquinas, setMaquinas] = useState([])
+  const [centrosCusto, setCentrosCusto] = useState([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [incluirInativas, setIncluirInativas] = useState(false)
@@ -59,13 +62,18 @@ export function MaquinaManager({ fazendaId }) {
   const custoId = useId()
   const horId = useId()
   const obsId = useId()
+  const ccId = useId()
 
   async function carregar() {
     setLoading(true)
     setLoadError('')
     try {
-      const data = await listarMaquinas(fazendaId, { incluirInativas })
+      const [data, ccs] = await Promise.all([
+        listarMaquinas(fazendaId, { incluirInativas }),
+        listarCentrosCusto(fazendaId).catch(() => [])
+      ])
       setMaquinas(data)
+      setCentrosCusto(ccs)
     } catch (err) {
       setLoadError(err.message || 'Nao foi possivel carregar maquinas')
       setMaquinas([])
@@ -100,7 +108,8 @@ export function MaquinaManager({ fazendaId }) {
       capacidade: maquina.capacidade || '',
       custo_hora: maquina.custo_hora ?? '',
       horimetro_atual: maquina.horimetro_atual ?? '',
-      observacoes: maquina.observacoes || ''
+      observacoes: maquina.observacoes || '',
+      centro_custo_padrao_id: maquina.centro_custo_padrao_id || ''
     })
     setFormError('')
   }
@@ -388,6 +397,28 @@ export function MaquinaManager({ fazendaId }) {
                     style={inputStyle}
                   />
                 </div>
+              </div>
+
+              <div>
+                <label htmlFor={ccId} style={formLabelStyle}>
+                  CENTRO DE CUSTO PADRÃO
+                </label>
+                <select
+                  id={ccId}
+                  value={draft.centro_custo_padrao_id}
+                  onChange={e => setDraft(d => ({ ...d, centro_custo_padrao_id: e.target.value }))}
+                  style={inputStyle}
+                >
+                  <option value="">Sem padrão</option>
+                  {centrosCusto.map(cc => (
+                    <option key={cc.id} value={cc.id}>
+                      {cc.codigo} · {cc.nome}
+                    </option>
+                  ))}
+                </select>
+                <p style={{ margin: '4px 0 0', color: C.textDim, fontSize: 11 }}>
+                  Sugestão de CC quando essa máquina for usada em operações ou OS.
+                </p>
               </div>
 
               <div>
