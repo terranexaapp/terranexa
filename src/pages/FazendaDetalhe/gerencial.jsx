@@ -9,6 +9,7 @@ import { EquipeManager } from './equipeManager'
 import { EstoqueManager } from './estoqueManager'
 import { MaquinaManager } from './maquinaManager'
 import { ProdutividadeManager } from './produtividadeManager'
+import { MembrosManager } from './membrosManager'
 import { normalizeFeature, findTalhaoForCoord } from './utils'
 import {
   eyebrowStyle,
@@ -405,6 +406,12 @@ export function GerencialView({
       text: 'Safras, rendimento e comparativos'
     },
     {
+      id: 'membros',
+      title: 'Membros e Convites',
+      short: 'Membros',
+      text: 'Convide colaboradores por e-mail com papeis definidos'
+    },
+    {
       id: 'configuracao',
       title: 'Configuracao da Fazenda',
       short: 'Config.',
@@ -414,7 +421,7 @@ export function GerencialView({
   const managementGroups = [
     { title: 'Campo', ids: ['talhoes', 'pluviometros', 'safras'] },
     { title: 'Operacao', ids: ['estoque', 'equipe', 'insumos', 'maquinas'] },
-    { title: 'Gestao', ids: ['produtividade', 'configuracao'] }
+    { title: 'Gestao', ids: ['produtividade', 'membros', 'configuracao'] }
   ].map(group => ({
     ...group,
     items: group.ids.map(itemId => managementMenu.find(item => item.id === itemId)).filter(Boolean)
@@ -514,7 +521,9 @@ export function GerencialView({
 
           {activeManager === 'produtividade' && <ProdutividadeManager fazendaId={fazendaId} talhoes={talhoes} />}
 
-          {!['talhoes', 'pluviometros', 'configuracao', 'safras', 'equipe', 'estoque', 'insumos', 'maquinas', 'produtividade'].includes(
+          {activeManager === 'membros' && <MembrosManager fazendaId={fazendaId} />}
+
+          {!['talhoes', 'pluviometros', 'configuracao', 'safras', 'equipe', 'estoque', 'insumos', 'maquinas', 'produtividade', 'membros'].includes(
             activeManager
           ) && <ManagementModulePanel item={activeItem} />}
         </div>
