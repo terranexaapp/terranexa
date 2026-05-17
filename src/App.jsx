@@ -5,6 +5,7 @@ import { FazendasPage } from './pages/FazendasPage'
 import { FazendaDetalhePage } from './pages/FazendaDetalhePage'
 import { InsumosPage } from './pages/InsumosPage'
 import { OSPage } from './pages/OSPage'
+import { AceitarConvitePage } from './pages/AceitarConvitePage'
 import { theme } from './styles/theme'
 import { Logo } from './components/Logo'
 import { ErrorBoundary } from './components/ErrorBoundary'
@@ -61,6 +62,7 @@ export default function App() {
               }
             />
             <Route path="/signup" element={<Navigate to="/login" replace />} />
+            <Route path="/aceitar-convite" element={<AceitarConvitePage />} />
             <Route
               path="/"
               element={

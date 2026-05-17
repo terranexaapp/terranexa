@@ -1,5 +1,5 @@
 import { cloneElement, isValidElement, useId, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { theme } from '../styles/theme'
 
@@ -16,6 +16,7 @@ export function LoginPage() {
   const [error, setError] = useState('')
   const { signIn } = useAuth()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -28,7 +29,8 @@ export function LoginPage() {
       setError(error.message.includes('Invalid login') ? 'E-mail ou senha incorretos' : error.message)
       setLoading(false)
     } else {
-      navigate('/')
+      const redirect = searchParams.get('redirect')
+      navigate(redirect || '/')
     }
   }
 
