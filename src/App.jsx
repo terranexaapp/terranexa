@@ -1,7 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './hooks/useAuth'
 import { LoginPage } from './pages/LoginPage'
-import { SignupPage } from './pages/SignupPage'
 import { FazendasPage } from './pages/FazendasPage'
 import { FazendaDetalhePage } from './pages/FazendaDetalhePage'
 import { InsumosPage } from './pages/InsumosPage'
@@ -61,14 +60,7 @@ export default function App() {
                 </PublicRoute>
               }
             />
-            <Route
-              path="/signup"
-              element={
-                <PublicRoute>
-                  <SignupPage />
-                </PublicRoute>
-              }
-            />
+            <Route path="/signup" element={<Navigate to="/login" replace />} />
             <Route
               path="/"
               element={
