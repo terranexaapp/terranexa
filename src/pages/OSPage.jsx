@@ -14,6 +14,7 @@ import {
 import { listarFazendas } from '../lib/fazendas'
 import { listarInsumos } from '../lib/insumos'
 import { listarEquipes, criarEquipe, desativarEquipe } from '../lib/equipes'
+import { listarCentrosCusto } from '../lib/centrosCusto'
 import { calcularCustoInsumo } from '../lib/operacoes'
 import { supabase } from '../lib/supabase'
 import { theme } from '../styles/theme'
@@ -626,8 +627,14 @@ function NovaOSModal({ fazendaId, talhoes, insumos, equipes, onClose, onSaved })
     prazo: '',
     receituario_agronomo: '',
     receituario_crea: '',
-    observacoes: ''
+    observacoes: '',
+    centro_custo_id: ''
   })
+  const [centrosCusto, setCentrosCusto] = useState([])
+
+  useEffect(() => {
+    if (fazendaId) listarCentrosCusto(fazendaId).then(setCentrosCusto).catch(() => setCentrosCusto([]))
+  }, [fazendaId])
   const [insumosRec, setInsumosRec] = useState([])
   const [busca, setBusca] = useState('')
   const [buscaTalhao, setBuscaTalhao] = useState('')
@@ -719,6 +726,10 @@ function NovaOSModal({ fazendaId, talhoes, insumos, equipes, onClose, onSaved })
       setErro('Selecione ao menos um talhão')
       return
     }
+    if (!form.centro_custo_id) {
+      setErro('Selecione o centro de custo da OS.')
+      return
+    }
     setSalvando(true)
     try {
       await criarOS({
@@ -738,6 +749,7 @@ function NovaOSModal({ fazendaId, talhoes, insumos, equipes, onClose, onSaved })
         bico: usaBico ? form.bico || null : null,
         area_parcial_ha: areaParcial ? Number(areaParcial) : null,
         area_percentual: percentualParcial,
+        centro_custo_id: form.centro_custo_id,
         insumos_recomendados: insumosRec
           .filter(i => i.dose_recomendada > 0)
           .map(i => ({
@@ -1147,6 +1159,26 @@ function NovaOSModal({ fazendaId, talhoes, insumos, equipes, onClose, onSaved })
                   </option>
                 ))}
               </select>
+            </F>
+            <F label="CENTRO DE CUSTO *">
+              <select
+                required
+                value={form.centro_custo_id}
+                onChange={e => set('centro_custo_id', e.target.value)}
+                style={{ ...inp, borderColor: form.centro_custo_id ? C.border : C.amber }}
+              >
+                <option value="">Selecione…</option>
+                {centrosCusto.map(cc => (
+                  <option key={cc.id} value={cc.id}>
+                    {cc.codigo} · {cc.nome}
+                  </option>
+                ))}
+              </select>
+              {centrosCusto.length === 0 && (
+                <p style={{ margin: '4px 0 0', color: C.amberDk, fontSize: 10 }}>
+                  Nenhum CC cadastrado. Vá em Gerencial → Configurações da fazenda.
+                </p>
+              )}
             </F>
             <F label="PRIORIDADE">
               <select value={form.prioridade} onChange={e => set('prioridade', e.target.value)} style={inp}>
