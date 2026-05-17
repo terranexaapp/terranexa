@@ -25,13 +25,7 @@ import {
 
 const C = theme.normal
 
-export function ManagementModulePanel({ item, navigate }) {
-  const actions = {
-    estoque: { label: 'Abrir estoque', run: () => navigate('/insumos') },
-    insumos: { label: 'Abrir insumos', run: () => navigate('/insumos') }
-  }
-  const action = actions[item.id]
-
+export function ManagementModulePanel({ item }) {
   return (
     <div style={managementContentPanelStyle}>
       <p style={eyebrowStyle}>{item.title.toUpperCase()}</p>
@@ -47,11 +41,22 @@ export function ManagementModulePanel({ item, navigate }) {
           </div>
         ))}
       </div>
-      {action && (
-        <button type="button" onClick={action.run} style={primaryActionStyle}>
-          {action.label}
-        </button>
-      )}
+    </div>
+  )
+}
+
+export function InsumosShortcut({ navigate }) {
+  return (
+    <div style={managementContentPanelStyle}>
+      <p style={eyebrowStyle}>INSUMOS</p>
+      <h3 style={panelTitleStyle}>Catálogo de insumos</h3>
+      <p style={viewSubtitleStyle}>
+        O catálogo completo de insumos (produtos, doses, fornecedores e custos) tem página dedicada. Para acompanhar
+        saldos e alertas de mínimo, abra <strong>Estoque</strong> aqui no menu.
+      </p>
+      <button type="button" onClick={() => navigate('/insumos')} style={primaryActionStyle}>
+        Abrir catálogo de insumos →
+      </button>
     </div>
   )
 }
