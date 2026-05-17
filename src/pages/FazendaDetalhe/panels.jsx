@@ -1,5 +1,6 @@
 import { theme } from '../../styles/theme'
 import { getCategoriaInfo } from '../../lib/operacoes'
+import { CentrosCustoSection } from './centrosCustoSection'
 import { money } from './utils'
 import { reportTypes } from './constants'
 import { MetricCard } from './sharedComponents'
@@ -72,17 +73,21 @@ export function ConfiguracaoFazendaPanel({ fazenda, talhoes, total }) {
   ]
 
   return (
-    <div style={managementContentPanelStyle}>
-      <p style={eyebrowStyle}>CONFIGURACAO DA FAZENDA</p>
-      <h3 style={panelTitleStyle}>Dados e preferencias da propriedade</h3>
-      <div style={farmConfigGridStyle}>
-        {rows.map(([label, value]) => (
-          <div key={label} style={farmConfigFieldStyle}>
-            <span>{label}</span>
-            <strong>{value}</strong>
-          </div>
-        ))}
+    <div style={{ display: 'grid', gap: 14 }}>
+      <div style={managementContentPanelStyle}>
+        <p style={eyebrowStyle}>CONFIGURACAO DA FAZENDA</p>
+        <h3 style={panelTitleStyle}>Dados e preferencias da propriedade</h3>
+        <div style={farmConfigGridStyle}>
+          {rows.map(([label, value]) => (
+            <div key={label} style={farmConfigFieldStyle}>
+              <span>{label}</span>
+              <strong>{value}</strong>
+            </div>
+          ))}
+        </div>
       </div>
+
+      {fazenda?.id && <CentrosCustoSection fazendaId={fazenda.id} />}
     </div>
   )
 }

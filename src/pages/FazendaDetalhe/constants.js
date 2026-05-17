@@ -50,7 +50,6 @@ export const DESKTOP_NAV_GROUPS = [
     title: 'Gestao',
     items: [
       { key: 'safras', view: 'gerencial', manager: 'safras', label: 'Safras', icon: 'leaf' },
-      { key: 'custos', view: 'gerencial', manager: 'custos', label: 'Centros de custo', icon: 'dollar' },
       { key: 'produtividade', view: 'gerencial', manager: 'produtividade', label: 'Produtividade', icon: 'bar-chart' },
       { key: 'configuracao', view: 'gerencial', manager: 'configuracao', label: 'Configuracoes', icon: 'gear' },
       { key: 'relatorios', view: 'relatorios', label: 'Relatorios', icon: 'report' }
