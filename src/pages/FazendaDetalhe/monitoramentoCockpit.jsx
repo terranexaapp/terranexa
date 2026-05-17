@@ -418,15 +418,33 @@ export function MonitoramentoCockpitView({
           </p>
         </div>
 
-        <div style={modeTabsStyle}>
-          {[
-            { id: 'severidade', label: 'Severidade' },
-            { id: 'atraso', label: 'Dias sem visita' }
-          ].map(m => (
-            <button key={m.id} onClick={() => setModo(m.id)} style={modeButtonStyle(modo === m.id)}>
-              {m.label}
-            </button>
-          ))}
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center', pointerEvents: 'auto' }}>
+          <div style={modeTabsStyle}>
+            {[
+              { id: 'severidade', label: 'Severidade' },
+              { id: 'atraso', label: 'Dias sem visita' }
+            ].map(m => (
+              <button key={m.id} onClick={() => setModo(m.id)} style={modeButtonStyle(modo === m.id)}>
+                {m.label}
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={() => setActiveView('monitoramento-inbox')}
+            style={{
+              ...glassPanel,
+              padding: '8px 14px',
+              fontWeight: 900,
+              fontSize: 11,
+              cursor: 'pointer',
+              fontFamily: FONTS.sans,
+              color: C.greenDp,
+              border: `1px solid ${C.greenDp}55`
+            }}
+            title="Ver lista de visitas (inbox do técnico)"
+          >
+            Inbox ↗
+          </button>
         </div>
       </div>
 

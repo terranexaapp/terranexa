@@ -17,6 +17,7 @@ import {
   InterpolacaoView
 } from './FazendaDetalhe/views'
 import { MonitoramentoCockpitView } from './FazendaDetalhe/monitoramentoCockpit'
+import { MonitoramentoInboxView } from './FazendaDetalhe/monitoramentoInbox'
 import { MonitoramentoOcorrenciaView } from './FazendaDetalhe/monitoramentoOcorrencia'
 import { FazendaMapaPrincipal } from './FazendaDetalhe/mapaPrincipal'
 import { GerencialView } from './FazendaDetalhe/gerencial'
@@ -407,6 +408,17 @@ export function FazendaDetalhePage() {
             )}
             {activeView === 'monitoramento' && (
               <MonitoramentoCockpitView
+                fazendaId={id}
+                fazenda={fazenda}
+                talhoes={talhoes}
+                monitoramentosResumo={monitoramentosResumo}
+                abrirTalhao={abrirTalhao}
+                setActiveView={setActiveView}
+                navigate={navigate}
+              />
+            )}
+            {activeView === 'monitoramento-inbox' && (
+              <MonitoramentoInboxView
                 fazendaId={id}
                 fazenda={fazenda}
                 talhoes={talhoes}
