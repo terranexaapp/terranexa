@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import {
   listarOS,
   criarOS,
@@ -24,6 +24,7 @@ const C = theme.normal
 
 export function OSPage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [fazendas, setFazendas] = useState([])
   const [fazendaId, setFazendaId] = useState(null)
   const [talhoes, setTalhoes] = useState([])
@@ -35,12 +36,20 @@ export function OSPage() {
   const [filtro, setFiltro] = useState('pendente')
   const [modal, setModal] = useState(null)
   const [osSel, setOsSel] = useState(null)
+  const [prefillMonitoramento, setPrefillMonitoramento] = useState(null)
 
   useEffect(() => {
     listarFazendas().then(fs => {
       setFazendas(fs)
       if (fs.length > 0) setFazendaId(fs[0].id)
     })
+    const from = location.state?.fromMonitoramento
+    if (from) {
+      setPrefillMonitoramento(from)
+      setModal('nova')
+      navigate(location.pathname, { replace: true, state: null })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
@@ -304,9 +313,11 @@ export function OSPage() {
           talhoes={talhoes}
           insumos={insumos}
           equipes={equipes}
-          onClose={() => setModal(null)}
+          prefill={prefillMonitoramento}
+          onClose={() => { setModal(null); setPrefillMonitoramento(null) }}
           onSaved={() => {
             setModal(null)
+            setPrefillMonitoramento(null)
             carregar()
           }}
         />
@@ -614,20 +625,22 @@ function formatCultura(cultura) {
   return cultura.charAt(0).toUpperCase() + cultura.slice(1)
 }
 
-function NovaOSModal({ fazendaId, talhoes, insumos, equipes, onClose, onSaved }) {
+const SEVERIDADE_TO_PRIORIDADE = { nde: 'alta', severa: 'alta', moderada: 'media', leve: 'baixa' }
+
+function NovaOSModal({ fazendaId, talhoes, insumos, equipes, prefill, onClose, onSaved }) {
   const [operacaoMae, setOperacaoMae] = useState('')
   const [servico, setServico] = useState('')
-  const [talhoesSel, setTalhoesSel] = useState([])
+  const [talhoesSel, setTalhoesSel] = useState(() => prefill?.talhaoId ? [prefill.talhaoId] : [])
   const [areaParcial, setAreaParcial] = useState('')
   const [form, setForm] = useState({
     vazao_lha: '',
     bico: '',
     equipe_id: '',
-    prioridade: 'media',
+    prioridade: SEVERIDADE_TO_PRIORIDADE[prefill?.severidade] || 'media',
     prazo: '',
     receituario_agronomo: '',
     receituario_crea: '',
-    observacoes: '',
+    observacoes: prefill?.recomendacao || '',
     centro_custo_id: ''
   })
   const [centrosCusto, setCentrosCusto] = useState([])
@@ -635,7 +648,21 @@ function NovaOSModal({ fazendaId, talhoes, insumos, equipes, onClose, onSaved })
   useEffect(() => {
     if (fazendaId) listarCentrosCusto(fazendaId).then(setCentrosCusto).catch(() => setCentrosCusto([]))
   }, [fazendaId])
+
   const [insumosRec, setInsumosRec] = useState([])
+
+  useEffect(() => {
+    if (!prefill?.insumoSugeridoId || !insumos.length) return
+    const insumo = insumos.find(i => i.id === prefill.insumoSugeridoId)
+    if (insumo) {
+      setInsumosRec(prev =>
+        prev.some(r => r.insumo_id === insumo.id)
+          ? prev
+          : [...prev, { insumo_id: insumo.id, nome: insumo.nome, unidade: insumo.unidade, custo_unitario: insumo.custo_unitario, carencia_dias: insumo.carencia_dias, dose_recomendada: '', dose_unidade: insumo.unidade + '/ha' }]
+      )
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [insumos])
   const [busca, setBusca] = useState('')
   const [buscaTalhao, setBuscaTalhao] = useState('')
   const [buscaAberta, setBuscaAberta] = useState(false)
@@ -836,6 +863,18 @@ function NovaOSModal({ fazendaId, talhoes, insumos, equipes, onClose, onSaved })
           </button>
         </div>
         <div style={{ flex: 1, overflowY: 'auto', padding: '16px 18px' }}>
+          {prefill && (
+            <div style={{ background: '#fde8e7', border: '1px solid #e8453a44', borderRadius: 12, padding: '10px 14px', marginBottom: 16 }}>
+              <p style={{ margin: '0 0 2px', fontSize: 9, fontFamily: 'monospace', letterSpacing: '1.5px', fontWeight: 700, color: '#c0392b' }}>
+                ORIGINADO DE MONITORAMENTO
+              </p>
+              <p style={{ margin: 0, fontSize: 12, color: '#7f1d1d' }}>
+                Talhão <strong>{prefill.talhaoCodigo}</strong>
+                {prefill.pragaNome ? ` · ${prefill.pragaNome}` : ''}
+                {prefill.severidade ? ` · Severidade ${prefill.severidade}` : ''}
+              </p>
+            </div>
+          )}
           <SecTitle label="1. SERVIÇO" />
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 14 }}>
             {OPERACOES_MAE.map((mae, idx) => (
