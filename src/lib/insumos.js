@@ -4,7 +4,9 @@ export async function listarInsumos(fazendaId) {
   const { data, error } = await supabase
     .from('insumos')
     .select(
-      `id, nome, classe, unidade, custo_unitario, carencia_dias, fornecedor, ativo, estoque:estoque(quantidade_atual, quantidade_inicial, quantidade_minima, status)`
+      `id, nome, classe, unidade, custo_unitario, carencia_dias, fornecedor, ativo,
+       centro_custo_padrao_id,
+       estoque:estoque(quantidade_atual, quantidade_inicial, quantidade_minima, status)`
     )
     .eq('fazenda_id', fazendaId)
     .eq('ativo', true)
@@ -17,7 +19,16 @@ export async function listarInsumos(fazendaId) {
   }))
 }
 
-export async function criarInsumo({ fazenda_id, nome, classe, unidade, custo_unitario, carencia_dias, fornecedor }) {
+export async function criarInsumo({
+  fazenda_id,
+  nome,
+  classe,
+  unidade,
+  custo_unitario,
+  carencia_dias,
+  fornecedor,
+  centro_custo_padrao_id
+}) {
   const { data: insumo, error } = await supabase
     .from('insumos')
     .insert({
@@ -27,7 +38,8 @@ export async function criarInsumo({ fazenda_id, nome, classe, unidade, custo_uni
       unidade,
       custo_unitario: Number(custo_unitario) || 0,
       carencia_dias: Number(carencia_dias) || 0,
-      fornecedor
+      fornecedor,
+      centro_custo_padrao_id: centro_custo_padrao_id || null
     })
     .select()
     .single()
@@ -47,7 +59,10 @@ export async function atualizarInsumo(id, updates) {
       unidade: updates.unidade,
       custo_unitario: Number(updates.custo_unitario) || 0,
       carencia_dias: Number(updates.carencia_dias) || 0,
-      fornecedor: updates.fornecedor
+      fornecedor: updates.fornecedor,
+      ...(updates.centro_custo_padrao_id !== undefined && {
+        centro_custo_padrao_id: updates.centro_custo_padrao_id || null
+      })
     })
     .eq('id', id)
     .select()

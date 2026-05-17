@@ -44,6 +44,7 @@ export async function criarOperacao({
   receituario_agronomo,
   receituario_crea,
   receituario_emissao,
+  centro_custo_id,
   insumos_usados
 }) {
   const catInfo = getCategoriaInfo(categoria)
@@ -59,7 +60,8 @@ export async function criarOperacao({
       observacoes: observacoes || null,
       receituario_agronomo: receituario_agronomo || null,
       receituario_crea: receituario_crea || null,
-      receituario_emissao: receituario_emissao || null
+      receituario_emissao: receituario_emissao || null,
+      centro_custo_id: centro_custo_id || null
     })
     .select()
     .single()

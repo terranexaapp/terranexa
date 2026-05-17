@@ -1,6 +1,7 @@
 import { theme } from '../../styles/theme'
-import { getCategoriaInfo } from '../../lib/operacoes'
-import { money } from './utils'
+import { CentrosCustoSection } from './centrosCustoSection'
+import { CustosPorCCPanel } from './custosPorCC'
+import { PragasDoencasSection } from './pragasDoencasSection'
 import { reportTypes } from './constants'
 import { MetricCard } from './sharedComponents'
 import {
@@ -72,22 +73,28 @@ export function ConfiguracaoFazendaPanel({ fazenda, talhoes, total }) {
   ]
 
   return (
-    <div style={managementContentPanelStyle}>
-      <p style={eyebrowStyle}>CONFIGURACAO DA FAZENDA</p>
-      <h3 style={panelTitleStyle}>Dados e preferencias da propriedade</h3>
-      <div style={farmConfigGridStyle}>
-        {rows.map(([label, value]) => (
-          <div key={label} style={farmConfigFieldStyle}>
-            <span>{label}</span>
-            <strong>{value}</strong>
-          </div>
-        ))}
+    <div style={{ display: 'grid', gap: 14 }}>
+      <div style={managementContentPanelStyle}>
+        <p style={eyebrowStyle}>CONFIGURACAO DA FAZENDA</p>
+        <h3 style={panelTitleStyle}>Dados e preferencias da propriedade</h3>
+        <div style={farmConfigGridStyle}>
+          {rows.map(([label, value]) => (
+            <div key={label} style={farmConfigFieldStyle}>
+              <span>{label}</span>
+              <strong>{value}</strong>
+            </div>
+          ))}
+        </div>
       </div>
+
+      {fazenda?.id && <CentrosCustoSection fazendaId={fazenda.id} />}
+
+      {fazenda?.id && <PragasDoencasSection fazendaId={fazenda.id} />}
     </div>
   )
 }
 
-export function RelatoriosView({ talhoes, total }) {
+export function RelatoriosView({ fazendaId, talhoes, total }) {
   return (
     <section style={viewStackStyle}>
       <div style={heroPanelStyle}>
@@ -101,9 +108,11 @@ export function RelatoriosView({ talhoes, total }) {
         <button style={primaryActionStyle}>Exportar PDF</button>
       </div>
 
+      {fazendaId && <CustosPorCCPanel fazendaId={fazendaId} />}
+
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(260px, 360px) minmax(0, 1fr)', gap: 14 }}>
         <div style={panelStyle}>
-          <p style={eyebrowStyle}>MODELOS</p>
+          <p style={eyebrowStyle}>MODELOS (EM DESENVOLVIMENTO)</p>
           <div style={{ display: 'grid', gap: 8, marginTop: 12 }}>
             {reportTypes.map((report, index) => (
               <button key={report} style={reportButtonStyle}>
@@ -138,59 +147,3 @@ export function RelatoriosView({ talhoes, total }) {
   )
 }
 
-export function CustosPanel({ custos, totalCusto }) {
-  return (
-    <div
-      style={{
-        background: C.bg,
-        borderRadius: 14,
-        padding: '12px 14px',
-        marginBottom: 12,
-        border: `1px solid ${C.border}`
-      }}
-    >
-      <p style={{ ...eyebrowStyle, marginBottom: 10 }}>CUSTO POR CATEGORIA</p>
-      {custos
-        .sort((a, b) => b.custo_total - a.custo_total)
-        .map(c => {
-          const info = getCategoriaInfo(c.categoria)
-          const perc = totalCusto > 0 ? (c.custo_total / totalCusto) * 100 : 0
-          return (
-            <div key={c.categoria} style={{ marginBottom: 8 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3, gap: 8 }}>
-                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                  <div style={{ width: 8, height: 8, borderRadius: 2, background: info.cor }} />
-                  <span style={{ fontSize: 11, color: C.textDk }}>{info.label}</span>
-                  <span style={{ fontSize: 9, color: C.textDim, fontFamily: 'monospace' }}>{c.qtd_operacoes} op.</span>
-                </div>
-                <div>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: info.cor, fontFamily: 'monospace' }}>
-                    {money(c.custo_total)}
-                  </span>
-                  <span style={{ fontSize: 9, color: C.textDim, fontFamily: 'monospace', marginLeft: 6 }}>
-                    {perc.toFixed(0)}%
-                  </span>
-                </div>
-              </div>
-              <div style={{ background: C.border, borderRadius: 99, height: 5, overflow: 'hidden' }}>
-                <div style={{ width: perc + '%', height: 5, borderRadius: 99, background: info.cor }} />
-              </div>
-            </div>
-          )
-        })}
-      <div
-        style={{
-          paddingTop: 8,
-          borderTop: `1px solid ${C.borderSoft}`,
-          display: 'flex',
-          justifyContent: 'space-between'
-        }}
-      >
-        <span style={{ fontSize: 11, fontWeight: 700, color: C.textDk }}>Total</span>
-        <span style={{ fontSize: 13, fontWeight: 700, color: C.greenDp, fontFamily: 'monospace' }}>
-          {money(totalCusto)}
-        </span>
-      </div>
-    </div>
-  )
-}

@@ -7,6 +7,7 @@ import {
   getClasseInfo,
   CLASSES_INSUMO
 } from '../../lib/insumos'
+import { listarCentrosCusto } from '../../lib/centrosCusto'
 import { money } from './utils'
 import {
   eyebrowStyle,
@@ -27,6 +28,7 @@ const STATUS_LABEL = { todos: 'Todos', ok: 'OK', baixo: 'Baixo', critico: 'Crít
 
 export function EstoqueManager({ fazendaId, navigate }) {
   const [insumos, setInsumos] = useState([])
+  const [centrosCusto, setCentrosCusto] = useState([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [filterStatus, setFilterStatus] = useState('todos')
@@ -43,8 +45,12 @@ export function EstoqueManager({ fazendaId, navigate }) {
     setLoading(true)
     setLoadError('')
     try {
-      const data = await listarInsumos(fazendaId)
+      const [data, ccs] = await Promise.all([
+        listarInsumos(fazendaId),
+        listarCentrosCusto(fazendaId).catch(() => [])
+      ])
       setInsumos(data)
+      setCentrosCusto(ccs)
     } catch (err) {
       setLoadError(err.message || 'Nao foi possivel carregar insumos')
       setInsumos([])
@@ -72,6 +78,32 @@ export function EstoqueManager({ fazendaId, navigate }) {
     }, {})
     return { total, emAlerta, valorInvestido, porStatus }
   }, [insumos])
+
+  const topCCs = useMemo(() => {
+    const ccMap = new Map(centrosCusto.map(c => [c.id, c]))
+    const buckets = new Map()
+    for (const i of insumos) {
+      const ccId = i.centro_custo_padrao_id || null
+      const valor = Number(i.estoque?.quantidade_atual || 0) * Number(i.custo_unitario || 0)
+      if (!buckets.has(ccId)) {
+        const cc = ccId ? ccMap.get(ccId) : null
+        buckets.set(ccId, {
+          centro_custo_id: ccId,
+          codigo: cc?.codigo || 'SEM_CC',
+          nome: cc?.nome || 'Sem centro de custo',
+          total: 0,
+          qtd_itens: 0
+        })
+      }
+      const b = buckets.get(ccId)
+      b.total += valor
+      b.qtd_itens += 1
+    }
+    return Array.from(buckets.values())
+      .filter(b => b.total > 0 || b.qtd_itens > 0)
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 5)
+  }, [insumos, centrosCusto])
 
   const filtrados = useMemo(() => {
     return insumos
@@ -160,6 +192,39 @@ export function EstoqueManager({ fazendaId, navigate }) {
         <KpiCard label="Sem saldo" value={kpis.porStatus.vazio || 0} tone={C.textDim} />
         <KpiCard label="Valor investido" value={money(kpis.valorInvestido)} tone={C.greenDp} />
       </div>
+
+      {topCCs.length > 0 && (
+        <div style={ccBlockStyle}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
+            <p style={eyebrowStyle}>INVESTIDO POR CENTRO DE CUSTO</p>
+            <span style={{ fontSize: 11, color: C.textDim }}>Top {topCCs.length}</span>
+          </div>
+          <div style={ccListStyle}>
+            {topCCs.map(cc => {
+              const pct = kpis.valorInvestido > 0 ? (cc.total / kpis.valorInvestido) * 100 : 0
+              return (
+                <div key={cc.centro_custo_id || 'sem-cc'} style={ccRowStyle}>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', minWidth: 0 }}>
+                    <code style={ccCodeStyle}>{cc.codigo}</code>
+                    <span style={{ color: C.textDk, fontSize: 12 }}>{cc.nome}</span>
+                    <span style={{ color: C.textDim, fontSize: 10, fontFamily: 'monospace' }}>
+                      ({cc.qtd_itens} {cc.qtd_itens === 1 ? 'item' : 'itens'})
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <span style={{ color: C.greenDp, fontSize: 12, fontFamily: 'monospace', fontWeight: 800 }}>
+                      {money(cc.total)}
+                    </span>
+                    <span style={{ color: C.textDim, fontSize: 10, fontFamily: 'monospace', minWidth: 36, textAlign: 'right' }}>
+                      {pct.toFixed(0)}%
+                    </span>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {loadError && <div style={formErrorStyle}>{loadError}</div>}
 
@@ -323,6 +388,31 @@ function Metric({ label, value }) {
 const shellStyle = { ...panelStyle, display: 'grid', gap: 12 }
 const headerStyle = { display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' }
 const headerActionsStyle = { display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }
+const ccBlockStyle = {
+  background: C.bgSoft,
+  border: `1px solid ${C.border}`,
+  borderRadius: 12,
+  padding: '12px 14px'
+}
+const ccListStyle = { display: 'grid', gap: 6 }
+const ccRowStyle = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  gap: 8,
+  padding: '6px 0',
+  borderBottom: `1px dashed ${C.borderSoft}`
+}
+const ccCodeStyle = {
+  fontFamily: 'monospace',
+  fontSize: 10,
+  fontWeight: 900,
+  color: C.greenDp,
+  background: C.greenLight,
+  borderRadius: 4,
+  padding: '2px 6px',
+  letterSpacing: '0.5px'
+}
 const kpiGridStyle = {
   display: 'grid',
   gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',

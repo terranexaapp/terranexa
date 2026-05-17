@@ -12,6 +12,7 @@ import {
   statusEstoqueInfo
 } from '../lib/insumos'
 import { listarFazendas } from '../lib/fazendas'
+import { listarCentrosCusto } from '../lib/centrosCusto'
 import { theme } from '../styles/theme'
 import { ErrorPanel } from '../components/ErrorPanel'
 
@@ -501,10 +502,16 @@ function InsumoModal({ fazendaId, insumo, onClose, onSaved }) {
     unidade: insumo?.unidade || 'L',
     custo_unitario: insumo?.custo_unitario || '',
     carencia_dias: insumo?.carencia_dias || 0,
-    fornecedor: insumo?.fornecedor || ''
+    fornecedor: insumo?.fornecedor || '',
+    centro_custo_padrao_id: insumo?.centro_custo_padrao_id || ''
   })
+  const [centrosCusto, setCentrosCusto] = useState([])
   const [loading, setLoading] = useState(false)
   const [erro, setErro] = useState('')
+
+  useEffect(() => {
+    if (fazendaId) listarCentrosCusto(fazendaId).then(setCentrosCusto).catch(() => setCentrosCusto([]))
+  }, [fazendaId])
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -623,6 +630,20 @@ function InsumoModal({ fazendaId, insumo, onClose, onSaved }) {
               />
             </F>
           </div>
+          <F label="CENTRO DE CUSTO PADRÃO">
+            <select
+              value={form.centro_custo_padrao_id}
+              onChange={e => setForm(p => ({ ...p, centro_custo_padrao_id: e.target.value }))}
+              style={inp}
+            >
+              <option value="">Sem padrão</option>
+              {centrosCusto.map(cc => (
+                <option key={cc.id} value={cc.id}>
+                  {cc.codigo} · {cc.nome}
+                </option>
+              ))}
+            </select>
+          </F>
           {erro && (
             <div
               style={{

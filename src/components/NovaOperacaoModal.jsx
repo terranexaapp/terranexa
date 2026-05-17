@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { CATEGORIAS, getCategoriaInfo, criarOperacao, calcularCustoInsumo, listarSafras } from '../lib/operacoes'
 import { listarInsumos } from '../lib/insumos'
+import { listarCentrosCusto } from '../lib/centrosCusto'
 import { theme } from '../styles/theme'
 
 const C = theme.normal
@@ -14,18 +15,33 @@ export function NovaOperacaoModal({ talhao, fazendaId, onClose, onSaved }) {
     observacoes: '',
     receituario_agronomo: '',
     receituario_crea: '',
-    safra_id: ''
+    safra_id: '',
+    centro_custo_id: ''
   })
   const [insumosUsados, setInsumosUsados] = useState([])
   const [catalogo, setCatalogo] = useState([])
   const [safras, setSafras] = useState([])
+  const [centrosCusto, setCentrosCusto] = useState([])
   const [salvando, setSalvando] = useState(false)
   const [erro, setErro] = useState('')
 
   useEffect(() => {
     listarInsumos(fazendaId).then(setCatalogo)
     listarSafras(fazendaId).then(setSafras)
+    listarCentrosCusto(fazendaId).then(setCentrosCusto).catch(() => setCentrosCusto([]))
   }, [fazendaId])
+
+  // Sugere CC padrão do primeiro insumo selecionado (se ainda não escolhido manualmente)
+  useEffect(() => {
+    if (form.centro_custo_id) return
+    const first = insumosUsados[0]
+    if (!first) return
+    const insumo = catalogo.find(c => c.id === first.insumo_id)
+    if (insumo?.centro_custo_padrao_id) {
+      setForm(p => ({ ...p, centro_custo_id: insumo.centro_custo_padrao_id }))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [insumosUsados.length, catalogo])
 
   function set(k, v) {
     setForm(p => ({ ...p, [k]: v }))
@@ -59,6 +75,10 @@ export function NovaOperacaoModal({ talhao, fazendaId, onClose, onSaved }) {
       setErro('Informe a data')
       return
     }
+    if (!form.centro_custo_id) {
+      setErro('Selecione o centro de custo desta operação.')
+      return
+    }
     setSalvando(true)
     try {
       await criarOperacao({
@@ -70,6 +90,7 @@ export function NovaOperacaoModal({ talhao, fazendaId, onClose, onSaved }) {
         observacoes: form.observacoes,
         receituario_agronomo: form.receituario_agronomo,
         receituario_crea: form.receituario_crea,
+        centro_custo_id: form.centro_custo_id,
         insumos_usados: insumosUsados
       })
       onSaved()
@@ -306,6 +327,48 @@ export function NovaOperacaoModal({ talhao, fazendaId, onClose, onSaved }) {
                   </select>
                 </div>
               )}
+              <div style={{ marginBottom: 12 }}>
+                <label
+                  style={{
+                    display: 'block',
+                    fontSize: 9,
+                    fontFamily: 'monospace',
+                    letterSpacing: '2px',
+                    color: C.textDim,
+                    marginBottom: 5,
+                    fontWeight: 700
+                  }}
+                >
+                  CENTRO DE CUSTO *
+                </label>
+                <select
+                  required
+                  value={form.centro_custo_id}
+                  onChange={e => set('centro_custo_id', e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    background: C.bgSoft,
+                    border: `1px solid ${form.centro_custo_id ? C.border : C.amber}`,
+                    borderRadius: 10,
+                    fontSize: 13,
+                    color: C.textDk,
+                    outline: 'none'
+                  }}
+                >
+                  <option value="">Selecione…</option>
+                  {centrosCusto.map(cc => (
+                    <option key={cc.id} value={cc.id}>
+                      {cc.codigo} · {cc.nome}
+                    </option>
+                  ))}
+                </select>
+                {centrosCusto.length === 0 && (
+                  <p style={{ margin: '4px 0 0', color: C.amberDk, fontSize: 10 }}>
+                    Nenhum CC cadastrado. Vá em Gerencial → Configurações da fazenda.
+                  </p>
+                )}
+              </div>
               <div style={{ marginBottom: 12 }}>
                 <label
                   style={{

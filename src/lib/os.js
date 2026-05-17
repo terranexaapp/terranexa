@@ -128,6 +128,7 @@ export async function criarOS({
   bico,
   area_parcial_ha,
   area_percentual,
+  centro_custo_id,
   insumos_recomendados
 }) {
   const {
@@ -160,6 +161,7 @@ export async function criarOS({
       bico: bico || null,
       area_parcial_ha: area_parcial_ha ? Number(area_parcial_ha) : null,
       area_percentual: area_percentual ? Number(area_percentual) : null,
+      centro_custo_id: centro_custo_id || null,
       criada_por_id: user.id
     })
     .select()

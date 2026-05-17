@@ -398,7 +398,6 @@ export function GerencialView({
     { id: 'insumos', title: 'Insumos', short: 'Insumos', text: 'Produtos, doses, custo medio e fornecedores' },
     { id: 'safras', title: 'Safras e Culturas', short: 'Safras', text: 'Ciclo agricola, variedades e metas' },
     { id: 'maquinas', title: 'Maquinas e Implementos', short: 'Maquinas', text: 'Frota, capacidade e custo hora' },
-    { id: 'custos', title: 'Centros de Custo', short: 'Custos', text: 'Custos por fazenda, safra e atividade' },
     {
       id: 'produtividade',
       title: 'Historico de Produtividade',
@@ -415,7 +414,7 @@ export function GerencialView({
   const managementGroups = [
     { title: 'Campo', ids: ['talhoes', 'pluviometros', 'safras'] },
     { title: 'Operacao', ids: ['estoque', 'equipe', 'insumos', 'maquinas'] },
-    { title: 'Gestao', ids: ['custos', 'produtividade', 'configuracao'] }
+    { title: 'Gestao', ids: ['produtividade', 'configuracao'] }
   ].map(group => ({
     ...group,
     items: group.ids.map(itemId => managementMenu.find(item => item.id === itemId)).filter(Boolean)

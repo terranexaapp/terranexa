@@ -20,7 +20,7 @@ export const NAV_ITEMS = [
   { id: 'dashboard', label: 'Dashboard' },
   { id: 'chuvas', label: 'Chuvas' },
   { id: 'solo', label: 'Solo' },
-  { id: 'scouting', label: 'Scouting' },
+  { id: 'monitoramento', label: 'Monitoramento' },
   { id: 'gerencial', label: 'Gerenciamento' },
   { id: 'relatorios', label: 'Relatórios' }
 ]
@@ -33,7 +33,7 @@ export const DESKTOP_NAV_GROUPS = [
       { key: 'talhoes', view: 'gerencial', manager: 'talhoes', label: 'Talhoes', icon: 'map' },
       { key: 'chuvas', view: 'chuvas', label: 'Chuvas', icon: 'cloud-rain' },
       { key: 'solo', view: 'solo', label: 'Solo', icon: 'soil' },
-      { key: 'scouting', view: 'scouting', label: 'Scouting', icon: 'search' }
+      { key: 'monitoramento', view: 'monitoramento', label: 'Monitoramento', icon: 'search' }
     ]
   },
   {
@@ -50,7 +50,6 @@ export const DESKTOP_NAV_GROUPS = [
     title: 'Gestao',
     items: [
       { key: 'safras', view: 'gerencial', manager: 'safras', label: 'Safras', icon: 'leaf' },
-      { key: 'custos', view: 'gerencial', manager: 'custos', label: 'Centros de custo', icon: 'dollar' },
       { key: 'produtividade', view: 'gerencial', manager: 'produtividade', label: 'Produtividade', icon: 'bar-chart' },
       { key: 'configuracao', view: 'gerencial', manager: 'configuracao', label: 'Configuracoes', icon: 'gear' },
       { key: 'relatorios', view: 'relatorios', label: 'Relatorios', icon: 'report' }
