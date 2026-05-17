@@ -37,9 +37,10 @@ push` com a estrutura atual via [override de trilha](https://supabase.com/docs/r
 | 13 | `001G_area_trigger.sql` | Trigger que mantém `fazendas.area_total_ha` em sincronia com soma de talhões. |
 | 14 | `001H_maquinas.sql` | Tabela `maquinas` (frota da fazenda) + index + RLS + trigger updated_at. |
 | 15 | `001I_produtividades.sql` | Tabela `produtividades` (histórico de colheitas por talhão/safra) + indexes + RLS. |
-| 16 | `002_storage_buckets.sql` | Buckets Storage: `mapas`, `comprovantes`, etc. |
-| 17 | `003_vincular_dados_existentes.sql` | Backfill (executar **só uma vez** logo após criar seu usuário no app). |
-| 18 | `004_final_check.sql` | Sanity check de RLS / tabelas. Roda no fim e reporta o que faltou. |
+| 16 | `001J_centros_custo.sql` | Tabela `centros_custo` + trigger seed (34 CCs por fazenda) + FKs em operacoes/ordens_servico/insumos/maquinas. |
+| 17 | `002_storage_buckets.sql` | Buckets Storage: `mapas`, `comprovantes`, etc. |
+| 18 | `003_vincular_dados_existentes.sql` | Backfill (executar **só uma vez** logo após criar seu usuário no app). |
+| 19 | `004_final_check.sql` | Sanity check de RLS / tabelas. Roda no fim e reporta o que faltou. |
 
 > 💡 Os arquivos `001_terranexa_schema.sql` e `001E_functions_and_views.sql`
 > e `001F_security_policies.sql` (sem letras pós-`001`) são versões
