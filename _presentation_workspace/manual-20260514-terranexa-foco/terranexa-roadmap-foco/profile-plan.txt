@@ -1,0 +1,7 @@
+Task mode: create
+Primary deck-profile: product-platform
+Secondary gates: engineering-platform clarity for map/GPS/offline architecture.
+Required proof objects: current-state summary, central roadmap mind map, priority phases P0-P4, next sprint sequence, focus rules.
+Source/asset requirements: local TerraNexa codebase history, existing public/icon-512.png as the app identity asset, previous project decisions from the working conversation.
+Brand constraints: use TerraNexa colors and the real local app icon; do not invent partner marks or product screenshots.
+Known missing inputs: no final business metrics yet; roadmap uses implementation priority rather than performance KPIs.

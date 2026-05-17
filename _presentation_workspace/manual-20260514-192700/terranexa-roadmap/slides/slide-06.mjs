@@ -1,0 +1,5 @@
+import {S,header,footer,text,rect,bar} from './shared.mjs';
+export async function slide06(presentation,ctx){const slide=presentation.slides.add();await header(slide,ctx,'Modelo de dados','O Supabase já modela a fazenda como operação agrícola completa.', 'A base tem cerca de 20 tabelas principais e separa cadastro, operação, agronomia e relatórios.');
+const rows=[['Núcleo da fazenda',5,S.green,'profiles, fazendas, safras, talhões, equipes'],['Operação e custos',6,S.amber,'insumos, estoque, operações, OS e vínculos'],['Agronomia',6,S.blue,'pluviômetros, chuva, solo, monitoramentos e caminhamentos'],['Evidência e gestão',3,S.soil,'armadilhas, relatórios e storage']];
+rows.forEach((r,i)=>bar(slide,ctx,90,305+i*58,900,r[0],r[1],6,r[2],r[3]));
+rect(slide,ctx,955,260,200,278,S.dark);text(slide,ctx,'20',1004,300,104,64,{serif:true,bold:true,size:54,color:'#FFFFFF',align:'center'});text(slide,ctx,'tabelas principais',990,370,132,24,{size:13,color:'#CDEAC0',align:'center'});text(slide,ctx,'Próximo: garantir políticas RLS + sincronização offline antes de escalar usuários.',982,430,150,86,{size:11,color:'#E8F4DC',align:'center'});footer(slide,ctx,6);return slide;}

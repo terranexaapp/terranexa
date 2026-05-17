@@ -2,10 +2,14 @@
 -- Adiciona dados_especificos (contagens por praga) e tipo_registro ao monitoramento_pontos.
 -- Cria tabela monitoramento_caminhamentos para trilha GPS do tecnico.
 
--- Pontos: dados especificos de cada tipo de ocorrencia
+-- Pontos: dados especificos de cada tipo de ocorrencia + agrupamento de varias ocorrencias no mesmo ponto GPS
 ALTER TABLE monitoramento_pontos
   ADD COLUMN IF NOT EXISTS tipo_registro text NOT NULL DEFAULT 'ocorrencia',
-  ADD COLUMN IF NOT EXISTS dados_especificos jsonb;
+  ADD COLUMN IF NOT EXISTS dados_especificos jsonb,
+  ADD COLUMN IF NOT EXISTS ponto_grupo_id uuid;
+
+CREATE INDEX IF NOT EXISTS idx_monitoramento_pontos_grupo
+  ON monitoramento_pontos(ponto_grupo_id);
 
 -- Trilha GPS do caminhamento do tecnico durante o monitoramento
 CREATE TABLE IF NOT EXISTS monitoramento_caminhamentos (

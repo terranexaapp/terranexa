@@ -1,0 +1,12 @@
+01 cover: dark editorial with small roadmap visual.
+02 current state: matrix plus decision rail.
+03 mind map: central TerraNexa App with P0-P4 branches.
+04 P0 gate: checklist board.
+05 P1 field: mobile-first workflow and map proof.
+06 P2 modules: dependency map.
+07 P3 operation: pipeline from OS to reports.
+08 P4 scale: readiness ladder.
+09 next 14 days: horizontal sprint timeline.
+10 focus rules: do/avoid/measure board.
+11 success loop: circular operating loop around talhao.
+12 action slide: focused next decisions and owner rhythm.

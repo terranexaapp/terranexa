@@ -1,0 +1,9 @@
+Slide size: 1280x720.
+Background: warm paper with deep-green chapter slides.
+Typography: Georgia for claim headlines, Aptos/Aptos Mono for interface labels.
+Palette: TerraNexa green, pale green, amber, blue, soil and red only for priority/status meaning.
+Diagram grammar: thick pale connectors, compact labeled nodes, central decision node.
+Container grammar: square-edged editorial panels; cards only when they represent a stage or decision.
+Footer: thin rule, deck label and slide number.
+Identity: real local TerraNexa app icon only.
+Banned motifs: generic SaaS gradients, decorative orbs, unrelated stock imagery, fake logos.

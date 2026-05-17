@@ -1,0 +1,5 @@
+import {S,header,footer,text,rect,card} from './shared.mjs';
+export async function slide12(presentation,ctx){const slide=presentation.slides.add();await header(slide,ctx,'Gerenciamento','A página de gerenciamento deve virar um painel modular, não um depósito de funções.', 'O menu superior por caixas já foi definido; cada caixa precisa abrir apenas sua própria operação.');
+const items=[['Cadastro de Talhão','Desenhar, importar KML, cultura, fase e área total',S.green],['Pluviômetros','Registrar, editar ponto, renomear e desativar',S.blue],['Configuração da Fazenda','Nome, safra ativa, parâmetros e preferências',S.amber],['Equipe','Técnicos, operadores e permissões',S.soil],['Insumos/Estoque','Produtos, doses, saldo e custo médio',S.green2],['Máquinas','Frota, capacidade e custo hora',S.blue],['Centros de Custo','Agrupar custo por fazenda, safra e atividade',S.amber2],['Histórico Produtivo','Produtividade por talhão e safra',S.soil]];
+items.forEach((it,i)=>{const col=i%4,row=Math.floor(i/4);card(slide,ctx,68+col*286,280+row*126,250,92,it[0],it[1],it[2],{titleSize:15,bodySize:10.4});});
+footer(slide,ctx,12);return slide;}

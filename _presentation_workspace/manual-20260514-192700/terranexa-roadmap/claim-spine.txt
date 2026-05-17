@@ -1,0 +1,4 @@
+Thesis: TerraNexa is ready to move from build mode to controlled field testing, but the critical path is deployment hygiene, mobile GPS validation, and closing the operational loop from monitoring/OS back to the talhao history.
+Audience: project owner and implementation team.
+Arc: what exists -> why it matters -> what is missing -> how to test -> what to build next.
+Slide count: 18.

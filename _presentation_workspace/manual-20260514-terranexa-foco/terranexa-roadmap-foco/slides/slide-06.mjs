@@ -1,0 +1,6 @@
+import {S,header,footer,text,shape,rule,card,phase,connector} from './shared.mjs';
+export async function slide06(presentation,ctx){const slide=presentation.slides.add();await header(slide,ctx,'P2 | Módulos essenciais','Só depois do teste de campo, fechamos o sistema mínimo de gestão.', 'A ordem importa: talhão e monitoramento alimentam pluviômetros, solo, estoque, OS e gerenciamento.');
+shape(slide,ctx,514,286,220,92,S.dark);text(slide,ctx,'Talhão',570,306,106,28,{serif:true,bold:true,size:26,color:'#FFFFFF',align:'center'});text(slide,ctx,'unidade de dados',548,342,150,18,{size:11,color:'#CDEAC0',align:'center'});
+const mods=[['Cadastro de Talhão','área, cultura, limites e safra',180,278,S.green],['Pluviômetros e chuva','registro por ponto e mapa interpolado',790,248,S.blue],['Solo','amostras e histórico por talhão',840,405,S.soil],['Estoque','entradas, saídas e mínimo',530,510,S.amber],['Ordem de Serviço','planejar, executar e concluir',180,430,S.red],['Gerenciamento','configuração da fazenda',420,270,S.green2]];
+mods.forEach(m=>{connector(slide,ctx,624,332,m[2]+95,m[3]+42,'#CBD8C4',5);card(slide,ctx,m[2],m[3],190,84,m[0],m[1],m[4],{titleSize:15,bodySize:10.5});});
+phase(slide,ctx,'Meta P2: operação agrícola mínima, sem relatórios avançados ainda',326,610,610,S.green);footer(slide,ctx,6);return slide;}

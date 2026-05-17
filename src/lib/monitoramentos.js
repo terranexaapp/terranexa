@@ -101,7 +101,8 @@ export async function criarMonitoramentoPonto({
   recomendacao,
   foto_url,
   tipo_registro,
-  dados_especificos
+  dados_especificos,
+  ponto_grupo_id
 }) {
   const payload = {
     monitoramento_id,
@@ -119,6 +120,7 @@ export async function criarMonitoramentoPonto({
   if (foto_url !== undefined) payload.foto_url = foto_url || null
   if (tipo_registro !== undefined) payload.tipo_registro = tipo_registro || 'ocorrencia'
   if (dados_especificos !== undefined) payload.dados_especificos = dados_especificos || null
+  if (ponto_grupo_id !== undefined) payload.ponto_grupo_id = ponto_grupo_id || null
 
   const { data, error } = await supabase.from('monitoramento_pontos').insert(payload).select().single()
   if (error) throw error

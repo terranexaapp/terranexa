@@ -1,4 +1,4 @@
-// Monitoring occurrence view: GPS tracking + category cards + pest-specific forms
+// Monitoring occurrence view: GPS caminhamento + drafts por ponto + registro agrupado
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { theme } from '../../styles/theme'
 import {
@@ -31,7 +31,6 @@ const ESTADIOS = [
   'R6 – Grão cheio', 'R7 – Início maturação', 'R8 – Maturação plena'
 ]
 
-// Detecta o tipo de formulário pelo nome/tipo da praga
 function detectFormType(praga) {
   if (!praga) return 'generica'
   const nome = (praga.nome_comum || '').toLowerCase()
@@ -41,7 +40,6 @@ function detectFormType(praga) {
   return 'generica'
 }
 
-// Calcula CV (coeficiente de variação): (desvio_padrão / média) * 100
 function calcularCV(valores) {
   const nums = valores.map(Number).filter(n => !isNaN(n) && n >= 0)
   if (nums.length < 2) return null
@@ -51,7 +49,6 @@ function calcularCV(valores) {
   return ((Math.sqrt(variancia) / media) * 100).toFixed(1)
 }
 
-// sacos perdidos/ha: gramas / (metros_quadrados × 6)
 function calcularSacosHa(gramas, metros) {
   const g = Number(gramas)
   const m = Number(metros)
@@ -59,152 +56,102 @@ function calcularSacosHa(gramas, metros) {
   return (g / (m * 6)).toFixed(2)
 }
 
-// ─── Estilos base ─────────────────────────────────────────────────────────────
+function uuid() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID()
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16)
+  })
+}
+
+function resumoDraft(d) {
+  if (d.categoria.id === 'plantio') {
+    const cv = calcularCV(d.form.distancias || [])
+    return cv != null ? `CV ${cv}%` : `${(d.form.distancias || []).length} medições`
+  }
+  if (d.categoria.id === 'colheita') {
+    const s = calcularSacosHa(d.form.gramas, d.form.metros_quadrados)
+    return s ? `${s} sc/ha` : 'colheita'
+  }
+  if (d.categoria.id === 'estadio') {
+    return d.form.estadio || 'estádio'
+  }
+  if (d.formType === 'lagarta') {
+    const total = (Number(d.form.pequenas_m) || 0) + (Number(d.form.medias_m) || 0) + (Number(d.form.grandes_m) || 0)
+    return `${total}/m · ${d.form.dano || ''}`
+  }
+  if (d.formType === 'percevejo') {
+    return `${Number(d.form.adultos_m) || 0}A + ${Number(d.form.ninfas_m) || 0}N por m`
+  }
+  if (d.formType === 'daninha') {
+    return `${d.form.desenvolvimento || ''} · ${d.form.pressao || ''}`.trim()
+  }
+  if (d.form.severidade) return d.form.severidade
+  return d.categoria.label
+}
+
+// ─── Estilos ──────────────────────────────────────────────────────────────────
 const s = {
-  root: {
-    display: 'flex', flexDirection: 'column', height: '100%',
-    background: C.bg, overflow: 'hidden', position: 'relative'
-  },
-  header: {
-    display: 'flex', alignItems: 'center', gap: 10,
-    padding: '10px 14px', background: C.greenDk, flexShrink: 0
-  },
-  btnBack: {
-    background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: 8,
-    color: '#fff', fontSize: 20, cursor: 'pointer', padding: '4px 10px',
-    lineHeight: 1
-  },
+  root: { display: 'flex', flexDirection: 'column', height: '100%', background: C.bg, overflow: 'hidden', position: 'relative' },
+  header: { display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: C.greenDk, flexShrink: 0 },
+  btnBack: { background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: 8, color: '#fff', fontSize: 20, cursor: 'pointer', padding: '4px 10px', lineHeight: 1 },
+  btnFinalizar: { background: 'rgba(255,255,255,0.25)', border: 'none', borderRadius: 8, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', padding: '6px 12px' },
   headerTitle: { color: '#fff', fontWeight: 700, fontSize: 15, flex: 1, margin: 0 },
   headerSub: { color: 'rgba(255,255,255,0.8)', fontSize: 12, margin: 0 },
-  gpsBar: {
-    display: 'flex', alignItems: 'center', gap: 8,
-    padding: '6px 14px', background: C.greenLight, borderBottom: `1px solid ${C.border}`,
-    flexShrink: 0
-  },
-  gpsDot: (ok) => ({
-    width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
-    background: ok ? C.green : C.amber
-  }),
+  gpsBar: { display: 'flex', alignItems: 'center', gap: 8, padding: '6px 14px', background: C.greenLight, borderBottom: `1px solid ${C.border}`, flexShrink: 0 },
+  gpsDot: ok => ({ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: ok ? C.green : C.amber }),
   gpsText: { fontSize: 12, color: C.textMid, flex: 1 },
-  pointsBadge: {
-    background: C.green, color: '#fff', borderRadius: 20,
-    fontSize: 11, fontWeight: 700, padding: '2px 8px'
-  },
+  pointsBadge: { background: C.green, color: '#fff', borderRadius: 20, fontSize: 11, fontWeight: 700, padding: '2px 8px' },
   body: { flex: 1, overflowY: 'auto', padding: 14 },
+
+  // Drafts list
+  draftCard: { display: 'flex', alignItems: 'center', gap: 10, background: C.bgLight, border: `1.5px solid ${C.border}`, borderRadius: 10, padding: '10px 12px', marginBottom: 8 },
+  draftDot: cor => ({ width: 10, height: 10, borderRadius: '50%', background: cor, flexShrink: 0 }),
+  draftTexts: { flex: 1, minWidth: 0 },
+  draftTitulo: { fontSize: 13, fontWeight: 700, color: C.textDk, margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
+  draftResumo: { fontSize: 11, color: C.textMid, margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
+  draftRemove: { background: 'none', border: 'none', color: C.red, fontSize: 18, cursor: 'pointer', padding: '2px 6px', lineHeight: 1 },
+
+  sectionTitle: { fontSize: 11, fontWeight: 700, color: C.textDim, textTransform: 'uppercase', letterSpacing: 0.5, margin: '4px 0 8px' },
+
+  // Footer fixo com botões registrar/finalizar
+  footer: { padding: '12px 14px', background: C.bg, borderTop: `1px solid ${C.border}`, display: 'flex', gap: 8, flexShrink: 0 },
 
   // Category cards
   grid2: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 },
-  categoryCard: (gradFrom, gradTo) => ({
-    position: 'relative', borderRadius: 14, overflow: 'hidden',
-    aspectRatio: '4/3', cursor: 'pointer', border: 'none',
-    background: `linear-gradient(160deg, ${gradFrom} 0%, ${gradTo} 100%)`,
-    display: 'flex', alignItems: 'flex-end'
-  }),
-  categoryCardLabel: {
-    width: '100%',
-    background: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 100%)',
-    color: '#fff', fontWeight: 700, fontSize: 13,
-    padding: '20px 10px 8px', textAlign: 'left'
-  },
+  categoryCard: (gradFrom, gradTo) => ({ position: 'relative', borderRadius: 14, overflow: 'hidden', aspectRatio: '4/3', cursor: 'pointer', border: 'none', background: `linear-gradient(160deg, ${gradFrom} 0%, ${gradTo} 100%)`, display: 'flex', alignItems: 'flex-end' }),
+  categoryCardLabel: { width: '100%', background: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 100%)', color: '#fff', fontWeight: 700, fontSize: 13, padding: '20px 10px 8px', textAlign: 'left' },
 
-  // Pest cards
-  pestCard: (gradFrom, gradTo) => ({
-    position: 'relative', borderRadius: 12, overflow: 'hidden',
-    aspectRatio: '1/1', cursor: 'pointer', border: 'none',
-    background: `linear-gradient(160deg, ${gradFrom} 0%, ${gradTo} 100%)`,
-    display: 'flex', alignItems: 'flex-end'
-  }),
-  pestCardLabel: {
-    width: '100%',
-    background: 'linear-gradient(to top, rgba(0,0,0,0.75) 0%, transparent 100%)',
-    color: '#fff', fontWeight: 600, fontSize: 12,
-    padding: '18px 8px 6px', textAlign: 'left'
-  },
+  pestCard: (gradFrom, gradTo) => ({ position: 'relative', borderRadius: 12, overflow: 'hidden', aspectRatio: '1/1', cursor: 'pointer', border: 'none', background: `linear-gradient(160deg, ${gradFrom} 0%, ${gradTo} 100%)`, display: 'flex', alignItems: 'flex-end' }),
+  pestCardLabel: { width: '100%', background: 'linear-gradient(to top, rgba(0,0,0,0.75) 0%, transparent 100%)', color: '#fff', fontWeight: 600, fontSize: 12, padding: '18px 8px 6px', textAlign: 'left' },
 
   // Forms
   formSection: { marginBottom: 18 },
   label: { fontSize: 12, fontWeight: 600, color: C.textMid, marginBottom: 4, display: 'block' },
-  input: {
-    width: '100%', padding: '9px 12px', borderRadius: 8,
-    border: `1.5px solid ${C.border}`, fontSize: 14, outline: 'none',
-    boxSizing: 'border-box', background: C.bg, color: C.textDk
-  },
-  textarea: {
-    width: '100%', padding: '9px 12px', borderRadius: 8,
-    border: `1.5px solid ${C.border}`, fontSize: 14, outline: 'none',
-    boxSizing: 'border-box', background: C.bg, color: C.textDk,
-    minHeight: 80, resize: 'vertical', fontFamily: 'inherit'
-  },
+  input: { width: '100%', padding: '9px 12px', borderRadius: 8, border: `1.5px solid ${C.border}`, fontSize: 14, outline: 'none', boxSizing: 'border-box', background: C.bg, color: C.textDk },
+  textarea: { width: '100%', padding: '9px 12px', borderRadius: 8, border: `1.5px solid ${C.border}`, fontSize: 14, outline: 'none', boxSizing: 'border-box', background: C.bg, color: C.textDk, minHeight: 80, resize: 'vertical', fontFamily: 'inherit' },
   segmented: { display: 'flex', gap: 6, flexWrap: 'wrap' },
-  segBtn: (active, cor) => ({
-    padding: '7px 14px', borderRadius: 20, fontSize: 13, fontWeight: 600,
-    cursor: 'pointer', border: `1.5px solid ${cor}`,
-    background: active ? cor : 'transparent',
-    color: active ? '#fff' : cor
-  }),
-  row2: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 },
-  resultBox: {
-    background: C.greenLight, borderRadius: 10, padding: '10px 14px',
-    border: `1.5px solid ${C.green}`, display: 'flex', justifyContent: 'space-between',
-    alignItems: 'center'
-  },
+  segBtn: (active, cor) => ({ padding: '7px 14px', borderRadius: 20, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: `1.5px solid ${cor}`, background: active ? cor : 'transparent', color: active ? '#fff' : cor }),
+  resultBox: { background: C.greenLight, borderRadius: 10, padding: '10px 14px', border: `1.5px solid ${C.green}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
   resultLabel: { fontSize: 12, color: C.textMid, fontWeight: 600 },
   resultValue: { fontSize: 20, fontWeight: 700, color: C.greenDk },
 
-  btnPrimary: {
-    width: '100%', padding: '13px', borderRadius: 10,
-    background: C.green, border: 'none', color: '#fff',
-    fontWeight: 700, fontSize: 15, cursor: 'pointer'
-  },
-  btnSecondary: {
-    padding: '10px 18px', borderRadius: 8,
-    background: 'transparent', border: `1.5px solid ${C.border}`,
-    color: C.textMid, fontWeight: 600, fontSize: 13, cursor: 'pointer'
-  },
-  btnCamera: {
-    display: 'flex', alignItems: 'center', gap: 8,
-    padding: '10px 16px', borderRadius: 10,
-    background: C.bgLight, border: `1.5px solid ${C.border}`,
-    color: C.textDk, fontSize: 13, fontWeight: 600, cursor: 'pointer'
-  },
-  fotoPreview: {
-    width: '100%', maxHeight: 200, borderRadius: 10, objectFit: 'cover',
-    border: `1.5px solid ${C.border}`, marginTop: 8
-  },
-  distanciaScroll: {
-    display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 6
-  },
-  distanciaItem: {
-    display: 'flex', alignItems: 'center', gap: 4,
-    background: C.greenLight, border: `1px solid ${C.green}`,
-    borderRadius: 20, padding: '4px 10px', flexShrink: 0
-  },
+  btnPrimary: { flex: 1, padding: '13px', borderRadius: 10, background: C.green, border: 'none', color: '#fff', fontWeight: 700, fontSize: 15, cursor: 'pointer' },
+  btnPrimaryDisabled: { flex: 1, padding: '13px', borderRadius: 10, background: C.border, border: 'none', color: C.textVery, fontWeight: 700, fontSize: 15, cursor: 'not-allowed' },
+  btnSecondary: { flex: 1, padding: '13px', borderRadius: 10, background: 'transparent', border: `1.5px solid ${C.border}`, color: C.textMid, fontWeight: 600, fontSize: 14, cursor: 'pointer' },
+
+  btnCamera: { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderRadius: 10, background: C.bgLight, border: `1.5px solid ${C.border}`, color: C.textDk, fontSize: 13, fontWeight: 600, cursor: 'pointer' },
+  fotoPreview: { width: '100%', maxHeight: 200, borderRadius: 10, objectFit: 'cover', border: `1.5px solid ${C.border}`, marginTop: 8 },
+
+  distanciaScroll: { display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 6 },
+  distanciaItem: { display: 'flex', alignItems: 'center', gap: 4, background: C.greenLight, border: `1px solid ${C.green}`, borderRadius: 20, padding: '4px 10px', flexShrink: 0 },
   distanciaText: { fontSize: 13, color: C.greenDk, fontWeight: 600 },
-  distanciaRemove: {
-    background: 'none', border: 'none', color: C.textDim,
-    cursor: 'pointer', fontSize: 14, padding: '0 2px', lineHeight: 1
-  },
-  btnAdd: {
-    background: C.green, border: 'none', borderRadius: 20,
-    color: '#fff', fontSize: 18, width: 32, height: 32,
-    cursor: 'pointer', flexShrink: 0, display: 'flex',
-    alignItems: 'center', justifyContent: 'center'
-  },
+  distanciaRemove: { background: 'none', border: 'none', color: C.textDim, cursor: 'pointer', fontSize: 14, padding: '0 2px', lineHeight: 1 },
+  btnAdd: { background: C.green, border: 'none', borderRadius: 20, color: '#fff', fontSize: 18, width: 32, height: 32, cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' },
   addRow: { display: 'flex', gap: 8, alignItems: 'center' },
-  addInput: {
-    flex: 1, padding: '8px 12px', borderRadius: 8,
-    border: `1.5px solid ${C.border}`, fontSize: 14,
-    outline: 'none', boxSizing: 'border-box'
-  },
-  overlay: {
-    position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    zIndex: 200, padding: 16
-  },
-  overlayBox: {
-    background: C.bg, borderRadius: 16, padding: '20px 18px',
-    width: '100%', maxWidth: 360, maxHeight: '85vh', overflowY: 'auto'
-  }
+  addInput: { flex: 1, padding: '8px 12px', borderRadius: 8, border: `1.5px solid ${C.border}`, fontSize: 14, outline: 'none', boxSizing: 'border-box' },
+
+  empty: { textAlign: 'center', color: C.textDim, fontSize: 13, padding: '20px 0' }
 }
 
 // ─── Componente principal ─────────────────────────────────────────────────────
@@ -214,39 +161,40 @@ export function MonitoramentoOcorrenciaView({ fazenda, fazendaId, talhao, onBack
   const [categoriaSel, setCategoriaSel] = useState(null)
   const [pragaSel, setPragaSel] = useState(null)
 
-  // Catálogo de pragas/doenças da fazenda
+  // Catálogo de pragas/doenças
   const [catalogo, setCatalogo] = useState([])
 
-  // GPS e caminhamento
+  // GPS
   const [gpsStatus, setGpsStatus] = useState('Aguardando GPS...')
   const [gpsOk, setGpsOk] = useState(false)
   const watchRef = useRef(null)
-  const trilhaRef = useRef([])      // [{lat, lng, ts}]
+  const trilhaRef = useRef([])
+  const ultimaPosRef = useRef(null)
   const iniciadoEmRef = useRef(new Date().toISOString())
 
-  // Monitoramento criado no Supabase (lazy — só na primeira ocorrência salva)
+  // Monitoramento Supabase (lazy)
   const monitoramentoIdRef = useRef(null)
   const monitoramentoCreateRef = useRef(null)
 
-  // Pontos registrados nesta sessão
+  // Drafts: ocorrências acumuladas para o ponto atual
+  // [{ id, categoria, praga, formType, form, fotoFile, fotoPreview }]
+  const [drafts, setDrafts] = useState([])
+
+  // Total de pontos efetivamente registrados na sessão
   const [pontosRegistrados, setPontosRegistrados] = useState(0)
 
-  // Formulário atual
+  // Formulário ativo
   const [form, setForm] = useState({})
   const [fotoPreview, setFotoPreview] = useState(null)
   const [fotoFile, setFotoFile] = useState(null)
-  const [saving, setSaving] = useState(false)
-  const [saveError, setSaveError] = useState(null)
-
-  // GPS snapshot no momento de capturar (antes de abrir form)
-  const gpsSnapRef = useRef(null)
-
-  // Para o Plantio: input temporário antes de adicionar à lista
   const [distanciaInput, setDistanciaInput] = useState('')
+
+  const [registrando, setRegistrando] = useState(false)
+  const [erro, setErro] = useState(null)
 
   const cameraRef = useRef(null)
 
-  // ── Carregar catálogo de pragas ────────────────────────────────────────────
+  // ── Carregar catálogo ─────────────────────────────────────────────────────
   useEffect(() => {
     if (!fazendaId) return
     listarPragasDoencas(fazendaId)
@@ -254,7 +202,7 @@ export function MonitoramentoOcorrenciaView({ fazenda, fazendaId, talhao, onBack
       .catch(() => setCatalogo([]))
   }, [fazendaId])
 
-  // ── GPS watch — acumula trilha desde o início ──────────────────────────────
+  // ── GPS watch contínuo (caminhamento) ────────────────────────────────────
   useEffect(() => {
     requestOfflineStorage().catch(() => {})
 
@@ -268,9 +216,11 @@ export function MonitoramentoOcorrenciaView({ fazenda, fazendaId, talhao, onBack
       pos => {
         const lat = pos.coords.latitude
         const lng = pos.coords.longitude
+        const precisao = pos.coords.accuracy
+        ultimaPosRef.current = { lat, lng, precisao }
         trilhaRef.current.push({ lat, lng, ts: new Date().toISOString() })
         setGpsOk(true)
-        setGpsStatus(`GPS ativo · ±${Math.round(pos.coords.accuracy || 0)}m`)
+        setGpsStatus(`GPS ativo · ±${Math.round(precisao || 0)}m`)
       },
       err => {
         setGpsOk(false)
@@ -284,23 +234,16 @@ export function MonitoramentoOcorrenciaView({ fazenda, fazendaId, talhao, onBack
     }
   }, [])
 
-  // ── Salva caminhamento ao sair (se houve monitoramento criado) ────────────
+  // ── Sair: salva caminhamento ──────────────────────────────────────────────
   const finalizarESair = useCallback(async () => {
     try {
       if (monitoramentoIdRef.current && trilhaRef.current.length > 0) {
-        await salvarCaminhamento(
-          monitoramentoIdRef.current,
-          trilhaRef.current,
-          iniciadoEmRef.current
-        )
+        await salvarCaminhamento(monitoramentoIdRef.current, trilhaRef.current, iniciadoEmRef.current)
       }
-    } catch {
-      // não bloqueia saída em caso de erro de rede
-    }
+    } catch { /* ignora erro de rede */ }
     onBack()
   }, [onBack])
 
-  // ── Criar/obter monitoramento no Supabase (lazy) ───────────────────────────
   async function ensureMonitoramento() {
     if (monitoramentoIdRef.current) return monitoramentoIdRef.current
     if (!monitoramentoCreateRef.current) {
@@ -315,129 +258,135 @@ export function MonitoramentoOcorrenciaView({ fazenda, fazendaId, talhao, onBack
     return monitoramentoCreateRef.current
   }
 
-  // ── GPS snapshot ao abrir formulário ──────────────────────────────────────
-  function capturarGPSEAbrirForm(categoria, praga = null) {
+  // ── Abrir formulário ──────────────────────────────────────────────────────
+  function iniciarFormulario(categoria, praga = null) {
     setCategoriaSel(categoria)
     setPragaSel(praga)
     setForm({})
     setFotoPreview(null)
     setFotoFile(null)
-    setSaveError(null)
     setDistanciaInput('')
-
-    if (!navigator.geolocation) {
-      gpsSnapRef.current = null
-      setTela('formulario')
-      return
-    }
-    navigator.geolocation.getCurrentPosition(
-      pos => {
-        gpsSnapRef.current = {
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-          precisao: pos.coords.accuracy
-        }
-        setTela('formulario')
-      },
-      () => {
-        // Usa último ponto da trilha se getCurrentPosition falhar
-        const ult = trilhaRef.current[trilhaRef.current.length - 1]
-        gpsSnapRef.current = ult ? { lat: ult.lat, lng: ult.lng, precisao: null } : null
-        setTela('formulario')
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 5000 }
-    )
+    setErro(null)
+    setTela('formulario')
   }
 
-  // ── Camera handler ────────────────────────────────────────────────────────
   function handleFotoChange(e) {
     const file = e.target.files?.[0]
     if (!file) return
     setFotoFile(file)
-    const url = URL.createObjectURL(file)
-    setFotoPreview(url)
+    setFotoPreview(URL.createObjectURL(file))
   }
 
-  // ── Salvar ocorrência ─────────────────────────────────────────────────────
-  async function salvarOcorrencia() {
-    if (!talhao?.id) return
-    setSaving(true)
-    setSaveError(null)
+  // ── "Salvar ocorrência" → adiciona ao draft, NÃO grava no DB ─────────────
+  function adicionarOcorrencia() {
+    const formType = pragaSel ? detectFormType(pragaSel) : categoriaSel?.id
+    const draft = {
+      id: uuid(),
+      categoria: categoriaSel,
+      praga: pragaSel,
+      formType,
+      form: { ...form },
+      fotoFile,
+      fotoPreview
+    }
+    setDrafts(d => [...d, draft])
+    setTela('categorias')
+  }
+
+  function removerDraft(id) {
+    setDrafts(d => d.filter(x => x.id !== id))
+  }
+
+  // ── "Registrar Ponto" → captura GPS, salva todos os drafts agrupados ─────
+  async function registrarPonto() {
+    if (drafts.length === 0) return
+    setRegistrando(true)
+    setErro(null)
+
     try {
-      let foto_url = null
-      if (fotoFile && fazendaId) {
-        try {
-          const uploaded = await uploadFotoMonitoramento({ fazendaId, file: fotoFile })
-          foto_url = getPublicUrl(uploaded)
-        } catch {
-          // foto falhou — continua sem ela
-        }
+      // 1. Captura GPS único para o ponto
+      const gps = await new Promise(resolve => {
+        if (!navigator.geolocation) return resolve(ultimaPosRef.current)
+        navigator.geolocation.getCurrentPosition(
+          pos => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude, precisao: pos.coords.accuracy }),
+          () => resolve(ultimaPosRef.current),
+          { enableHighAccuracy: true, timeout: 8000, maximumAge: 3000 }
+        )
+      })
+      if (!gps) {
+        setErro('Sem GPS para registrar o ponto. Aguarde sinal.')
+        setRegistrando(false)
+        return
       }
 
-      const gps = gpsSnapRef.current
+      // 2. Garante monitoramento
       const monitoramentoId = await ensureMonitoramento()
+      const grupoId = uuid()
 
-      const tipo_registro = categoriaSel?.id || 'ocorrencia'
-      const dados_especificos = { ...form }
-      if (foto_url) dados_especificos.foto_url = foto_url
+      // 3. Salva cada draft
+      for (const d of drafts) {
+        let foto_url = null
+        if (d.fotoFile && fazendaId) {
+          try {
+            const uploaded = await uploadFotoMonitoramento({ fazendaId, file: d.fotoFile })
+            foto_url = getPublicUrl(uploaded)
+          } catch { /* segue sem foto */ }
+        }
 
-      // Campos raiz do ponto
-      const pontoPayload = {
-        monitoramento_id: monitoramentoId,
-        tipo: 'ocorrencia',
-        tipo_registro,
-        latitude: gps?.lat ?? 0,
-        longitude: gps?.lng ?? 0,
-        precisao_m: gps?.precisao ?? null,
-        praga_doenca_id: pragaSel?.id || null,
-        severidade: form.severidade || form.dano || null,
-        recomendacao: form.acao_sugerida || form.recomendacao || null,
-        observacoes: form.observacoes || null,
-        foto_url,
-        dados_especificos
+        const dados_especificos = { ...d.form }
+        if (foto_url) dados_especificos.foto_url = foto_url
+
+        await criarMonitoramentoPonto({
+          monitoramento_id: monitoramentoId,
+          tipo: 'ocorrencia',
+          tipo_registro: d.categoria.id,
+          latitude: gps.lat,
+          longitude: gps.lng,
+          precisao_m: gps.precisao,
+          praga_doenca_id: d.praga?.id || null,
+          severidade: d.form.severidade || d.form.dano || null,
+          recomendacao: d.form.acao_sugerida || d.form.recomendacao || null,
+          observacoes: d.form.observacoes || null,
+          foto_url,
+          dados_especificos,
+          ponto_grupo_id: grupoId
+        })
       }
 
-      await criarMonitoramentoPonto(pontoPayload)
-
-      // Salva offline também
+      // 4. Cache offline
       saveMonitoringPointOffline(
-        { tipo: tipo_registro, lat: gps?.lat, lng: gps?.lng, hora: new Date().toLocaleString('pt-BR') },
-        { fazendaId, fazendaNome: fazenda?.nome || '', talhaoId: talhao.id, talhaoCodigo: talhao?.codigo || '' }
+        { tipo: 'ponto', lat: gps.lat, lng: gps.lng, hora: new Date().toLocaleString('pt-BR'), ocorrencias: drafts.length },
+        { fazendaId, fazendaNome: fazenda?.nome || '', talhaoId: talhao?.id || null, talhaoCodigo: talhao?.codigo || '' }
       )
 
+      setDrafts([])
       setPontosRegistrados(n => n + 1)
-      setTela('categorias')
     } catch (err) {
-      setSaveError(err.message || 'Erro ao salvar')
+      setErro(err.message || 'Erro ao registrar ponto')
     } finally {
-      setSaving(false)
+      setRegistrando(false)
     }
   }
 
-  // ── Filtrar catálogo por tipo ─────────────────────────────────────────────
   function catalogoPorTipo(tipoDB) {
     if (!tipoDB) return []
     return catalogo.filter(p => p.tipo === tipoDB)
   }
 
-  // ─── Render: cabeçalho ────────────────────────────────────────────────────
-  function renderHeader() {
-    const backLabel = tela === 'lista' ? '← Categorias'
-      : tela === 'formulario' ? `← ${categoriaSel?.label || 'Voltar'}`
-      : null
+  function setField(key, val) { setForm(f => ({ ...f, [key]: val })) }
 
+  // ─── Header ───────────────────────────────────────────────────────────────
+  function renderHeader() {
     return (
       <div style={s.header}>
-        {backLabel ? (
+        {tela !== 'categorias' ? (
           <button
             style={s.btnBack}
             onClick={() => {
               if (tela === 'formulario') setTela(categoriaSel?.tipoDB ? 'lista' : 'categorias')
               else setTela('categorias')
             }}
-          >
-            ←
-          </button>
+          >←</button>
         ) : (
           <button style={s.btnBack} onClick={finalizarESair}>✕</button>
         )}
@@ -447,23 +396,15 @@ export function MonitoramentoOcorrenciaView({ fazenda, fazendaId, talhao, onBack
               : tela === 'lista' ? categoriaSel?.label
               : pragaSel?.nome_comum || categoriaSel?.label}
           </p>
-          {talhao?.codigo && (
-            <p style={s.headerSub}>Talhão {talhao.codigo}</p>
-          )}
+          {talhao?.codigo && (<p style={s.headerSub}>Talhão {talhao.codigo}</p>)}
         </div>
-        {tela === 'categorias' && pontosRegistrados > 0 && (
-          <button
-            style={{ ...s.btnBack, background: 'rgba(255,255,255,0.3)', fontSize: 13, padding: '6px 12px' }}
-            onClick={finalizarESair}
-          >
-            Finalizar
-          </button>
+        {tela === 'categorias' && (
+          <button style={s.btnFinalizar} onClick={finalizarESair}>Finalizar</button>
         )}
       </div>
     )
   }
 
-  // ─── Render: barra de GPS ─────────────────────────────────────────────────
   function renderGPSBar() {
     return (
       <div style={s.gpsBar}>
@@ -476,13 +417,31 @@ export function MonitoramentoOcorrenciaView({ fazenda, fazendaId, talhao, onBack
     )
   }
 
-  // ─── Tela 1: grade de categorias ──────────────────────────────────────────
+  // ─── Tela: categorias + drafts atuais ─────────────────────────────────────
   function renderCategorias() {
     return (
       <div style={s.body}>
-        {pontosRegistrados > 0 && (
+        {drafts.length > 0 && (
+          <>
+            <p style={s.sectionTitle}>Ocorrências deste ponto ({drafts.length})</p>
+            {drafts.map(d => (
+              <div key={d.id} style={s.draftCard}>
+                <div style={s.draftDot(d.categoria.gradTo)} />
+                <div style={s.draftTexts}>
+                  <p style={s.draftTitulo}>
+                    {d.praga?.nome_comum || d.categoria.label}
+                  </p>
+                  <p style={s.draftResumo}>{resumoDraft(d)}</p>
+                </div>
+                <button style={s.draftRemove} onClick={() => removerDraft(d.id)}>✕</button>
+              </div>
+            ))}
+            <p style={s.sectionTitle}>Adicionar outra ocorrência</p>
+          </>
+        )}
+        {drafts.length === 0 && (
           <p style={{ fontSize: 13, color: C.textMid, marginBottom: 12 }}>
-            Selecione para registrar outra ocorrência ou finalize o monitoramento.
+            Selecione uma categoria para adicionar a primeira ocorrência deste ponto.
           </p>
         )}
         <div style={s.grid2}>
@@ -491,14 +450,8 @@ export function MonitoramentoOcorrenciaView({ fazenda, fazendaId, talhao, onBack
               key={cat.id}
               style={s.categoryCard(cat.gradFrom, cat.gradTo)}
               onClick={() => {
-                if (cat.tipoDB) {
-                  // Tem catálogo → vai para lista de pragas
-                  setCategoriaSel(cat)
-                  setTela('lista')
-                } else {
-                  // Sem catálogo (estadio/plantio/colheita/outras) → vai direto pro form
-                  capturarGPSEAbrirForm(cat, null)
-                }
+                if (cat.tipoDB) { setCategoriaSel(cat); setTela('lista') }
+                else iniciarFormulario(cat, null)
               }}
             >
               <span style={s.categoryCardLabel}>{cat.label}</span>
@@ -509,54 +462,57 @@ export function MonitoramentoOcorrenciaView({ fazenda, fazendaId, talhao, onBack
     )
   }
 
-  // ─── Tela 2: lista de pragas/doenças da categoria ─────────────────────────
+  function renderFooter() {
+    if (tela !== 'categorias') return null
+    const podeRegistrar = drafts.length > 0 && !registrando
+    return (
+      <div style={s.footer}>
+        {erro && <p style={{ color: C.red, fontSize: 12, margin: 0, alignSelf: 'center' }}>{erro}</p>}
+        <button
+          style={podeRegistrar ? s.btnPrimary : s.btnPrimaryDisabled}
+          disabled={!podeRegistrar}
+          onClick={registrarPonto}
+        >
+          {registrando ? 'Registrando...' : `Registrar ponto${drafts.length > 0 ? ` (${drafts.length})` : ''}`}
+        </button>
+      </div>
+    )
+  }
+
+  // ─── Tela: lista de pragas/doenças da categoria ───────────────────────────
   function renderListaPragas() {
     const lista = catalogoPorTipo(categoriaSel?.tipoDB)
-
     if (lista.length === 0) {
       return (
         <div style={{ ...s.body, display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 40, gap: 12 }}>
           <p style={{ color: C.textDim, fontSize: 14, textAlign: 'center' }}>
             Nenhuma {categoriaSel?.label?.toLowerCase()} cadastrada para esta fazenda.
           </p>
-          <button style={s.btnSecondary} onClick={() => capturarGPSEAbrirForm(categoriaSel, null)}>
+          <button style={{ ...s.btnSecondary, flex: 'none' }} onClick={() => iniciarFormulario(categoriaSel, null)}>
             Registrar sem especificar
           </button>
         </div>
       )
     }
-
     const gradFrom = categoriaSel?.gradFrom || '#222'
     const gradTo   = categoriaSel?.gradTo   || '#555'
-
     return (
       <div style={s.body}>
         <div style={s.grid2}>
           {lista.map(praga => (
-            <button
-              key={praga.id}
-              style={s.pestCard(gradFrom, gradTo)}
-              onClick={() => capturarGPSEAbrirForm(categoriaSel, praga)}
-            >
+            <button key={praga.id} style={s.pestCard(gradFrom, gradTo)} onClick={() => iniciarFormulario(categoriaSel, praga)}>
               {praga.foto_url && (
-                <img
-                  src={praga.foto_url}
-                  alt={praga.nome_comum}
-                  style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
-                />
+                <img src={praga.foto_url} alt={praga.nome_comum} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
               )}
               <span style={s.pestCardLabel}>
                 {praga.nome_comum}
-                {praga.nome_cientifico ? (
+                {praga.nome_cientifico && (
                   <><br /><span style={{ fontSize: 10, fontStyle: 'italic', opacity: 0.8 }}>{praga.nome_cientifico}</span></>
-                ) : null}
+                )}
               </span>
             </button>
           ))}
-          <button
-            style={s.pestCard('#555', '#888')}
-            onClick={() => capturarGPSEAbrirForm(categoriaSel, null)}
-          >
+          <button style={s.pestCard('#555', '#888')} onClick={() => iniciarFormulario(categoriaSel, null)}>
             <span style={s.pestCardLabel}>Outra / não identificada</span>
           </button>
         </div>
@@ -564,12 +520,7 @@ export function MonitoramentoOcorrenciaView({ fazenda, fazendaId, talhao, onBack
     )
   }
 
-  // ─── Tela 3: formulários específicos ─────────────────────────────────────
-
-  function setField(key, val) {
-    setForm(f => ({ ...f, [key]: val }))
-  }
-
+  // ─── Formulários específicos ──────────────────────────────────────────────
   function renderFormLagarta() {
     return (
       <>
@@ -588,7 +539,7 @@ export function MonitoramentoOcorrenciaView({ fazenda, fazendaId, talhao, onBack
         <div style={s.formSection}>
           <label style={s.label}>Dano</label>
           <div style={s.segmented}>
-            {['leve', 'moderada', 'severa'].map(d => (
+            {['leve','moderada','severa'].map(d => (
               <button key={d} style={s.segBtn(form.dano === d, d === 'leve' ? C.green : d === 'moderada' ? C.amber : C.red)} onClick={() => setField('dano', d)}>
                 {d.charAt(0).toUpperCase() + d.slice(1)}
               </button>
@@ -624,20 +575,16 @@ export function MonitoramentoOcorrenciaView({ fazenda, fazendaId, talhao, onBack
         <div style={s.formSection}>
           <label style={s.label}>Desenvolvimento</label>
           <div style={s.segmented}>
-            {['Inicial', 'Vegetativo', 'Reprodutivo'].map(d => (
-              <button key={d} style={s.segBtn(form.desenvolvimento === d, C.green)} onClick={() => setField('desenvolvimento', d)}>
-                {d}
-              </button>
+            {['Inicial','Vegetativo','Reprodutivo'].map(d => (
+              <button key={d} style={s.segBtn(form.desenvolvimento === d, C.green)} onClick={() => setField('desenvolvimento', d)}>{d}</button>
             ))}
           </div>
         </div>
         <div style={s.formSection}>
           <label style={s.label}>Pressão de infestação</label>
           <div style={s.segmented}>
-            {['Alta', 'Média', 'Baixa'].map(p => (
-              <button key={p} style={s.segBtn(form.pressao === p, p === 'Alta' ? C.red : p === 'Média' ? C.amber : C.green)} onClick={() => setField('pressao', p)}>
-                {p}
-              </button>
+            {['Alta','Média','Baixa'].map(p => (
+              <button key={p} style={s.segBtn(form.pressao === p, p === 'Alta' ? C.red : p === 'Média' ? C.amber : C.green)} onClick={() => setField('pressao', p)}>{p}</button>
             ))}
           </div>
         </div>
@@ -651,9 +598,7 @@ export function MonitoramentoOcorrenciaView({ fazenda, fazendaId, talhao, onBack
         <label style={s.label}>Severidade</label>
         <div style={s.segmented}>
           {ESCALAS_SEVERIDADE.map(e => (
-            <button key={e.id} style={s.segBtn(form.severidade === e.id, e.cor)} onClick={() => setField('severidade', e.id)}>
-              {e.label}
-            </button>
+            <button key={e.id} style={s.segBtn(form.severidade === e.id, e.cor)} onClick={() => setField('severidade', e.id)}>{e.label}</button>
           ))}
         </div>
       </div>
@@ -664,16 +609,12 @@ export function MonitoramentoOcorrenciaView({ fazenda, fazendaId, talhao, onBack
     return (
       <div style={s.formSection}>
         <label style={s.label}>Estádio fenológico</label>
-        <select style={{ ...s.input }} value={form.estadio || ''} onChange={e => setField('estadio', e.target.value)}>
+        <select style={s.input} value={form.estadio || ''} onChange={e => setField('estadio', e.target.value)}>
           <option value="">Selecione...</option>
           {ESTADIOS.map(e => <option key={e} value={e}>{e}</option>)}
         </select>
       </div>
     )
-  }
-
-  function renderFormOutras() {
-    return null // só observações + câmera (renderizados abaixo como campos comuns)
   }
 
   function renderFormPlantio() {
@@ -686,13 +627,8 @@ export function MonitoramentoOcorrenciaView({ fazenda, fazendaId, talhao, onBack
       setForm(f => ({ ...f, distancias: [...(f.distancias || []), v] }))
       setDistanciaInput('')
     }
-
     function removeDistancia(idx) {
-      setForm(f => {
-        const arr = [...(f.distancias || [])]
-        arr.splice(idx, 1)
-        return { ...f, distancias: arr }
-      })
+      setForm(f => { const arr = [...(f.distancias || [])]; arr.splice(idx, 1); return { ...f, distancias: arr } })
     }
 
     return (
@@ -712,24 +648,14 @@ export function MonitoramentoOcorrenciaView({ fazenda, fazendaId, talhao, onBack
             ))}
           </div>
           <div style={s.addRow}>
-            <input
-              style={s.addInput}
-              type="number"
-              min="0"
-              value={distanciaInput}
-              onChange={e => setDistanciaInput(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && addDistancia()}
-              placeholder="cm"
-            />
+            <input style={s.addInput} type="number" min="0" value={distanciaInput} onChange={e => setDistanciaInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && addDistancia()} placeholder="cm" />
             <button style={s.btnAdd} onClick={addDistancia}>+</button>
           </div>
         </div>
         {distancias.length >= 2 && (
           <div style={{ ...s.resultBox, marginBottom: 16 }}>
             <span style={s.resultLabel}>CV (coef. variação)</span>
-            <span style={{ ...s.resultValue, color: cv > 25 ? C.red : cv > 15 ? C.amber : C.greenDk }}>
-              {cv}%
-            </span>
+            <span style={{ ...s.resultValue, color: cv > 25 ? C.red : cv > 15 ? C.amber : C.greenDk }}>{cv}%</span>
           </div>
         )}
       </>
@@ -761,83 +687,63 @@ export function MonitoramentoOcorrenciaView({ fazenda, fazendaId, talhao, onBack
   function renderFormulario() {
     const catId = categoriaSel?.id
     const formType = pragaSel ? detectFormType(pragaSel) : catId
-
     const mostrarObservacoes = catId !== 'plantio' && catId !== 'colheita'
-    const mostrarCamera      = catId !== 'plantio' && catId !== 'colheita'
+    const mostrarCamera = catId !== 'plantio' && catId !== 'colheita'
 
     return (
-      <div style={s.body}>
-        {pragaSel && (
-          <div style={{ marginBottom: 16, padding: '10px 14px', background: C.greenLight, borderRadius: 10, border: `1px solid ${C.green}` }}>
-            <p style={{ margin: 0, fontWeight: 700, fontSize: 14, color: C.greenDk }}>{pragaSel.nome_comum}</p>
-            {pragaSel.nome_cientifico && (
-              <p style={{ margin: '2px 0 0', fontSize: 12, color: C.textMid, fontStyle: 'italic' }}>{pragaSel.nome_cientifico}</p>
-            )}
-            {pragaSel.nivel_dano_economico && (
-              <p style={{ margin: '4px 0 0', fontSize: 12, color: C.textMid }}>NDE: {pragaSel.nivel_dano_economico}</p>
-            )}
-          </div>
-        )}
+      <>
+        <div style={s.body}>
+          {pragaSel && (
+            <div style={{ marginBottom: 16, padding: '10px 14px', background: C.greenLight, borderRadius: 10, border: `1px solid ${C.green}` }}>
+              <p style={{ margin: 0, fontWeight: 700, fontSize: 14, color: C.greenDk }}>{pragaSel.nome_comum}</p>
+              {pragaSel.nome_cientifico && (<p style={{ margin: '2px 0 0', fontSize: 12, color: C.textMid, fontStyle: 'italic' }}>{pragaSel.nome_cientifico}</p>)}
+              {pragaSel.nivel_dano_economico && (<p style={{ margin: '4px 0 0', fontSize: 12, color: C.textMid }}>NDE: {pragaSel.nivel_dano_economico}</p>)}
+            </div>
+          )}
 
-        {formType === 'lagarta'  && renderFormLagarta()}
-        {formType === 'percevejo' && renderFormPercevejo()}
-        {formType === 'daninha'  && renderFormDaninha()}
-        {catId === 'estadio'     && renderFormEstadio()}
-        {catId === 'outras'      && renderFormOutras()}
-        {catId === 'plantio'     && renderFormPlantio()}
-        {catId === 'colheita'    && renderFormColheita()}
-        {formType === 'generica' && catId !== 'outras' && catId !== 'estadio' && catId !== 'plantio' && catId !== 'colheita' && renderFormGenerica()}
+          {formType === 'lagarta'   && renderFormLagarta()}
+          {formType === 'percevejo' && renderFormPercevejo()}
+          {formType === 'daninha'   && renderFormDaninha()}
+          {catId === 'estadio'      && renderFormEstadio()}
+          {catId === 'plantio'      && renderFormPlantio()}
+          {catId === 'colheita'     && renderFormColheita()}
+          {formType === 'generica' && catId !== 'outras' && catId !== 'estadio' && catId !== 'plantio' && catId !== 'colheita' && renderFormGenerica()}
 
-        {mostrarObservacoes && (
-          <div style={s.formSection}>
-            <label style={s.label}>Observações</label>
-            <textarea style={s.textarea} value={form.observacoes || ''} onChange={e => setField('observacoes', e.target.value)} placeholder="Descreva o que observou..." />
-          </div>
-        )}
+          {mostrarObservacoes && (
+            <div style={s.formSection}>
+              <label style={s.label}>Observações</label>
+              <textarea style={s.textarea} value={form.observacoes || ''} onChange={e => setField('observacoes', e.target.value)} placeholder="Descreva o que observou..." />
+            </div>
+          )}
 
-        {mostrarCamera && (
-          <div style={{ marginBottom: 20 }}>
-            <input
-              ref={cameraRef}
-              type="file"
-              accept="image/*"
-              capture="environment"
-              onChange={handleFotoChange}
-              style={{ display: 'none' }}
-            />
-            <button style={s.btnCamera} onClick={() => cameraRef.current?.click()}>
-              <span>📷</span>
-              <span>{fotoPreview ? 'Trocar foto' : 'Tirar foto'}</span>
-            </button>
-            {fotoPreview && (
-              <img src={fotoPreview} alt="preview" style={s.fotoPreview} />
-            )}
-          </div>
-        )}
-
-        {saveError && (
-          <p style={{ color: C.red, fontSize: 13, marginBottom: 12 }}>{saveError}</p>
-        )}
-
-        <button
-          style={{ ...s.btnPrimary, opacity: saving ? 0.7 : 1 }}
-          disabled={saving}
-          onClick={salvarOcorrencia}
-        >
-          {saving ? 'Salvando...' : 'Salvar ocorrência'}
-        </button>
-      </div>
+          {mostrarCamera && (
+            <div style={{ marginBottom: 20 }}>
+              <input ref={cameraRef} type="file" accept="image/*" capture="environment" onChange={handleFotoChange} style={{ display: 'none' }} />
+              <button style={s.btnCamera} onClick={() => cameraRef.current?.click()}>
+                <span>📷</span><span>{fotoPreview ? 'Trocar foto' : 'Tirar foto'}</span>
+              </button>
+              {fotoPreview && (<img src={fotoPreview} alt="preview" style={s.fotoPreview} />)}
+            </div>
+          )}
+        </div>
+        <div style={s.footer}>
+          <button style={s.btnPrimary} onClick={adicionarOcorrencia}>
+            Salvar ocorrência
+          </button>
+        </div>
+      </>
     )
   }
 
-  // ─── Render principal ──────────────────────────────────────────────────────
+  // ─── Render principal ─────────────────────────────────────────────────────
   return (
     <div style={s.root}>
       {renderHeader()}
       {renderGPSBar()}
-      {tela === 'categorias'  && renderCategorias()}
-      {tela === 'lista'       && renderListaPragas()}
-      {tela === 'formulario'  && renderFormulario()}
+      {tela === 'categorias' && renderCategorias()}
+      {tela === 'lista'      && renderListaPragas()}
+      {tela === 'formulario' && renderFormulario()}
+      {tela === 'categorias' && renderFooter()}
     </div>
   )
 }

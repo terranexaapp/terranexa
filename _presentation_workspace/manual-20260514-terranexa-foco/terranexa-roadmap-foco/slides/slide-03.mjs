@@ -1,0 +1,11 @@
+import {S,bg,brand,footer,text,shape,rule,vRule,node,phase,connector} from './shared.mjs';
+export async function slide03(presentation,ctx){const slide=presentation.slides.add();bg(slide,ctx);await brand(slide,ctx,58,36,false);text(slide,ctx,'MAPA DE EXECUÇÃO',58,94,260,18,{mono:true,bold:true,size:9,color:S.dim});text(slide,ctx,'O mapa mental vira a bússola do projeto.',58,116,430,46,{serif:true,bold:true,size:25,color:S.ink});
+connector(slide,ctx,585,360,350,322);connector(slide,ctx,650,320,770,218);connector(slide,ctx,690,405,785,500);connector(slide,ctx,700,365,915,350);connector(slide,ctx,580,414,350,505);
+shape(slide,ctx,548,305,160,110,'#C9C9C9',{geometry:'ellipse',line:ctx.line('#B5B5B5',1)});text(slide,ctx,'TerraNexa App',578,347,100,24,{size:13,color:'#222222',align:'center'});
+phase(slide,ctx,'P0 Colocar para testar',250,306,190,S.green);phase(slide,ctx,'P1 Teste no campo',710,200,170,S.amber);phase(slide,ctx,'P2 Módulos essenciais',712,486,190,S.blue);phase(slide,ctx,'P3 Operação real',900,330,170,S.soil);phase(slide,ctx,'P4 Escala',270,490,120,S.red);
+[['Login e fazendas',110,304,150],['Mapa abrindo',175,245,145],['GitHub atualizado',350,250,160],['Vercel deploy funcionando',190,182,210],['Variáveis Supabase',468,298,170],['PWA instalável',135,390,150],['Mapbox ou Esri definitivo',270,406,230]].forEach(n=>node(slide,ctx,n[0],n[1],n[2],n[3]));
+[['Mapa mobile tela cheia',535,190,178],['Salvar ponto offline',650,145,176],['Linha do tempo mobile/desktop',742,90,190],['Cores por dias sem monitoramento',915,150,210],['Monitorar talhão',985,240,155],['GPS centralizar produtor',855,292,190]].forEach(n=>node(slide,ctx,n[0],n[1],n[2],n[3]));
+[['Talhões',934,486,105],['Pluviômetros e chuva',934,548,190],['Solo',865,590,90],['Estoque',760,626,120],['Gerenciamento',595,594,160],['Ordem de serviço',430,548,170]].forEach(n=>node(slide,ctx,n[0],n[1],n[2],n[3]));
+[['Histórico por safra',716,360,180],['Relatórios',730,430,125],['Alertas',1075,294,100],['Custos por hectare',1030,360,180],['Permissões de usuários',955,430,205]].forEach(n=>node(slide,ctx,n[0],n[1],n[2],n[3]));
+[['Plano comercial',120,426,155],['Performance',155,520,130],['Backup',325,585,95],['Domínio próprio',455,520,160]].forEach(n=>node(slide,ctx,n[0],n[1],n[2],n[3]));
+footer(slide,ctx,3);return slide;}

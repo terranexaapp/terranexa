@@ -1,0 +1,5 @@
+import {S,header,footer,text,rect,bar,card} from './shared.mjs';
+export async function slide16(presentation,ctx){const slide=presentation.slides.add();await header(slide,ctx,'Riscos e decisões','Os riscos principais são controláveis, mas precisam ser tratados antes de abrir para muitos usuários.', 'A maior armadilha é confundir app bonito com operação confiável em campo.');
+const risks=[['Variáveis Vercel incompletas',4,S.red,'bloqueia deploy correto'],['Mapbox billing/token',3,S.amber,'usar fallback Esri até decidir'],['Offline sem sincronização plena',5,S.red,'crítico para campo'],['RLS/permissões por fazenda',4,S.amber,'necessário antes de escala'],['Performance com muitos talhões',3,S.blue,'testar Leaflet no celular']];
+risks.forEach((r,i)=>bar(slide,ctx,90,286+i*55,780,r[0],r[1],5,r[2],r[3]));
+card(slide,ctx,940,292,220,250,'Decisão recomendada','Rodar piloto com poucos usuários, registrar falhas e só depois expandir módulos e fazendas.',S.green,{titleSize:19,bodySize:15,fill:S.pale});footer(slide,ctx,16);return slide;}

@@ -1,0 +1,1 @@
+Sources used: git log, local source tree, src/pages/FazendaDetalhePage.jsx, src/styles/theme.js, database/001_terranexa_schema.sql, README env guidance, public TerraNexa icon. No external metrics invented.

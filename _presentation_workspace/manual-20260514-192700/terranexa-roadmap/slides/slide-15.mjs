@@ -1,0 +1,5 @@
+import {S,header,footer,text,rect,card} from './shared.mjs';
+export async function slide15(presentation,ctx){const slide=presentation.slides.add();await header(slide,ctx,'Plano de teste','O piloto precisa medir fluxo completo, não só se a tela abre.', 'Teste ideal: uma fazenda, poucos talhões, celular real, sol forte, internet instável e uso com GPS.');
+const tests=[['1. Acesso','Login, lista de fazendas, abrir Fazenda Laranjeiras'],['2. Mapa','Zoom por pinça, clique em talhão, camada satélite carregando'],['3. GPS','Permitir localização, centralizar, ver marcador do produtor'],['4. Monitorar','Registrar ponto, caminhar, salvar offline e sincronizar'],['5. Resultado','Voltar ao mapa e ver cor do talhão mudar'],['6. OS','Criar ordem simples e validar ligação com histórico']];
+tests.forEach((t,i)=>card(slide,ctx,78+(i%3)*370,272+Math.floor(i/3)*140,320,104,t[0],t[1],i<3?S.green:S.amber,{titleSize:17,bodySize:13}));
+footer(slide,ctx,15);return slide;}
