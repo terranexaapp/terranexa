@@ -13,7 +13,6 @@ import { RelatoriosView } from './FazendaDetalhe/panels'
 import {
   FarmDesktopSidebar,
   DashboardView,
-  MonitoramentoDashboardView,
   InterpolacaoView
 } from './FazendaDetalhe/views'
 import { MonitoramentoCockpitView } from './FazendaDetalhe/monitoramentoCockpit'
@@ -201,6 +200,7 @@ export function FazendaDetalhePage() {
     <div
       style={{ minHeight: '100vh', background: isMapView ? '#102316' : C.bg, display: 'flex', flexDirection: 'column' }}
     >
+      {!isMapView && (
       <header style={showDesktopShell ? desktopTopbarStyle : floatingHeaderStyle}>
         {showDesktopShell && (
           <>
@@ -274,6 +274,7 @@ export function FazendaDetalhePage() {
           </nav>
         </div>
       </header>
+      )}
 
       {menuOpen && (
         <div style={drawerBackdropStyle} onClick={() => setMenuOpen(false)}>
@@ -382,6 +383,7 @@ export function FazendaDetalhePage() {
                 navigate={navigate}
                 setActiveView={setActiveView}
                 setShowNovaOp={setShowNovaOp}
+                setMenuOpen={setMenuOpen}
               />
             )}
             {activeView === 'dashboard' && (
