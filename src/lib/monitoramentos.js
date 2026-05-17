@@ -99,11 +99,13 @@ export async function criarMonitoramentoPonto({
   severidade,
   percentual_dano,
   recomendacao,
-  foto_url
+  foto_url,
+  tipo_registro,
+  dados_especificos
 }) {
   const payload = {
     monitoramento_id,
-    tipo: tipo || 'ponto',
+    tipo: tipo || 'ocorrencia',
     latitude: Number(latitude),
     longitude: Number(longitude),
     precisao_m: Number(precisao_m || 0),
@@ -115,8 +117,26 @@ export async function criarMonitoramentoPonto({
   if (percentual_dano !== undefined) payload.percentual_dano = percentual_dano == null ? null : Number(percentual_dano)
   if (recomendacao !== undefined) payload.recomendacao = recomendacao || null
   if (foto_url !== undefined) payload.foto_url = foto_url || null
+  if (tipo_registro !== undefined) payload.tipo_registro = tipo_registro || 'ocorrencia'
+  if (dados_especificos !== undefined) payload.dados_especificos = dados_especificos || null
 
   const { data, error } = await supabase.from('monitoramento_pontos').insert(payload).select().single()
+  if (error) throw error
+  return data
+}
+
+export async function salvarCaminhamento(monitoramentoId, trilha, iniciadoEm) {
+  if (!monitoramentoId || !Array.isArray(trilha) || trilha.length === 0) return null
+  const { data, error } = await supabase
+    .from('monitoramento_caminhamentos')
+    .insert({
+      monitoramento_id: monitoramentoId,
+      trilha,
+      iniciado_em: iniciadoEm || new Date().toISOString(),
+      finalizado_em: new Date().toISOString()
+    })
+    .select()
+    .single()
   if (error) throw error
   return data
 }

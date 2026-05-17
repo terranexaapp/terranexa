@@ -14,9 +14,9 @@ import {
   FarmDesktopSidebar,
   DashboardView,
   MonitoramentoDashboardView,
-  MonitoramentoRegistroView,
   InterpolacaoView
 } from './FazendaDetalhe/views'
+import { MonitoramentoOcorrenciaView } from './FazendaDetalhe/monitoramentoOcorrencia'
 import { FazendaMapaPrincipal } from './FazendaDetalhe/mapaPrincipal'
 import { GerencialView } from './FazendaDetalhe/gerencial'
 import { TalhaoGeoModal } from './FazendaDetalhe/talhaoGeoModal'
@@ -442,7 +442,7 @@ export function FazendaDetalhePage() {
             )}
             {activeView === 'relatorios' && <RelatoriosView fazendaId={id} talhoes={talhoes} total={total} />}
             {activeView === 'monitoramento-registro' && (
-              <MonitoramentoRegistroView
+              <MonitoramentoOcorrenciaView
                 fazenda={fazenda}
                 fazendaId={id}
                 talhao={talhaoSel}
