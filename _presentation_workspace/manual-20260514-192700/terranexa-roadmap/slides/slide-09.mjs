@@ -1,0 +1,6 @@
+import {S,header,footer,text,rect,drawMap,card} from './shared.mjs';
+export async function slide09(presentation,ctx){const slide=presentation.slides.add();await header(slide,ctx,'Monitoramento','A nova camada transforma ausência de visita em sinal visual imediato.', 'Regra definida: verde até 5 dias, amarelo de 6 a 10 dias, vermelho acima de 10 dias e cinza quando nunca houve visita.');
+drawMap(slide,ctx,84,270,560,310,{monitor:true,badge:'CAMADA MONITORAMENTO'});
+const leg=[['Verde','<= 5 dias','monitorado recentemente',S.green],['Amarelo','6 a 10 dias','atenção operacional',S.amber],['Vermelho','> 10 dias','visita atrasada',S.red],['Cinza','nunca','sem histórico registrado','#8A9070']];
+leg.forEach((l,i)=>card(slide,ctx,720,242+i*84,330,76,l[0]+' · '+l[1],l[2],l[3],{titleSize:15,bodySize:10.8}));
+text(slide,ctx,'Recomendação: este botão deve ficar no mini menu do talhão e também em Scouting como visão geral da fazenda.',126,604,1040,24,{size:17,serif:true,bold:true,color:S.ink,align:'center'});footer(slide,ctx,9);return slide;}

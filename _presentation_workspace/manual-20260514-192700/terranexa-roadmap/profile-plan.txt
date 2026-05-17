@@ -1,0 +1,6 @@
+task mode: create
+primary deck-profile: product-platform
+secondary gates: engineering-platform, appendix-heavy
+required proof objects: product system map, architecture, roadmap, field pilot plan, risk matrix, future UI mockups
+source requirements: local git history, app source tree, Supabase schema, current implementation notes
+known missing inputs: no live Mapbox token, no field pilot data yet

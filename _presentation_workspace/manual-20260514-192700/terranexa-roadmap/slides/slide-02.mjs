@@ -1,0 +1,5 @@
+import {S,header,footer,text,rect,rule,kpi,card} from './shared.mjs';
+export async function slide02(presentation,ctx){const slide=presentation.slides.add();await header(slide,ctx,'Resumo executivo','O TerraNexa já tem base funcional; agora o caminho crítico é teste de campo controlado.', 'A recomendação é congelar a ambição por alguns dias, validar o fluxo principal no celular e só então ampliar módulos.');
+kpi(slide,ctx,70,300,'Feito','produto navegável','Login, fazendas, mapa, talhões, OS, insumos, pluviômetros, PWA',S.green); kpi(slide,ctx,335,300,'Agora','validar campo','Vercel, variáveis, celular, GPS, monitoramento, clique no talhão',S.amber2); kpi(slide,ctx,600,300,'Depois','operação real','OS concluída virando histórico, chuvas, solo, relatórios e permissões',S.blue);
+card(slide,ctx,900,128,260,400,'Decisão de foco','A próxima versão deve provar: abrir no celular, selecionar talhão, centralizar GPS, registrar monitoramento e atualizar cor por dias sem visita. Todo o resto entra depois que esse ciclo estiver estável.',S.green,{titleSize:20,bodySize:15,fill:S.pale,stroke:'#BBD7A8'});
+footer(slide,ctx,2);return slide;}

@@ -1,0 +1,5 @@
+import {S,header,footer,text,rect,stage} from './shared.mjs';
+export async function slide14(presentation,ctx){const slide=presentation.slides.add();await header(slide,ctx,'Roadmap priorizado','A sequência recomendada evita que o projeto se perca em melhorias paralelas.', 'A lógica é: pôr no ar, testar no campo, fechar ciclo operacional, depois escalar gestão e relatórios.');
+const stages=[['P0','Colocar para testar','Vercel, env vars, login, mapa, PWA, celular',S.green],['P1','Campo real','GPS, monitorar, offline, cores por atraso, linha do tempo',S.amber],['P2','Operação essencial','OS concluída, insumos, histórico, pluviômetros e solo básico',S.blue],['P3','Gestão','Permissões, equipe, safras, centros de custo e relatórios',S.soil],['P4','Escala','Domínio, backup, performance, analytics e plano comercial',S.red]];
+stages.forEach((s,i)=>stage(slide,ctx,70+i*230,315,190,s[0],s[1],s[2],s[3],i<2?'agora':''));
+text(slide,ctx,'Regra de gestão: não abrir P3/P4 enquanto P0/P1 não tiverem passado por teste real no celular.',190,548,900,36,{serif:true,bold:true,size:22,color:S.ink,align:'center'});footer(slide,ctx,14);return slide;}

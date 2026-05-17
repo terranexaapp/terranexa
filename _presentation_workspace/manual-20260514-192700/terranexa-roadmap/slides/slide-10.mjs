@@ -1,0 +1,5 @@
+import {S,header,footer,text,rect,drawMap,workflowNode} from './shared.mjs';
+export async function slide10(presentation,ctx){const slide=presentation.slides.add();await header(slide,ctx,'Chuvas e pluviômetros','O módulo de chuva deve separar cadastro, registro e leitura interpolada.', 'A linha do tempo não deve carregar interpolação pesada; o mapa principal e a página Chuvas devem exibir a leitura visual.');
+drawMap(slide,ctx,70,252,530,320,{monitor:false,badge:'PÁGINA CHUVAS'});
+workflowNode(slide,ctx,690,252,'Registrar pluviômetro','Ponto georreferenciado, renomear e editar posição','PLU',S.blue);workflowNode(slide,ctx,690,382,'Registrar chuva','Entrada por período e fonte do pluviômetro','MM',S.amber);workflowNode(slide,ctx,690,512,'Mapa interpolado','Recorte por talhão ou fazenda completa','INT',S.green);
+rect(slide,ctx,864,296,70,3,S.softLine);rect(slide,ctx,864,426,70,3,S.softLine);footer(slide,ctx,10);return slide;}

@@ -1,0 +1,16 @@
+Thesis: TerraNexa already has the base of a field app; the next work must be sequenced around field validation before expanding management and reports.
+Audience: project owner and build team.
+One-line arc: prove what is ready, show the execution map, then commit to phases P0-P4 with field testing as the decision gate.
+
+01. Claim: TerraNexa is no longer just a prototype; it is entering a focused field-test path. Proof: cover roadmap map.
+02. Claim: The foundation is assembled, but the next risk is field reliability. Proof: done/needs validation matrix.
+03. Claim: The execution map must keep every feature connected to talhao value. Proof: central mind map P0-P4.
+04. Claim: P0 is the launch gate: the app must open, log in, install and deploy cleanly. Proof: checklist with status.
+05. Claim: P1 is the real product test: GPS, offline monitoring and mobile map behavior. Proof: field workflow.
+06. Claim: P2 closes the minimum farm-management system. Proof: module dependency map.
+07. Claim: P3 turns records into operation control. Proof: OS/cost/history/reporting pipeline.
+08. Claim: P4 should wait until the field loop is validated. Proof: scale readiness ladder.
+09. Claim: The next fourteen days should test one complete flow instead of many partial modules. Proof: sprint timeline.
+10. Claim: Focus rules prevent scope drift. Proof: do/avoid/measure board.
+11. Claim: The success metric is simple: one monitored talhao that becomes data on the map and history. Proof: operating loop.
+12. Claim: The next decision is to run P0/P1 in the field, then promote P2. Proof: final action plan.

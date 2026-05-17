@@ -1,0 +1,1101 @@
+{
+  "schema": "openai.presentation.layout/v4",
+  "unit": "px",
+  "slide": {
+    "aid": "sl/5q351g",
+    "id": "5q351g",
+    "slide": 12,
+    "layoutId": "4d4a5d18-f281-47b0-b08e-2e04e0efb251",
+    "layoutName": "Title Slide",
+    "layoutType": "title",
+    "masterLayoutId": "5f6c649f-3f9f-4b72-a4d3-d70203b0041b",
+    "masterLayoutName": "Master",
+    "frame": {
+      "left": 0,
+      "top": 0,
+      "width": 1280,
+      "height": 720
+    }
+  },
+  "theme": {
+    "colorSchemeName": "ChatGPT",
+    "colors": {
+      "accent1": "#156082",
+      "accent2": "#E97132",
+      "accent3": "#196B24",
+      "accent4": "#0F9ED5",
+      "accent5": "#A02B93",
+      "accent6": "#4EA72E",
+      "bg1": "#FFFFFF",
+      "bg2": "#000000",
+      "tx1": "#1F1F1F",
+      "tx2": "#FFFFFF",
+      "dk1": "#000000",
+      "lt1": "#FFFFFF",
+      "dk2": "#0E2841",
+      "lt2": "#E8E8E8",
+      "hlink": "#467886",
+      "folHlink": "#96607D"
+    },
+    "typefaces": [
+      "Aptos",
+      "Aptos Mono",
+      "Georgia"
+    ]
+  },
+  "inheritedLayers": [
+    {
+      "scope": "layout",
+      "id": "4d4a5d18-f281-47b0-b08e-2e04e0efb251",
+      "name": "Title Slide",
+      "type": "title",
+      "parentLayoutId": "5f6c649f-3f9f-4b72-a4d3-d70203b0041b",
+      "elements": []
+    },
+    {
+      "scope": "master",
+      "id": "5f6c649f-3f9f-4b72-a4d3-d70203b0041b",
+      "name": "Master",
+      "type": "master",
+      "elements": []
+    }
+  ],
+  "elements": [
+    {
+      "order": 1,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/orytsvu9",
+      "id": "1",
+      "bbox": [
+        0,
+        0,
+        1280,
+        720
+      ],
+      "geometry": "rect",
+      "fillColor": "#F7F9F2",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 2,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/z61032ls",
+      "id": "2",
+      "bbox": [
+        0,
+        0,
+        1280,
+        18
+      ],
+      "geometry": "rect",
+      "fillColor": "#E8F4DC",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 3,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/al87ed8b",
+      "id": "3",
+      "bbox": [
+        0,
+        18,
+        1280,
+        2
+      ],
+      "geometry": "rect",
+      "fillColor": "#E8A84C",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 4,
+      "kind": "image",
+      "scope": "slide",
+      "aid": "im/0bi9s36h",
+      "id": "4",
+      "bbox": [
+        58,
+        36,
+        34,
+        34
+      ],
+      "alt": "TerraNexa icon",
+      "contentType": "image/png",
+      "asset": {
+        "assetId": "b37bf4e1-1326-4d91-a01d-47bf01bd3d71",
+        "contentType": "image/png",
+        "byteLength": 6664
+      }
+    },
+    {
+      "order": 5,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/sfil0rqd",
+      "id": "5",
+      "bbox": [
+        102,
+        37,
+        160,
+        24
+      ],
+      "geometry": "rect",
+      "text": "TerraNexa",
+      "textPreview": "TerraNexa",
+      "resolvedFontSize": 20,
+      "resolvedTextStyle": {
+        "fontSize": 20,
+        "typeface": "Georgia",
+        "bold": true,
+        "alignment": "left"
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "TerraNexa"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "TerraNexa",
+          "runs": [
+            {
+              "index": 1,
+              "text": "TerraNexa",
+              "fontSize": 20,
+              "typeface": "Georgia",
+              "color": "#3D8A22",
+              "bold": true
+            }
+          ]
+        }
+      ],
+      "fillColor": "rgba(0, 0, 0, 0)",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 6,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/zupwb2hw",
+      "id": "6",
+      "bbox": [
+        103,
+        65,
+        190,
+        14
+      ],
+      "geometry": "rect",
+      "text": "ROADMAP DE FOCO",
+      "textPreview": "ROADMAP DE FOCO",
+      "resolvedFontSize": 7.4,
+      "resolvedTextStyle": {
+        "fontSize": 7.4,
+        "typeface": "Aptos Mono",
+        "bold": true,
+        "alignment": "left"
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "ROADMAP DE FOCO"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "ROADMAP DE FOCO",
+          "runs": [
+            {
+              "index": 1,
+              "text": "ROADMAP DE FOCO",
+              "fontSize": 7.4,
+              "typeface": "Aptos Mono",
+              "color": "#7E8A68",
+              "bold": true
+            }
+          ]
+        }
+      ],
+      "fillColor": "rgba(0, 0, 0, 0)",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 7,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/a9w3m94f",
+      "id": "7",
+      "bbox": [
+        58,
+        108,
+        430,
+        18
+      ],
+      "geometry": "rect",
+      "text": "PRÓXIMA DECISÃO",
+      "textPreview": "PRÓXIMA DECISÃO",
+      "resolvedFontSize": 9,
+      "resolvedTextStyle": {
+        "fontSize": 9,
+        "typeface": "Aptos Mono",
+        "bold": true,
+        "alignment": "left"
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "PRÓXIMA DECISÃO"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "PRÓXIMA DECISÃO",
+          "runs": [
+            {
+              "index": 1,
+              "text": "PRÓXIMA DECISÃO",
+              "fontSize": 9,
+              "typeface": "Aptos Mono",
+              "color": "#7E8A68",
+              "bold": true
+            }
+          ]
+        }
+      ],
+      "fillColor": "rgba(0, 0, 0, 0)",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 8,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/hwfyxobm",
+      "id": "8",
+      "bbox": [
+        58,
+        132,
+        780,
+        78
+      ],
+      "geometry": "rect",
+      "text": "A próxima etapa deve ser curta, verificável e orientada ao campo.",
+      "textPreview": "A próxima etapa deve ser curta, verificável e orientada ao campo.",
+      "resolvedFontSize": 31,
+      "resolvedTextStyle": {
+        "fontSize": 31,
+        "typeface": "Georgia",
+        "bold": true,
+        "alignment": "left"
+      },
+      "textLayout": {
+        "lineCount": 2,
+        "lines": [
+          {
+            "index": 1,
+            "text": "A próxima etapa deve ser curta, verificável e"
+          },
+          {
+            "index": 2,
+            "text": "orientada ao campo."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "A próxima etapa deve ser curta, verificável e orientada ao campo.",
+          "runs": [
+            {
+              "index": 1,
+              "text": "A próxima etapa deve ser curta, verificável e orientada ao campo.",
+              "fontSize": 31,
+              "typeface": "Georgia",
+              "color": "#18380E",
+              "bold": true
+            }
+          ]
+        }
+      ],
+      "fillColor": "rgba(0, 0, 0, 0)",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 9,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/obm58z25",
+      "id": "9",
+      "bbox": [
+        58,
+        214,
+        780,
+        40
+      ],
+      "geometry": "rect",
+      "text": "Se seguirmos a ordem, o TerraNexa chega mais rápido a um piloto real sem perder qualidade.",
+      "textPreview": "Se seguirmos a ordem, o TerraNexa chega mais rápido a um piloto real sem perder qualidade.",
+      "resolvedFontSize": 14,
+      "resolvedTextStyle": {
+        "fontSize": 14,
+        "typeface": "Aptos",
+        "alignment": "left"
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Se seguirmos a ordem, o TerraNexa chega mais rápido a um piloto real sem perder qualidade."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Se seguirmos a ordem, o TerraNexa chega mais rápido a um piloto real sem perder qualidade.",
+          "runs": [
+            {
+              "index": 1,
+              "text": "Se seguirmos a ordem, o TerraNexa chega mais rápido a um piloto real sem perder qualidade.",
+              "fontSize": 14,
+              "typeface": "Aptos",
+              "color": "#536444"
+            }
+          ]
+        }
+      ],
+      "fillColor": "rgba(0, 0, 0, 0)",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 10,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/e1w7mp0b",
+      "id": "10",
+      "bbox": [
+        86,
+        286,
+        280,
+        150
+      ],
+      "geometry": "rect",
+      "fillColor": "#FFFFFF",
+      "lineColor": "#DDE8D2",
+      "lineWidth": 1
+    },
+    {
+      "order": 11,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/7mp0bi9s",
+      "id": "11",
+      "bbox": [
+        86,
+        286,
+        280,
+        4
+      ],
+      "geometry": "rect",
+      "fillColor": "#3D8A22",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 12,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/w7mp0bi9",
+      "id": "12",
+      "bbox": [
+        102,
+        304,
+        248,
+        24
+      ],
+      "geometry": "rect",
+      "text": "1. Fechar P0",
+      "textPreview": "1. Fechar P0",
+      "resolvedFontSize": 17,
+      "resolvedTextStyle": {
+        "fontSize": 17,
+        "typeface": "Georgia",
+        "bold": true,
+        "alignment": "left"
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "1. Fechar P0"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "1. Fechar P0",
+          "runs": [
+            {
+              "index": 1,
+              "text": "1. Fechar P0",
+              "fontSize": 17,
+              "typeface": "Georgia",
+              "color": "#18380E",
+              "bold": true
+            }
+          ]
+        }
+      ],
+      "fillColor": "rgba(0, 0, 0, 0)",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 13,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/psfil0rq",
+      "id": "13",
+      "bbox": [
+        102,
+        340,
+        248,
+        80
+      ],
+      "geometry": "rect",
+      "text": "Conferir variáveis, publicar Vercel, instalar PWA e abrir fazenda/mapa em celular real.",
+      "textPreview": "Conferir variáveis, publicar Vercel, instalar PWA e abrir fazenda/mapa em celular real.",
+      "resolvedFontSize": 12,
+      "resolvedTextStyle": {
+        "fontSize": 12,
+        "typeface": "Aptos",
+        "alignment": "left"
+      },
+      "textLayout": {
+        "lineCount": 2,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Conferir variáveis, publicar Vercel, instalar PWA e"
+          },
+          {
+            "index": 2,
+            "text": "abrir fazenda/mapa em celular real."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Conferir variáveis, publicar Vercel, instalar PWA e abrir fazenda/mapa em celular real.",
+          "runs": [
+            {
+              "index": 1,
+              "text": "Conferir variáveis, publicar Vercel, instalar PWA e abrir fazenda/mapa em celular real.",
+              "fontSize": 12,
+              "typeface": "Aptos",
+              "color": "#536444"
+            }
+          ]
+        }
+      ],
+      "fillColor": "rgba(0, 0, 0, 0)",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 14,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/epkzupwb",
+      "id": "14",
+      "bbox": [
+        500,
+        286,
+        280,
+        150
+      ],
+      "geometry": "rect",
+      "fillColor": "#FFFFFF",
+      "lineColor": "#DDE8D2",
+      "lineWidth": 1
+    },
+    {
+      "order": 15,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/7adsji5s",
+      "id": "15",
+      "bbox": [
+        500,
+        286,
+        280,
+        4
+      ],
+      "geometry": "rect",
+      "fillColor": "#E8A84C",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 16,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/wval87ed",
+      "id": "16",
+      "bbox": [
+        516,
+        304,
+        248,
+        24
+      ],
+      "geometry": "rect",
+      "text": "2. Rodar P1",
+      "textPreview": "2. Rodar P1",
+      "resolvedFontSize": 17,
+      "resolvedTextStyle": {
+        "fontSize": 17,
+        "typeface": "Georgia",
+        "bold": true,
+        "alignment": "left"
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "2. Rodar P1"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "2. Rodar P1",
+          "runs": [
+            {
+              "index": 1,
+              "text": "2. Rodar P1",
+              "fontSize": 17,
+              "typeface": "Georgia",
+              "color": "#18380E",
+              "bold": true
+            }
+          ]
+        }
+      ],
+      "fillColor": "rgba(0, 0, 0, 0)",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 17,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/pg3ex0nu",
+      "id": "17",
+      "bbox": [
+        516,
+        340,
+        248,
+        80
+      ],
+      "geometry": "rect",
+      "text": "Testar GPS, monitoramento, offline e cor por dias sem visita em uma área real da fazenda.",
+      "textPreview": "Testar GPS, monitoramento, offline e cor por dias sem visita em uma área real da fazenda.",
+      "resolvedFontSize": 12,
+      "resolvedTextStyle": {
+        "fontSize": 12,
+        "typeface": "Aptos",
+        "alignment": "left"
+      },
+      "textLayout": {
+        "lineCount": 2,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Testar GPS, monitoramento, offline e cor por dias"
+          },
+          {
+            "index": 2,
+            "text": "sem visita em uma área real da fazenda."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Testar GPS, monitoramento, offline e cor por dias sem visita em uma área real da fazenda.",
+          "runs": [
+            {
+              "index": 1,
+              "text": "Testar GPS, monitoramento, offline e cor por dias sem visita em uma área real da fazenda.",
+              "fontSize": 12,
+              "typeface": "Aptos",
+              "color": "#536444"
+            }
+          ]
+        }
+      ],
+      "fillColor": "rgba(0, 0, 0, 0)",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 18,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/eloj2t83",
+      "id": "18",
+      "bbox": [
+        914,
+        286,
+        280,
+        150
+      ],
+      "geometry": "rect",
+      "fillColor": "#FFFFFF",
+      "lineColor": "#DDE8D2",
+      "lineWidth": 1
+    },
+    {
+      "order": 19,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/36hcrmhk",
+      "id": "19",
+      "bbox": [
+        914,
+        286,
+        280,
+        4
+      ],
+      "geometry": "rect",
+      "fillColor": "#4A8AB8",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 20,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/zupwb2hw",
+      "id": "20",
+      "bbox": [
+        930,
+        304,
+        248,
+        24
+      ],
+      "geometry": "rect",
+      "text": "3. Promover P2",
+      "textPreview": "3. Promover P2",
+      "resolvedFontSize": 17,
+      "resolvedTextStyle": {
+        "fontSize": 17,
+        "typeface": "Georgia",
+        "bold": true,
+        "alignment": "left"
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "3. Promover P2"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "3. Promover P2",
+          "runs": [
+            {
+              "index": 1,
+              "text": "3. Promover P2",
+              "fontSize": 17,
+              "typeface": "Georgia",
+              "color": "#18380E",
+              "bold": true
+            }
+          ]
+        }
+      ],
+      "fillColor": "rgba(0, 0, 0, 0)",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 21,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/a9w3m94f",
+      "id": "21",
+      "bbox": [
+        930,
+        340,
+        248,
+        80
+      ],
+      "geometry": "rect",
+      "text": "Depois do campo validado, fechar talhões, pluviômetros, solo, estoque e ordem de serviço.",
+      "textPreview": "Depois do campo validado, fechar talhões, pluviômetros, solo, estoque e ordem de serviço.",
+      "resolvedFontSize": 12,
+      "resolvedTextStyle": {
+        "fontSize": 12,
+        "typeface": "Aptos",
+        "alignment": "left"
+      },
+      "textLayout": {
+        "lineCount": 2,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Depois do campo validado, fechar talhões,"
+          },
+          {
+            "index": 2,
+            "text": "pluviômetros, solo, estoque e ordem de serviço."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Depois do campo validado, fechar talhões, pluviômetros, solo, estoque e ordem de serviço.",
+          "runs": [
+            {
+              "index": 1,
+              "text": "Depois do campo validado, fechar talhões, pluviômetros, solo, estoque e ordem de serviço.",
+              "fontSize": 12,
+              "typeface": "Aptos",
+              "color": "#536444"
+            }
+          ]
+        }
+      ],
+      "fillColor": "rgba(0, 0, 0, 0)",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 22,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/h0fepkzu",
+      "id": "22",
+      "bbox": [
+        366,
+        360,
+        134,
+        4
+      ],
+      "geometry": "rect",
+      "fillColor": "#DDE8D2",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 23,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/sfil0rqd",
+      "id": "23",
+      "bbox": [
+        780,
+        360,
+        134,
+        4
+      ],
+      "geometry": "rect",
+      "fillColor": "#DDE8D2",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 24,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/z61032ls",
+      "id": "24",
+      "bbox": [
+        190,
+        528,
+        900,
+        64
+      ],
+      "geometry": "rect",
+      "fillColor": "#0D2414",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 25,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/al87ed8b",
+      "id": "25",
+      "bbox": [
+        230,
+        548,
+        820,
+        22
+      ],
+      "geometry": "rect",
+      "text": "Foco recomendado: P0 + P1 primeiro. O restante entra quando o mapa e o monitoramento funcionarem na mão do produtor.",
+      "textPreview": "Foco recomendado: P0 + P1 primeiro. O restante entra quando o mapa e o monitoramento funcionarem na mão do produtor.",
+      "resolvedFontSize": 20,
+      "resolvedTextStyle": {
+        "fontSize": 20,
+        "typeface": "Georgia",
+        "bold": true,
+        "alignment": "center"
+      },
+      "textLayout": {
+        "lineCount": 2,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Foco recomendado: P0 + P1 primeiro. O restante entra quando o mapa e o"
+          },
+          {
+            "index": 2,
+            "text": "monitoramento funcionarem na mão do produtor."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Foco recomendado: P0 + P1 primeiro. O restante entra quando o mapa e o monitoramento funcionarem na mão do produtor.",
+          "runs": [
+            {
+              "index": 1,
+              "text": "Foco recomendado: P0 + P1 primeiro. O restante entra quando o mapa e o monitoramento funcionarem na mão do produtor.",
+              "fontSize": 20,
+              "typeface": "Georgia",
+              "color": "#FFFFFF",
+              "bold": true
+            }
+          ]
+        }
+      ],
+      "fillColor": "rgba(0, 0, 0, 0)",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 26,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/hcrmhk3q",
+      "id": "26",
+      "bbox": [
+        390,
+        614,
+        500,
+        32
+      ],
+      "geometry": "rect",
+      "fillColor": "#E8F4DC",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 27,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/orytsvu9",
+      "id": "27",
+      "bbox": [
+        400,
+        622,
+        480,
+        14
+      ],
+      "geometry": "rect",
+      "text": "próxima conversa: validar campo, não redesenhar o escopo",
+      "textPreview": "próxima conversa: validar campo, não redesenhar o escopo",
+      "resolvedFontSize": 10.51,
+      "resolvedTextStyle": {
+        "fontSize": 10.51,
+        "typeface": "Aptos",
+        "bold": true,
+        "alignment": "center"
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "próxima conversa: validar campo, não redesenhar o escopo"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "próxima conversa: validar campo, não redesenhar o escopo",
+          "runs": [
+            {
+              "index": 1,
+              "text": "próxima conversa: validar campo, não redesenhar o escopo",
+              "fontSize": 10.51,
+              "typeface": "Aptos",
+              "color": "#3D8A22",
+              "bold": true
+            }
+          ]
+        }
+      ],
+      "fillColor": "rgba(0, 0, 0, 0)",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 28,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/zed8v6ps",
+      "id": "28",
+      "bbox": [
+        58,
+        665,
+        1060,
+        1
+      ],
+      "geometry": "rect",
+      "fillColor": "#DDE8D2",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 29,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/6xkf6dcb",
+      "id": "29",
+      "bbox": [
+        58,
+        678,
+        650,
+        18
+      ],
+      "geometry": "rect",
+      "text": "TerraNexa | fases de foco para teste em campo",
+      "textPreview": "TerraNexa | fases de foco para teste em campo",
+      "resolvedFontSize": 8.51,
+      "resolvedTextStyle": {
+        "fontSize": 8.51,
+        "typeface": "Aptos Mono",
+        "bold": true,
+        "alignment": "left"
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "TerraNexa | fases de foco para teste em campo"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "TerraNexa | fases de foco para teste em campo",
+          "runs": [
+            {
+              "index": 1,
+              "text": "TerraNexa | fases de foco para teste em campo",
+              "fontSize": 8.51,
+              "typeface": "Aptos Mono",
+              "color": "#7E8A68",
+              "bold": true
+            }
+          ]
+        }
+      ],
+      "fillColor": "rgba(0, 0, 0, 0)",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 30,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/g3ex0nux",
+      "id": "30",
+      "bbox": [
+        1160,
+        674,
+        54,
+        24
+      ],
+      "geometry": "rect",
+      "text": "12",
+      "textPreview": "12",
+      "resolvedFontSize": 13,
+      "resolvedTextStyle": {
+        "fontSize": 13,
+        "typeface": "Aptos Mono",
+        "bold": true,
+        "alignment": "right"
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "12"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "12",
+          "runs": [
+            {
+              "index": 1,
+              "text": "12",
+              "fontSize": 13,
+              "typeface": "Aptos Mono",
+              "color": "#3D8A22",
+              "bold": true
+            }
+          ]
+        }
+      ],
+      "fillColor": "rgba(0, 0, 0, 0)",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    }
+  ],
+  "composeRuns": []
+}

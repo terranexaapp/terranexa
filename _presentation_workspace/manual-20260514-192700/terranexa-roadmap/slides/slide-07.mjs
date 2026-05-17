@@ -1,0 +1,5 @@
+import {S,header,footer,text,rect,drawMap,pill} from './shared.mjs';
+export async function slide07(presentation,ctx){const slide=presentation.slides.add();await header(slide,ctx,'Mapa','O mapa deixou de ser apenas visual: virou a tela operacional do produtor.', 'A evolução para Leaflet melhora clique, pinça, zoom e camadas; Mapbox entra como satélite quando o token estiver ativo.');
+drawMap(slide,ctx,90,272,500,300,{monitor:false,badge:'ANTES · ESRI'});drawMap(slide,ctx,690,272,500,300,{monitor:true,badge:'DEPOIS · LEAFLET + MAPBOX'});
+pill(slide,ctx,'Custom tile engine',210,594,180,S.pale,S.mid);pill(slide,ctx,'Leaflet + camadas agrícolas',820,594,240,S.pale,S.green);
+text(slide,ctx,'Ganho esperado: navegação natural no celular, polígonos clicáveis confiáveis e camadas agrícolas mais fáceis de manter.',184,620,920,26,{serif:true,bold:true,size:20,color:S.ink,align:'center'});footer(slide,ctx,7);return slide;}

@@ -1,0 +1,1513 @@
+{
+  "schema": "openai.presentation.layout/v4",
+  "unit": "px",
+  "slide": {
+    "aid": "sl/vzsx18",
+    "id": "vzsx18",
+    "slide": 2,
+    "layoutId": "4d4a5d18-f281-47b0-b08e-2e04e0efb251",
+    "layoutName": "Title Slide",
+    "layoutType": "title",
+    "masterLayoutId": "5f6c649f-3f9f-4b72-a4d3-d70203b0041b",
+    "masterLayoutName": "Master",
+    "frame": {
+      "left": 0,
+      "top": 0,
+      "width": 1280,
+      "height": 720
+    }
+  },
+  "theme": {
+    "colorSchemeName": "ChatGPT",
+    "colors": {
+      "accent1": "#156082",
+      "accent2": "#E97132",
+      "accent3": "#196B24",
+      "accent4": "#0F9ED5",
+      "accent5": "#A02B93",
+      "accent6": "#4EA72E",
+      "bg1": "#FFFFFF",
+      "bg2": "#000000",
+      "tx1": "#1F1F1F",
+      "tx2": "#FFFFFF",
+      "dk1": "#000000",
+      "lt1": "#FFFFFF",
+      "dk2": "#0E2841",
+      "lt2": "#E8E8E8",
+      "hlink": "#467886",
+      "folHlink": "#96607D"
+    },
+    "typefaces": [
+      "Aptos",
+      "Aptos Mono",
+      "Georgia"
+    ]
+  },
+  "inheritedLayers": [
+    {
+      "scope": "layout",
+      "id": "4d4a5d18-f281-47b0-b08e-2e04e0efb251",
+      "name": "Title Slide",
+      "type": "title",
+      "parentLayoutId": "5f6c649f-3f9f-4b72-a4d3-d70203b0041b",
+      "elements": []
+    },
+    {
+      "scope": "master",
+      "id": "5f6c649f-3f9f-4b72-a4d3-d70203b0041b",
+      "name": "Master",
+      "type": "master",
+      "elements": []
+    }
+  ],
+  "elements": [
+    {
+      "order": 1,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/wb2hwfyx",
+      "id": "1",
+      "bbox": [
+        0,
+        0,
+        1280,
+        720
+      ],
+      "geometry": "rect",
+      "fillColor": "#F7F9F2",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 2,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/3q5o7qpg",
+      "id": "2",
+      "bbox": [
+        0,
+        0,
+        1280,
+        18
+      ],
+      "geometry": "rect",
+      "fillColor": "#E8F4DC",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 3,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/e9cvixcz",
+      "id": "3",
+      "bbox": [
+        0,
+        18,
+        1280,
+        2
+      ],
+      "geometry": "rect",
+      "fillColor": "#E8A84C",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 4,
+      "kind": "image",
+      "scope": "slide",
+      "aid": "im/gr2p8nqx",
+      "id": "4",
+      "bbox": [
+        58,
+        36,
+        34,
+        34
+      ],
+      "alt": "TerraNexa icon",
+      "contentType": "image/png",
+      "asset": {
+        "assetId": "0548e0f2-4ffa-4fb4-be97-200445ea6980",
+        "contentType": "image/png",
+        "byteLength": 6664
+      }
+    },
+    {
+      "order": 5,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/w3m94fu1",
+      "id": "5",
+      "bbox": [
+        102,
+        37,
+        160,
+        24
+      ],
+      "geometry": "rect",
+      "text": "TerraNexa",
+      "textPreview": "TerraNexa",
+      "resolvedFontSize": 20,
+      "resolvedTextStyle": {
+        "fontSize": 20,
+        "typeface": "Georgia",
+        "bold": true,
+        "alignment": "left"
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "TerraNexa"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "TerraNexa",
+          "runs": [
+            {
+              "index": 1,
+              "text": "TerraNexa",
+              "fontSize": 20,
+              "typeface": "Georgia",
+              "color": "#3D8A22",
+              "bold": true
+            }
+          ]
+        }
+      ],
+      "fillColor": "rgba(0, 0, 0, 0)",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 6,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/3itgfmlk",
+      "id": "6",
+      "bbox": [
+        103,
+        65,
+        190,
+        14
+      ],
+      "geometry": "rect",
+      "text": "ROADMAP DE FOCO",
+      "textPreview": "ROADMAP DE FOCO",
+      "resolvedFontSize": 7.4,
+      "resolvedTextStyle": {
+        "fontSize": 7.4,
+        "typeface": "Aptos Mono",
+        "bold": true,
+        "alignment": "left"
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "ROADMAP DE FOCO"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "ROADMAP DE FOCO",
+          "runs": [
+            {
+              "index": 1,
+              "text": "ROADMAP DE FOCO",
+              "fontSize": 7.4,
+              "typeface": "Aptos Mono",
+              "color": "#7E8A68",
+              "bold": true
+            }
+          ]
+        }
+      ],
+      "fillColor": "rgba(0, 0, 0, 0)",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 7,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/ex0nuxc3",
+      "id": "7",
+      "bbox": [
+        58,
+        108,
+        430,
+        18
+      ],
+      "geometry": "rect",
+      "text": "ESTADO ATUAL",
+      "textPreview": "ESTADO ATUAL",
+      "resolvedFontSize": 9,
+      "resolvedTextStyle": {
+        "fontSize": 9,
+        "typeface": "Aptos Mono",
+        "bold": true,
+        "alignment": "left"
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "ESTADO ATUAL"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "ESTADO ATUAL",
+          "runs": [
+            {
+              "index": 1,
+              "text": "ESTADO ATUAL",
+              "fontSize": 9,
+              "typeface": "Aptos Mono",
+              "color": "#7E8A68",
+              "bold": true
+            }
+          ]
+        }
+      ],
+      "fillColor": "rgba(0, 0, 0, 0)",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 8,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/lkjm1cfa",
+      "id": "8",
+      "bbox": [
+        58,
+        132,
+        780,
+        78
+      ],
+      "geometry": "rect",
+      "text": "A fundação está montada; o próximo risco é confiabilidade em campo.",
+      "textPreview": "A fundação está montada; o próximo risco é confiabilidade em campo.",
+      "resolvedFontSize": 31,
+      "resolvedTextStyle": {
+        "fontSize": 31,
+        "typeface": "Georgia",
+        "bold": true,
+        "alignment": "left"
+      },
+      "textLayout": {
+        "lineCount": 2,
+        "lines": [
+          {
+            "index": 1,
+            "text": "A fundação está montada; o próximo risco é"
+          },
+          {
+            "index": 2,
+            "text": "confiabilidade em campo."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "A fundação está montada; o próximo risco é confiabilidade em campo.",
+          "runs": [
+            {
+              "index": 1,
+              "text": "A fundação está montada; o próximo risco é confiabilidade em campo.",
+              "fontSize": 31,
+              "typeface": "Georgia",
+              "color": "#18380E",
+              "bold": true
+            }
+          ]
+        }
+      ],
+      "fillColor": "rgba(0, 0, 0, 0)",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 9,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/szqtcj6t",
+      "id": "9",
+      "bbox": [
+        58,
+        214,
+        780,
+        40
+      ],
+      "geometry": "rect",
+      "text": "O app saiu de mapa desproporcional para mapa navegável, PWA, deploy e base agrícola. Agora precisa passar no celular, na lavoura.",
+      "textPreview": "O app saiu de mapa desproporcional para mapa navegável, PWA, deploy e base agrícola. Agora precisa passar no celular, na lavoura.",
+      "resolvedFontSize": 14,
+      "resolvedTextStyle": {
+        "fontSize": 14,
+        "typeface": "Aptos",
+        "alignment": "left"
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "O app saiu de mapa desproporcional para mapa navegável, PWA, deploy e base agrícola. Agora precisa passar no celular, na lavoura."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "O app saiu de mapa desproporcional para mapa navegável, PWA, deploy e base agrícola. Agora precisa passar no celular, na lavoura.",
+          "runs": [
+            {
+              "index": 1,
+              "text": "O app saiu de mapa desproporcional para mapa navegável, PWA, deploy e base agrícola. Agora precisa passar no celular, na lavoura.",
+              "fontSize": 14,
+              "typeface": "Aptos",
+              "color": "#536444"
+            }
+          ]
+        }
+      ],
+      "fillColor": "rgba(0, 0, 0, 0)",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 10,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/il0rqd4v",
+      "id": "10",
+      "bbox": [
+        68,
+        300,
+        255,
+        180
+      ],
+      "geometry": "rect",
+      "fillColor": "#FFFFFF",
+      "lineColor": "#DDE8D2",
+      "lineWidth": 1
+    },
+    {
+      "order": 11,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/b6xkf6dc",
+      "id": "11",
+      "bbox": [
+        68,
+        300,
+        255,
+        4
+      ],
+      "geometry": "rect",
+      "fillColor": "#3D8A22",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 12,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/0rqd4vmt",
+      "id": "12",
+      "bbox": [
+        84,
+        318,
+        223,
+        24
+      ],
+      "geometry": "rect",
+      "text": "Feito",
+      "textPreview": "Feito",
+      "resolvedFontSize": 17,
+      "resolvedTextStyle": {
+        "fontSize": 17,
+        "typeface": "Georgia",
+        "bold": true,
+        "alignment": "left"
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Feito"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Feito",
+          "runs": [
+            {
+              "index": 1,
+              "text": "Feito",
+              "fontSize": 17,
+              "typeface": "Georgia",
+              "color": "#18380E",
+              "bold": true
+            }
+          ]
+        }
+      ],
+      "fillColor": "rgba(0, 0, 0, 0)",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 13,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/tcj6tova",
+      "id": "13",
+      "bbox": [
+        84,
+        354,
+        223,
+        110
+      ],
+      "geometry": "rect",
+      "text": "Login e fazendas, mapa principal, satélite, polígonos clicáveis, linha do tempo, gerenciamento modular, pluviômetros e PWA.",
+      "textPreview": "Login e fazendas, mapa principal, satélite, polígonos clicáveis, linha do tempo, gerenciamento modular, pluviômetros e PWA.",
+      "resolvedFontSize": 12,
+      "resolvedTextStyle": {
+        "fontSize": 12,
+        "typeface": "Aptos",
+        "alignment": "left"
+      },
+      "textLayout": {
+        "lineCount": 4,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Login e fazendas, mapa principal, satélite,"
+          },
+          {
+            "index": 2,
+            "text": "polígonos clicáveis, linha do tempo,"
+          },
+          {
+            "index": 3,
+            "text": "gerenciamento modular, pluviômetros e"
+          },
+          {
+            "index": 4,
+            "text": "PWA."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Login e fazendas, mapa principal, satélite, polígonos clicáveis, linha do tempo, gerenciamento modular, pluviômetros e PWA.",
+          "runs": [
+            {
+              "index": 1,
+              "text": "Login e fazendas, mapa principal, satélite, polígonos clicáveis, linha do tempo, gerenciamento modular, pluviômetros e PWA.",
+              "fontSize": 12,
+              "typeface": "Aptos",
+              "color": "#536444"
+            }
+          ]
+        }
+      ],
+      "fillColor": "rgba(0, 0, 0, 0)",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 14,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/idonyd0z",
+      "id": "14",
+      "bbox": [
+        362,
+        300,
+        255,
+        180
+      ],
+      "geometry": "rect",
+      "fillColor": "#FFFFFF",
+      "lineColor": "#DDE8D2",
+      "lineWidth": 1
+    },
+    {
+      "order": 15,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/byhgn29g",
+      "id": "15",
+      "bbox": [
+        362,
+        300,
+        255,
+        4
+      ],
+      "geometry": "rect",
+      "fillColor": "#E8A84C",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 16,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/0je9cvix",
+      "id": "16",
+      "bbox": [
+        378,
+        318,
+        223,
+        24
+      ],
+      "geometry": "rect",
+      "text": "Agora",
+      "textPreview": "Agora",
+      "resolvedFontSize": 17,
+      "resolvedTextStyle": {
+        "fontSize": 17,
+        "typeface": "Georgia",
+        "bold": true,
+        "alignment": "left"
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Agora"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Agora",
+          "runs": [
+            {
+              "index": 1,
+              "text": "Agora",
+              "fontSize": 17,
+              "typeface": "Georgia",
+              "color": "#18380E",
+              "bold": true
+            }
+          ]
+        }
+      ],
+      "fillColor": "rgba(0, 0, 0, 0)",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 17,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/t47y1kre",
+      "id": "17",
+      "bbox": [
+        378,
+        354,
+        223,
+        110
+      ],
+      "geometry": "rect",
+      "text": "Ajustar ambiente Vercel, validar token Mapbox, testar GPS real, salvar monitoramento offline e garantir mobile tela cheia.",
+      "textPreview": "Ajustar ambiente Vercel, validar token Mapbox, testar GPS real, salvar monitoramento offline e garantir mobile tela cheia.",
+      "resolvedFontSize": 12,
+      "resolvedTextStyle": {
+        "fontSize": 12,
+        "typeface": "Aptos",
+        "alignment": "left"
+      },
+      "textLayout": {
+        "lineCount": 4,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Ajustar ambiente Vercel, validar token"
+          },
+          {
+            "index": 2,
+            "text": "Mapbox, testar GPS real, salvar"
+          },
+          {
+            "index": 3,
+            "text": "monitoramento offline e garantir mobile tela"
+          },
+          {
+            "index": 4,
+            "text": "cheia."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Ajustar ambiente Vercel, validar token Mapbox, testar GPS real, salvar monitoramento offline e garantir mobile tela cheia.",
+          "runs": [
+            {
+              "index": 1,
+              "text": "Ajustar ambiente Vercel, validar token Mapbox, testar GPS real, salvar monitoramento offline e garantir mobile tela cheia.",
+              "fontSize": 12,
+              "typeface": "Aptos",
+              "color": "#536444"
+            }
+          ]
+        }
+      ],
+      "fillColor": "rgba(0, 0, 0, 0)",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 18,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/i9s36hcr",
+      "id": "18",
+      "bbox": [
+        656,
+        300,
+        255,
+        180
+      ],
+      "geometry": "rect",
+      "fillColor": "#FFFFFF",
+      "lineColor": "#DDE8D2",
+      "lineWidth": 1
+    },
+    {
+      "order": 19,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/bulwval8",
+      "id": "19",
+      "bbox": [
+        656,
+        300,
+        255,
+        4
+      ],
+      "geometry": "rect",
+      "fillColor": "#4A8AB8",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 20,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/3itgfmlk",
+      "id": "20",
+      "bbox": [
+        672,
+        318,
+        223,
+        24
+      ],
+      "geometry": "rect",
+      "text": "Depois",
+      "textPreview": "Depois",
+      "resolvedFontSize": 17,
+      "resolvedTextStyle": {
+        "fontSize": 17,
+        "typeface": "Georgia",
+        "bold": true,
+        "alignment": "left"
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Depois"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Depois",
+          "runs": [
+            {
+              "index": 1,
+              "text": "Depois",
+              "fontSize": 17,
+              "typeface": "Georgia",
+              "color": "#18380E",
+              "bold": true
+            }
+          ]
+        }
+      ],
+      "fillColor": "rgba(0, 0, 0, 0)",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 21,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/ex0nuxc3",
+      "id": "21",
+      "bbox": [
+        672,
+        354,
+        223,
+        110
+      ],
+      "geometry": "rect",
+      "text": "Fechar OS, estoque, solo, chuva, custos, histórico por safra, relatórios e permissões de usuários.",
+      "textPreview": "Fechar OS, estoque, solo, chuva, custos, histórico por safra, relatórios e permissões de usuários.",
+      "resolvedFontSize": 12,
+      "resolvedTextStyle": {
+        "fontSize": 12,
+        "typeface": "Aptos",
+        "alignment": "left"
+      },
+      "textLayout": {
+        "lineCount": 3,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Fechar OS, estoque, solo, chuva, custos,"
+          },
+          {
+            "index": 2,
+            "text": "histórico por safra, relatórios e permissões de"
+          },
+          {
+            "index": 3,
+            "text": "usuários."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Fechar OS, estoque, solo, chuva, custos, histórico por safra, relatórios e permissões de usuários.",
+          "runs": [
+            {
+              "index": 1,
+              "text": "Fechar OS, estoque, solo, chuva, custos, histórico por safra, relatórios e permissões de usuários.",
+              "fontSize": 12,
+              "typeface": "Aptos",
+              "color": "#536444"
+            }
+          ]
+        }
+      ],
+      "fillColor": "rgba(0, 0, 0, 0)",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 22,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/loj2t83i",
+      "id": "22",
+      "bbox": [
+        965,
+        262,
+        220,
+        260
+      ],
+      "geometry": "rect",
+      "fillColor": "#E8F4DC",
+      "lineColor": "#DDE8D2",
+      "lineWidth": 1
+    },
+    {
+      "order": 23,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/w3m94fu1",
+      "id": "23",
+      "bbox": [
+        992,
+        292,
+        164,
+        24
+      ],
+      "geometry": "rect",
+      "text": "Decisão de foco",
+      "textPreview": "Decisão de foco",
+      "resolvedFontSize": 19,
+      "resolvedTextStyle": {
+        "fontSize": 19,
+        "typeface": "Georgia",
+        "bold": true,
+        "alignment": "center"
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Decisão de foco"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Decisão de foco",
+          "runs": [
+            {
+              "index": 1,
+              "text": "Decisão de foco",
+              "fontSize": 19,
+              "typeface": "Georgia",
+              "color": "#18380E",
+              "bold": true
+            }
+          ]
+        }
+      ],
+      "fillColor": "rgba(0, 0, 0, 0)",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 24,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/3q5o7qpg",
+      "id": "24",
+      "bbox": [
+        995,
+        336,
+        160,
+        112
+      ],
+      "geometry": "rect",
+      "text": "Não medir sucesso pela quantidade de telas. Medir pelo fluxo completo: abrir app, localizar talhão, monitorar, salvar e ver a cor mudar no mapa.",
+      "textPreview": "Não medir sucesso pela quantidade de telas. Medir pelo fluxo completo: abrir app, localizar talhão, monitorar, salvar e ver a cor mudar n...",
+      "resolvedFontSize": 12,
+      "resolvedTextStyle": {
+        "fontSize": 12,
+        "typeface": "Aptos",
+        "alignment": "center"
+      },
+      "textLayout": {
+        "lineCount": 6,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Não medir sucesso pela"
+          },
+          {
+            "index": 2,
+            "text": "quantidade de telas. Medir pelo"
+          },
+          {
+            "index": 3,
+            "text": "fluxo completo: abrir app,"
+          },
+          {
+            "index": 4,
+            "text": "localizar talhão, monitorar,"
+          },
+          {
+            "index": 5,
+            "text": "salvar e ver a cor mudar no"
+          },
+          {
+            "index": 6,
+            "text": "mapa."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Não medir sucesso pela quantidade de telas. Medir pelo fluxo completo: abrir app, localizar talhão, monitorar, salvar e ver a cor mudar no mapa.",
+          "runs": [
+            {
+              "index": 1,
+              "text": "Não medir sucesso pela quantidade de telas. Medir pelo fluxo completo: abrir app, localizar talhão, monitorar, salvar e ver a cor mudar no mapa.",
+              "fontSize": 12,
+              "typeface": "Aptos",
+              "color": "#536444"
+            }
+          ]
+        }
+      ],
+      "fillColor": "rgba(0, 0, 0, 0)",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 25,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/e9cvixcz",
+      "id": "25",
+      "bbox": [
+        92,
+        535,
+        3,
+        52
+      ],
+      "geometry": "rect",
+      "fillColor": "#3D8A22",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 26,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/lwval87e",
+      "id": "26",
+      "bbox": [
+        106,
+        532,
+        140,
+        30
+      ],
+      "geometry": "rect",
+      "text": "P0/P1",
+      "textPreview": "P0/P1",
+      "resolvedFontSize": 26,
+      "resolvedTextStyle": {
+        "fontSize": 26,
+        "typeface": "Georgia",
+        "bold": true,
+        "alignment": "left"
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "P0/P1"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "P0/P1",
+          "runs": [
+            {
+              "index": 1,
+              "text": "P0/P1",
+              "fontSize": 26,
+              "typeface": "Georgia",
+              "color": "#18380E",
+              "bold": true
+            }
+          ]
+        }
+      ],
+      "fillColor": "rgba(0, 0, 0, 0)",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 27,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/wb2hwfyx",
+      "id": "27",
+      "bbox": [
+        106,
+        569,
+        170,
+        14
+      ],
+      "geometry": "rect",
+      "text": "PRIORIDADE IMEDIATA",
+      "textPreview": "PRIORIDADE IMEDIATA",
+      "resolvedFontSize": 7.6,
+      "resolvedTextStyle": {
+        "fontSize": 7.6,
+        "typeface": "Aptos Mono",
+        "bold": true,
+        "alignment": "left"
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "PRIORIDADE IMEDIATA"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "PRIORIDADE IMEDIATA",
+          "runs": [
+            {
+              "index": 1,
+              "text": "PRIORIDADE IMEDIATA",
+              "fontSize": 7.6,
+              "typeface": "Aptos Mono",
+              "color": "#7E8A68",
+              "bold": true
+            }
+          ]
+        }
+      ],
+      "fillColor": "rgba(0, 0, 0, 0)",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 28,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/32lszqtc",
+      "id": "28",
+      "bbox": [
+        360,
+        535,
+        3,
+        52
+      ],
+      "geometry": "rect",
+      "fillColor": "#E8A84C",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 29,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/ahoza1gv",
+      "id": "29",
+      "bbox": [
+        374,
+        532,
+        140,
+        30
+      ],
+      "geometry": "rect",
+      "text": "1 fluxo",
+      "textPreview": "1 fluxo",
+      "resolvedFontSize": 26,
+      "resolvedTextStyle": {
+        "fontSize": 26,
+        "typeface": "Georgia",
+        "bold": true,
+        "alignment": "left"
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "1 fluxo"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "1 fluxo",
+          "runs": [
+            {
+              "index": 1,
+              "text": "1 fluxo",
+              "fontSize": 26,
+              "typeface": "Georgia",
+              "color": "#18380E",
+              "bold": true
+            }
+          ]
+        }
+      ],
+      "fillColor": "rgba(0, 0, 0, 0)",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 30,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/knih4byh",
+      "id": "30",
+      "bbox": [
+        374,
+        569,
+        170,
+        14
+      ],
+      "geometry": "rect",
+      "text": "TESTE PONTA A PONTA",
+      "textPreview": "TESTE PONTA A PONTA",
+      "resolvedFontSize": 7.6,
+      "resolvedTextStyle": {
+        "fontSize": 7.6,
+        "typeface": "Aptos Mono",
+        "bold": true,
+        "alignment": "left"
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "TESTE PONTA A PONTA"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "TESTE PONTA A PONTA",
+          "runs": [
+            {
+              "index": 1,
+              "text": "TESTE PONTA A PONTA",
+              "fontSize": 7.6,
+              "typeface": "Aptos Mono",
+              "color": "#7E8A68",
+              "bold": true
+            }
+          ]
+        }
+      ],
+      "fillColor": "rgba(0, 0, 0, 0)",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 31,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/d8bat47y",
+      "id": "31",
+      "bbox": [
+        640,
+        535,
+        3,
+        52
+      ],
+      "geometry": "rect",
+      "fillColor": "#4A8AB8",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 32,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/2lszqtcj",
+      "id": "32",
+      "bbox": [
+        654,
+        532,
+        140,
+        30
+      ],
+      "geometry": "rect",
+      "text": "campo",
+      "textPreview": "campo",
+      "resolvedFontSize": 26,
+      "resolvedTextStyle": {
+        "fontSize": 26,
+        "typeface": "Georgia",
+        "bold": true,
+        "alignment": "left"
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "campo"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "campo",
+          "runs": [
+            {
+              "index": 1,
+              "text": "campo",
+              "fontSize": 26,
+              "typeface": "Georgia",
+              "color": "#18380E",
+              "bold": true
+            }
+          ]
+        }
+      ],
+      "fillColor": "rgba(0, 0, 0, 0)",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 33,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/v6psfil0",
+      "id": "33",
+      "bbox": [
+        654,
+        569,
+        170,
+        14
+      ],
+      "geometry": "rect",
+      "text": "VALIDAÇÃO REAL",
+      "textPreview": "VALIDAÇÃO REAL",
+      "resolvedFontSize": 7.6,
+      "resolvedTextStyle": {
+        "fontSize": 7.6,
+        "typeface": "Aptos Mono",
+        "bold": true,
+        "alignment": "left"
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "VALIDAÇÃO REAL"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "VALIDAÇÃO REAL",
+          "runs": [
+            {
+              "index": 1,
+              "text": "VALIDAÇÃO REAL",
+              "fontSize": 7.6,
+              "typeface": "Aptos Mono",
+              "color": "#7E8A68",
+              "bold": true
+            }
+          ]
+        }
+      ],
+      "fillColor": "rgba(0, 0, 0, 0)",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 34,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/kf6dcbul",
+      "id": "34",
+      "bbox": [
+        92,
+        615,
+        840,
+        1
+      ],
+      "geometry": "rect",
+      "fillColor": "#DDE8D2",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 35,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/d0z61032",
+      "id": "35",
+      "bbox": [
+        92,
+        625,
+        840,
+        24
+      ],
+      "geometry": "rect",
+      "text": "Leitura: o projeto está pronto para sair do ciclo de tela bonita e entrar no ciclo de uso real pelo produtor.",
+      "textPreview": "Leitura: o projeto está pronto para sair do ciclo de tela bonita e entrar no ciclo de uso real pelo produtor.",
+      "resolvedFontSize": 18,
+      "resolvedTextStyle": {
+        "fontSize": 18,
+        "typeface": "Georgia",
+        "bold": true,
+        "alignment": "center"
+      },
+      "textLayout": {
+        "lineCount": 2,
+        "lines": [
+          {
+            "index": 1,
+            "text": "Leitura: o projeto está pronto para sair do ciclo de tela bonita e entrar no ciclo de uso real"
+          },
+          {
+            "index": 2,
+            "text": "pelo produtor."
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "Leitura: o projeto está pronto para sair do ciclo de tela bonita e entrar no ciclo de uso real pelo produtor.",
+          "runs": [
+            {
+              "index": 1,
+              "text": "Leitura: o projeto está pronto para sair do ciclo de tela bonita e entrar no ciclo de uso real pelo produtor.",
+              "fontSize": 18,
+              "typeface": "Georgia",
+              "color": "#18380E",
+              "bold": true
+            }
+          ]
+        }
+      ],
+      "fillColor": "rgba(0, 0, 0, 0)",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 36,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/29gr2p8n",
+      "id": "36",
+      "bbox": [
+        58,
+        665,
+        1060,
+        1
+      ],
+      "geometry": "rect",
+      "fillColor": "#DDE8D2",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 37,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/vu9knih4",
+      "id": "37",
+      "bbox": [
+        58,
+        678,
+        650,
+        18
+      ],
+      "geometry": "rect",
+      "text": "TerraNexa | fases de foco para teste em campo",
+      "textPreview": "TerraNexa | fases de foco para teste em campo",
+      "resolvedFontSize": 8.51,
+      "resolvedTextStyle": {
+        "fontSize": 8.51,
+        "typeface": "Aptos Mono",
+        "bold": true,
+        "alignment": "left"
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "TerraNexa | fases de foco para teste em campo"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "TerraNexa | fases de foco para teste em campo",
+          "runs": [
+            {
+              "index": 1,
+              "text": "TerraNexa | fases de foco para teste em campo",
+              "fontSize": 8.51,
+              "typeface": "Aptos Mono",
+              "color": "#7E8A68",
+              "bold": true
+            }
+          ]
+        }
+      ],
+      "fillColor": "rgba(0, 0, 0, 0)",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    },
+    {
+      "order": 38,
+      "kind": "shape",
+      "scope": "slide",
+      "aid": "sh/k3q5o7qp",
+      "id": "38",
+      "bbox": [
+        1160,
+        674,
+        54,
+        24
+      ],
+      "geometry": "rect",
+      "text": "02",
+      "textPreview": "02",
+      "resolvedFontSize": 13,
+      "resolvedTextStyle": {
+        "fontSize": 13,
+        "typeface": "Aptos Mono",
+        "bold": true,
+        "alignment": "right"
+      },
+      "textLayout": {
+        "lineCount": 1,
+        "lines": [
+          {
+            "index": 1,
+            "text": "02"
+          }
+        ]
+      },
+      "paragraphs": [
+        {
+          "index": 1,
+          "text": "02",
+          "runs": [
+            {
+              "index": 1,
+              "text": "02",
+              "fontSize": 13,
+              "typeface": "Aptos Mono",
+              "color": "#3D8A22",
+              "bold": true
+            }
+          ]
+        }
+      ],
+      "fillColor": "rgba(0, 0, 0, 0)",
+      "lineColor": "rgba(0, 0, 0, 0)",
+      "lineWidth": 0
+    }
+  ],
+  "composeRuns": []
+}
