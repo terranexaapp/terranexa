@@ -1,6 +1,7 @@
 import { theme } from '../../styles/theme'
 import { CentrosCustoSection } from './centrosCustoSection'
 import { CustosPorCCPanel } from './custosPorCC'
+import { PragasDoencasSection } from './pragasDoencasSection'
 import { reportTypes } from './constants'
 import { MetricCard } from './sharedComponents'
 import {
@@ -87,6 +88,8 @@ export function ConfiguracaoFazendaPanel({ fazenda, talhoes, total }) {
       </div>
 
       {fazenda?.id && <CentrosCustoSection fazendaId={fazenda.id} />}
+
+      {fazenda?.id && <PragasDoencasSection fazendaId={fazenda.id} />}
     </div>
   )
 }
