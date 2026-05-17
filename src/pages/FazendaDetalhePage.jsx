@@ -434,7 +434,7 @@ export function FazendaDetalhePage() {
                 navigate={navigate}
               />
             )}
-            {activeView === 'relatorios' && <RelatoriosView talhoes={talhoes} total={total} />}
+            {activeView === 'relatorios' && <RelatoriosView fazendaId={id} talhoes={talhoes} total={total} />}
             {activeView === 'monitoramento' && (
               <MonitoramentoRegistroView
                 fazenda={fazenda}
