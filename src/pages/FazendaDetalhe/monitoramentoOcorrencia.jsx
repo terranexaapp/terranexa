@@ -14,15 +14,32 @@ import { requestOfflineStorage, saveMonitoringPointOffline } from './offline'
 const C = theme.normal
 
 // ─── Categorias fixas ────────────────────────────────────────────────────────
+// foto: URL pública de imagem agronômica de fundo do card
 const CATEGORIAS = [
-  { id: 'praga',    label: 'Praga',              tipoDB: 'praga',    gradFrom: '#8B2A1A', gradTo: '#E85A3A' },
-  { id: 'doenca',   label: 'Doença',             tipoDB: 'doenca',   gradFrom: '#4A0A0A', gradTo: '#B03020' },
-  { id: 'daninha',  label: 'Planta Daninha',     tipoDB: 'daninha',  gradFrom: '#1A4A0A', gradTo: '#5AAE38' },
-  { id: 'estadio',  label: 'Estádio Fenológico', tipoDB: null,       gradFrom: '#0A2A4A', gradTo: '#4A8AB8' },
-  { id: 'outras',   label: 'Outras Ocorrências', tipoDB: null,       gradFrom: '#3A2010', gradTo: '#A0714F' },
-  { id: 'plantio',  label: 'Plantio',            tipoDB: null,       gradFrom: '#1A3A0A', gradTo: '#7EC850' },
-  { id: 'colheita', label: 'Colheita',           tipoDB: null,       gradFrom: '#4A2A00', gradTo: '#E8A84C' },
+  { id: 'praga',    label: 'Praga',              tipoDB: 'praga',    gradFrom: '#8B2A1A', gradTo: '#E85A3A', icone: '🐛',
+    foto: 'https://images.unsplash.com/photo-1593069567131-53a0614dde1d?w=400&q=70' },
+  { id: 'doenca',   label: 'Doença',             tipoDB: 'doenca',   gradFrom: '#4A0A0A', gradTo: '#B03020', icone: '🍂',
+    foto: 'https://images.unsplash.com/photo-1530836369250-ef72a3f5cda8?w=400&q=70' },
+  { id: 'daninha',  label: 'Planta Daninha',     tipoDB: 'daninha',  gradFrom: '#1A4A0A', gradTo: '#5AAE38', icone: '🌿',
+    foto: 'https://images.unsplash.com/photo-1466692476868-aef1dfb1e735?w=400&q=70' },
+  { id: 'estadio',  label: 'Estádio Fenológico', tipoDB: null,       gradFrom: '#0A2A4A', gradTo: '#4A8AB8', icone: '🌱',
+    foto: 'https://images.unsplash.com/photo-1416664806563-bb6be3be8a0c?w=400&q=70' },
+  { id: 'outras',   label: 'Outras Ocorrências', tipoDB: null,       gradFrom: '#3A2010', gradTo: '#A0714F', icone: '📌',
+    foto: 'https://images.unsplash.com/photo-1500076656116-558758c991c1?w=400&q=70' },
+  { id: 'plantio',  label: 'Plantio',            tipoDB: null,       gradFrom: '#1A3A0A', gradTo: '#7EC850', icone: '🌾',
+    foto: 'https://images.unsplash.com/photo-1500595046743-cd271d694d30?w=400&q=70' },
+  { id: 'colheita', label: 'Colheita',           tipoDB: null,       gradFrom: '#4A2A00', gradTo: '#E8A84C', icone: '🌽',
+    foto: 'https://images.unsplash.com/photo-1535912559178-30627e4cbdec?w=400&q=70' },
 ]
+
+// Ícones por tipo de praga (fallback quando praga.foto_url não existe)
+const ICONE_TIPO = {
+  praga: '🐛',
+  doenca: '🍂',
+  daninha: '🌿',
+  deficiencia: '🍃',
+  outro: '📌'
+}
 
 const ESTADIOS = [
   'VE – Emergência', 'VC – Cotilédone', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6',
@@ -31,12 +48,18 @@ const ESTADIOS = [
   'R6 – Grão cheio', 'R7 – Início maturação', 'R8 – Maturação plena'
 ]
 
-function detectFormType(praga) {
-  if (!praga) return 'generica'
-  const nome = (praga.nome_comum || '').toLowerCase()
-  if (nome.includes('lagarta')) return 'lagarta'
-  if (nome.includes('percevejo')) return 'percevejo'
-  if (praga.tipo === 'daninha') return 'daninha'
+function detectFormType(praga, categoria) {
+  if (praga) {
+    const nome = (praga.nome_comum || '').toLowerCase()
+    if (nome.includes('lagarta')) return 'lagarta'
+    if (nome.includes('percevejo')) return 'percevejo'
+    if (praga.tipo === 'daninha') return 'daninha'
+    return 'generica'
+  }
+  // Sem praga selecionada: usa categoria
+  const cat = categoria?.id
+  if (cat === 'estadio' || cat === 'plantio' || cat === 'colheita' || cat === 'outras') return cat
+  if (cat === 'daninha') return 'daninha'
   return 'generica'
 }
 
@@ -92,7 +115,10 @@ function resumoDraft(d) {
 
 // ─── Estilos ──────────────────────────────────────────────────────────────────
 const s = {
-  root: { display: 'flex', flexDirection: 'column', height: '100%', background: C.bg, overflow: 'hidden', position: 'relative' },
+  // Container externo: ocupa todo o espaço disponível, fundo neutro
+  outer: { display: 'flex', flexDirection: 'column', height: '100%', background: C.bgSoft, overflow: 'hidden' },
+  // Container interno: centralizado com max-width pra ficar parecido com mobile no desktop
+  root: { display: 'flex', flexDirection: 'column', height: '100%', maxWidth: 560, width: '100%', margin: '0 auto', background: C.bg, overflow: 'hidden', position: 'relative', boxShadow: '0 0 0 1px ' + C.border },
   header: { display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: C.greenDk, flexShrink: 0 },
   btnBack: { background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: 8, color: '#fff', fontSize: 20, cursor: 'pointer', padding: '4px 10px', lineHeight: 1 },
   btnFinalizar: { background: 'rgba(255,255,255,0.25)', border: 'none', borderRadius: 8, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', padding: '6px 12px' },
@@ -119,11 +145,25 @@ const s = {
 
   // Category cards
   grid2: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 },
-  categoryCard: (gradFrom, gradTo) => ({ position: 'relative', borderRadius: 14, overflow: 'hidden', aspectRatio: '4/3', cursor: 'pointer', border: 'none', background: `linear-gradient(160deg, ${gradFrom} 0%, ${gradTo} 100%)`, display: 'flex', alignItems: 'flex-end' }),
-  categoryCardLabel: { width: '100%', background: 'linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 100%)', color: '#fff', fontWeight: 700, fontSize: 13, padding: '20px 10px 8px', textAlign: 'left' },
+  categoryCard: (gradFrom, gradTo) => ({
+    position: 'relative', borderRadius: 14, overflow: 'hidden',
+    aspectRatio: '4/3', cursor: 'pointer', border: 'none', padding: 0,
+    background: `linear-gradient(160deg, ${gradFrom} 0%, ${gradTo} 100%)`
+  }),
+  categoryCardImg: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.55 },
+  categoryCardOverlay: { position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.15) 55%, rgba(0,0,0,0.4) 100%)' },
+  categoryCardIcon: { position: 'absolute', top: 12, right: 14, fontSize: 32, lineHeight: 1, filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.5))' },
+  categoryCardLabel: { position: 'absolute', left: 0, right: 0, bottom: 0, color: '#fff', fontWeight: 700, fontSize: 14, padding: '0 12px 10px', textAlign: 'left', textShadow: '0 1px 3px rgba(0,0,0,0.7)' },
 
-  pestCard: (gradFrom, gradTo) => ({ position: 'relative', borderRadius: 12, overflow: 'hidden', aspectRatio: '1/1', cursor: 'pointer', border: 'none', background: `linear-gradient(160deg, ${gradFrom} 0%, ${gradTo} 100%)`, display: 'flex', alignItems: 'flex-end' }),
-  pestCardLabel: { width: '100%', background: 'linear-gradient(to top, rgba(0,0,0,0.75) 0%, transparent 100%)', color: '#fff', fontWeight: 600, fontSize: 12, padding: '18px 8px 6px', textAlign: 'left' },
+  pestCard: (gradFrom, gradTo) => ({
+    position: 'relative', borderRadius: 12, overflow: 'hidden',
+    aspectRatio: '1/1', cursor: 'pointer', border: 'none', padding: 0,
+    background: `linear-gradient(160deg, ${gradFrom} 0%, ${gradTo} 100%)`
+  }),
+  pestCardImg: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.65 },
+  pestCardOverlay: { position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.1) 50%, rgba(0,0,0,0.3) 100%)' },
+  pestCardIcon: { position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -60%)', fontSize: 48, lineHeight: 1, filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.6))', pointerEvents: 'none' },
+  pestCardLabel: { position: 'absolute', left: 0, right: 0, bottom: 0, color: '#fff', fontWeight: 600, fontSize: 12, padding: '0 8px 8px', textAlign: 'left', textShadow: '0 1px 3px rgba(0,0,0,0.8)' },
 
   // Forms
   formSection: { marginBottom: 18 },
@@ -279,7 +319,7 @@ export function MonitoramentoOcorrenciaView({ fazenda, fazendaId, talhao, onBack
 
   // ── "Salvar ocorrência" → adiciona ao draft, NÃO grava no DB ─────────────
   function adicionarOcorrencia() {
-    const formType = pragaSel ? detectFormType(pragaSel) : categoriaSel?.id
+    const formType = detectFormType(pragaSel, categoriaSel)
     const draft = {
       id: uuid(),
       categoria: categoriaSel,
@@ -454,6 +494,11 @@ export function MonitoramentoOcorrenciaView({ fazenda, fazendaId, talhao, onBack
                 else iniciarFormulario(cat, null)
               }}
             >
+              {cat.foto && (
+                <img src={cat.foto} alt="" style={s.categoryCardImg} loading="lazy" onError={e => { e.target.style.display = 'none' }} />
+              )}
+              <div style={s.categoryCardOverlay} />
+              <span style={s.categoryCardIcon}>{cat.icone}</span>
               <span style={s.categoryCardLabel}>{cat.label}</span>
             </button>
           ))}
@@ -499,20 +544,27 @@ export function MonitoramentoOcorrenciaView({ fazenda, fazendaId, talhao, onBack
     return (
       <div style={s.body}>
         <div style={s.grid2}>
-          {lista.map(praga => (
-            <button key={praga.id} style={s.pestCard(gradFrom, gradTo)} onClick={() => iniciarFormulario(categoriaSel, praga)}>
-              {praga.foto_url && (
-                <img src={praga.foto_url} alt={praga.nome_comum} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
-              )}
-              <span style={s.pestCardLabel}>
-                {praga.nome_comum}
-                {praga.nome_cientifico && (
-                  <><br /><span style={{ fontSize: 10, fontStyle: 'italic', opacity: 0.8 }}>{praga.nome_cientifico}</span></>
-                )}
-              </span>
-            </button>
-          ))}
+          {lista.map(praga => {
+            const icone = ICONE_TIPO[praga.tipo] || categoriaSel?.icone || '🔍'
+            return (
+              <button key={praga.id} style={s.pestCard(gradFrom, gradTo)} onClick={() => iniciarFormulario(categoriaSel, praga)}>
+                {praga.foto_url ? (
+                  <img src={praga.foto_url} alt={praga.nome_comum} style={s.pestCardImg} loading="lazy" onError={e => { e.target.style.display = 'none' }} />
+                ) : null}
+                <div style={s.pestCardOverlay} />
+                {!praga.foto_url && <span style={s.pestCardIcon}>{icone}</span>}
+                <span style={s.pestCardLabel}>
+                  {praga.nome_comum}
+                  {praga.nome_cientifico && (
+                    <><br /><span style={{ fontSize: 10, fontStyle: 'italic', opacity: 0.8 }}>{praga.nome_cientifico}</span></>
+                  )}
+                </span>
+              </button>
+            )
+          })}
           <button style={s.pestCard('#555', '#888')} onClick={() => iniciarFormulario(categoriaSel, null)}>
+            <div style={s.pestCardOverlay} />
+            <span style={s.pestCardIcon}>➕</span>
             <span style={s.pestCardLabel}>Outra / não identificada</span>
           </button>
         </div>
@@ -686,7 +738,7 @@ export function MonitoramentoOcorrenciaView({ fazenda, fazendaId, talhao, onBack
 
   function renderFormulario() {
     const catId = categoriaSel?.id
-    const formType = pragaSel ? detectFormType(pragaSel) : catId
+    const formType = detectFormType(pragaSel, categoriaSel)
     const mostrarObservacoes = catId !== 'plantio' && catId !== 'colheita'
     const mostrarCamera = catId !== 'plantio' && catId !== 'colheita'
 
@@ -737,13 +789,15 @@ export function MonitoramentoOcorrenciaView({ fazenda, fazendaId, talhao, onBack
 
   // ─── Render principal ─────────────────────────────────────────────────────
   return (
-    <div style={s.root}>
-      {renderHeader()}
-      {renderGPSBar()}
-      {tela === 'categorias' && renderCategorias()}
-      {tela === 'lista'      && renderListaPragas()}
-      {tela === 'formulario' && renderFormulario()}
-      {tela === 'categorias' && renderFooter()}
+    <div style={s.outer}>
+      <div style={s.root}>
+        {renderHeader()}
+        {renderGPSBar()}
+        {tela === 'categorias' && renderCategorias()}
+        {tela === 'lista'      && renderListaPragas()}
+        {tela === 'formulario' && renderFormulario()}
+        {tela === 'categorias' && renderFooter()}
+      </div>
     </div>
   )
 }
