@@ -178,8 +178,11 @@ export function FazendaDetalhePage() {
     return status === 'late' || status === 'never'
   }).length
   const isMapView = activeView === 'mapa'
+  // Telas em fullscreen (sem header de pagina, sem padding) — mapa principal e
+  // a tela de ocorrencia, que renderiza seu proprio topbar + mapa de fundo.
+  const isFullscreenView = isMapView || activeView === 'monitoramento-registro'
   const isDesktopShell = useMediaQuery('(min-width: 980px)')
-  const showDesktopShell = isDesktopShell && !isMapView
+  const showDesktopShell = isDesktopShell && !isFullscreenView
 
   if (loading) {
     return (
@@ -199,9 +202,9 @@ export function FazendaDetalhePage() {
 
   return (
     <div
-      style={{ minHeight: '100vh', background: isMapView ? '#102316' : C.bg, display: 'flex', flexDirection: 'column' }}
+      style={{ minHeight: '100vh', background: isFullscreenView ? '#102316' : C.bg, display: 'flex', flexDirection: 'column' }}
     >
-      <header style={showDesktopShell ? desktopTopbarStyle : isMapView ? { display: 'none' } : floatingHeaderStyle}>
+      <header style={showDesktopShell ? desktopTopbarStyle : isFullscreenView ? { display: 'none' } : floatingHeaderStyle}>
         {showDesktopShell && (
           <>
             <div style={desktopTopbarBrandStyle}>
@@ -347,10 +350,10 @@ export function FazendaDetalhePage() {
         style={{
           flex: 1,
           width: '100%',
-          maxWidth: isMapView ? 'none' : showDesktopShell ? 'none' : 1360,
+          maxWidth: isFullscreenView ? 'none' : showDesktopShell ? 'none' : 1360,
           margin: showDesktopShell ? 0 : '0 auto',
-          padding: isMapView ? 0 : showDesktopShell ? 0 : 16,
-          paddingTop: isMapView ? 0 : showDesktopShell ? 76 : 98
+          padding: isFullscreenView ? 0 : showDesktopShell ? 0 : 16,
+          paddingTop: isFullscreenView ? 0 : showDesktopShell ? 76 : 98
         }}
       >
         <div style={showDesktopShell ? farmLayoutDesktopStyle : farmLayoutStyle}>
@@ -366,7 +369,15 @@ export function FazendaDetalhePage() {
               navigate={navigate}
             />
           )}
-          <section style={showDesktopShell ? farmContentDesktopStyle : { flex: 1, minWidth: 0 }}>
+          <section
+            style={
+              showDesktopShell
+                ? farmContentDesktopStyle
+                : isFullscreenView
+                  ? { width: '100%', minWidth: 0, height: '100dvh', display: 'flex', flexDirection: 'column' }
+                  : { flex: 1, minWidth: 0 }
+            }
+          >
             {activeView === 'mapa' && (
               <FazendaMapaPrincipal
                 fazenda={fazenda}

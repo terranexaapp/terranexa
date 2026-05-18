@@ -31,7 +31,12 @@
 
   display: flex;
   flex-direction: column;
+  /* Quando o container pai e um flex item (section em fullscreen), height:100%
+     em flex-children pode colapsar. Fixamos a altura em 100% mas tambem
+     adicionamos flex:1 para esticar no eixo principal do pai. */
   height: 100%;
+  flex: 1;
+  min-height: 0;
   background: #2a2a26;
   font-family: var(--m-font-ui);
   color: var(--m-ink);
@@ -116,6 +121,8 @@
   font-weight: 600;
   font-family: var(--m-font-mono);
   flex-shrink: 0;
+  border: none;
+  cursor: pointer;
 }
 .monit-app .m-topbar .gps-mini::before {
   content: '';
@@ -200,18 +207,19 @@
   right: 12px;
   background: #fff4d8;
   border: 1px solid #e8d4a4;
-  border-radius: 10px;
-  padding: 8px 12px;
+  border-radius: 12px;
+  padding: 10px 12px;
   display: flex;
-  gap: 8px;
-  align-items: center;
-  font-size: 11.5px;
+  gap: 10px;
+  align-items: flex-start;
+  font-size: 12px;
   color: var(--m-ink-2);
   z-index: 4;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
 }
 .monit-app .m-gps-warn .ic {
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
   background: var(--m-amber);
   color: #fff;
@@ -220,7 +228,46 @@
   flex-shrink: 0;
   font-family: var(--m-font-mono);
   font-weight: 700;
-  font-size: 10px;
+  font-size: 11px;
+  margin-top: 1px;
+}
+.monit-app .m-gps-warn-body {
+  flex: 1;
+  min-width: 0;
+  line-height: 1.35;
+}
+.monit-app .m-gps-warn-title {
+  font-weight: 700;
+  color: #8a5a14;
+  font-size: 12.5px;
+}
+.monit-app .m-gps-warn-help {
+  margin-top: 3px;
+  font-size: 11px;
+  color: var(--m-ink-2);
+  font-weight: 500;
+}
+.monit-app .m-gps-warn-cta {
+  background: var(--m-forest);
+  color: #f0f5e8;
+  border: none;
+  border-radius: 8px;
+  padding: 7px 12px;
+  font-size: 11.5px;
+  font-weight: 700;
+  font-family: var(--m-font-ui);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.monit-app .m-gps-warn-x {
+  background: transparent;
+  border: none;
+  color: var(--m-ink-2);
+  padding: 2px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  flex-shrink: 0;
 }
 
 /* ============ Bottom sheet ============ */

@@ -240,15 +240,34 @@ export function MonitoramentoOcorrenciaView({ fazenda, fazendaId, talhao, onBack
   const [catalogo, setCatalogo] = useState([])
 
   // GPS
-  const [gpsStatus, setGpsStatus] = useState('Aguardando GPS…')
-  const [gpsOk, setGpsOk] = useState(false)
+  // gpsState: 'idle' | 'requesting' | 'active' | 'denied' | 'unavailable' | 'timeout' | 'unsupported' | 'error'
+  const [gpsState, setGpsState] = useState('idle')
   const [gpsPos, setGpsPos] = useState(null) // { lat, lng, precisao }
-  const [gpsError, setGpsError] = useState(null)
+  const [gpsBlockedReason, setGpsBlockedReason] = useState(null) // 'blocked' | 'prompt-dismissed' | null
+  const [gpsBannerDismissed, setGpsBannerDismissed] = useState(false)
   const watchRef = useRef(null)
   const trilhaRef = useRef([])
   const ultimaPosRef = useRef(null)
   const iniciadoEmRef = useRef(new Date().toISOString())
   const inicioMsRef = useRef(Date.now())
+
+  const gpsOk = gpsState === 'active'
+  const gpsStatus =
+    gpsState === 'active' && gpsPos
+      ? `±${Math.round(gpsPos.precisao || 0)}m`
+      : gpsState === 'requesting'
+        ? 'Solicitando…'
+        : gpsState === 'denied'
+          ? 'GPS bloqueado'
+          : gpsState === 'unavailable'
+            ? 'GPS indisponível'
+            : gpsState === 'timeout'
+              ? 'GPS sem sinal'
+              : gpsState === 'unsupported'
+                ? 'GPS off'
+                : gpsState === 'error'
+                  ? 'Falha GPS'
+                  : 'Ativar GPS'
 
   // métricas reativas (Trilha / Pontos / Tempo)
   const [metricaPontos, setMetricaPontos] = useState(0)
@@ -282,41 +301,111 @@ export function MonitoramentoOcorrenciaView({ fazenda, fazendaId, talhao, onBack
   }, [fazendaId])
 
   // ── GPS watch contínuo ──────────────────────────────────────────────────
+  const onGpsSuccess = useCallback(pos => {
+    const lat = pos.coords.latitude
+    const lng = pos.coords.longitude
+    const precisao = pos.coords.accuracy
+    const novo = { lat, lng, precisao }
+    ultimaPosRef.current = novo
+    trilhaRef.current.push({ lat, lng, ts: new Date().toISOString() })
+    setGpsPos(novo)
+    setGpsState('active')
+    setGpsBlockedReason(null)
+    setMetricaTrilhaM(Math.round(distanciaTotal(trilhaRef.current)))
+  }, [])
+
+  const onGpsError = useCallback(err => {
+    let next = 'error'
+    if (err?.code === 1) next = 'denied'
+    else if (err?.code === 2) next = 'unavailable'
+    else if (err?.code === 3) next = 'timeout'
+    setGpsState(prev => (prev === 'active' ? 'active' : next))
+
+    // Distingue bloqueio permanente de prompt fechado em mobile (iOS/Android)
+    if (err?.code === 1 && navigator.permissions?.query) {
+      navigator.permissions
+        .query({ name: 'geolocation' })
+        .then(perm => {
+          setGpsBlockedReason(perm.state === 'denied' ? 'blocked' : 'prompt-dismissed')
+        })
+        .catch(() => {})
+    }
+  }, [])
+
+  const iniciarWatch = useCallback(() => {
+    if (watchRef.current != null) return
+    watchRef.current = navigator.geolocation.watchPosition(onGpsSuccess, onGpsError, {
+      enableHighAccuracy: true,
+      timeout: 25000,
+      maximumAge: 3000
+    })
+  }, [onGpsSuccess, onGpsError])
+
+  const solicitarGps = useCallback(() => {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      setGpsState('unsupported')
+      return
+    }
+    if (typeof window !== 'undefined' && !window.isSecureContext) {
+      setGpsState('unsupported')
+      return
+    }
+    setGpsBannerDismissed(false)
+    setGpsState('requesting')
+    // 1o fix rápido por getCurrentPosition + watch contínuo após sucesso
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        onGpsSuccess(pos)
+        iniciarWatch()
+      },
+      onGpsError,
+      { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 }
+    )
+  }, [onGpsSuccess, onGpsError, iniciarWatch])
+
   useEffect(() => {
     requestOfflineStorage().catch(() => {})
 
-    if (!navigator.geolocation) {
-      setGpsStatus('GPS indisponível')
-      setGpsError('GPS indisponível neste navegador')
-      return
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      setGpsState('unsupported')
+      return undefined
+    }
+    if (typeof window !== 'undefined' && !window.isSecureContext) {
+      setGpsState('unsupported')
+      return undefined
     }
 
-    setGpsStatus('Solicitando GPS…')
-    watchRef.current = navigator.geolocation.watchPosition(
-      pos => {
-        const lat = pos.coords.latitude
-        const lng = pos.coords.longitude
-        const precisao = pos.coords.accuracy
-        const novo = { lat, lng, precisao }
-        ultimaPosRef.current = novo
-        trilhaRef.current.push({ lat, lng, ts: new Date().toISOString() })
-        setGpsOk(true)
-        setGpsPos(novo)
-        setGpsStatus(`±${Math.round(precisao || 0)}m`)
-        setGpsError(null)
-        setMetricaTrilhaM(Math.round(distanciaTotal(trilhaRef.current)))
-      },
-      err => {
-        setGpsOk(false)
-        setGpsError(err.message || 'Sem sinal GPS')
-        setGpsStatus('Sem GPS')
-      },
-      { enableHighAccuracy: true, timeout: 20000, maximumAge: 3000 }
-    )
+    // Se a permissao ja foi concedida, ligamos o watch direto. Caso contrario
+    // aguardamos o gesto do usuario (botao "Ativar GPS") — em mobile, disparar
+    // sem gesto cai em auto-denial silencioso e queima prompts futuros.
+    if (navigator.permissions?.query) {
+      navigator.permissions
+        .query({ name: 'geolocation' })
+        .then(perm => {
+          if (perm.state === 'granted') {
+            setGpsState('requesting')
+            iniciarWatch()
+          } else if (perm.state === 'denied') {
+            setGpsState('denied')
+            setGpsBlockedReason('blocked')
+          } else {
+            setGpsState('idle') // prompt — aguarda gesto do usuario
+          }
+        })
+        .catch(() => {
+          // Sem Permissions API (Safari antigo): tentamos o 1o fix direto.
+          solicitarGps()
+        })
+    } else {
+      solicitarGps()
+    }
 
     return () => {
       if (watchRef.current != null) navigator.geolocation.clearWatch(watchRef.current)
+      watchRef.current = null
     }
+    // solicitarGps/iniciarWatch sao estaveis (useCallback) — efeito so roda 1x
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // ── Cronômetro ──────────────────────────────────────────────────────────
@@ -483,6 +572,36 @@ export function MonitoramentoOcorrenciaView({ fazenda, fazendaId, talhao, onBack
     })
   }
 
+  // ── GPS banner ──────────────────────────────────────────────────────────
+  const gpsBannerVisible =
+    !gpsBannerDismissed && gpsState !== 'active' && gpsState !== 'requesting'
+  const gpsBannerTitle =
+    gpsState === 'denied'
+      ? 'GPS bloqueado'
+      : gpsState === 'unavailable'
+        ? 'GPS indisponível'
+        : gpsState === 'timeout'
+          ? 'Sinal GPS fraco'
+          : gpsState === 'unsupported'
+            ? 'GPS não suportado'
+            : gpsState === 'error'
+              ? 'Falha no GPS'
+              : 'Ative o GPS para começar'
+  const gpsBannerHelp =
+    gpsState === 'denied' && gpsBlockedReason === 'blocked'
+      ? 'Toque no cadeado/ajustes do site e mude Localização para Permitir. Verifique também se a Localização do celular está ligada.'
+      : gpsState === 'denied'
+        ? 'O aviso de permissão foi fechado. Toque em Tentar e responda Permitir.'
+        : gpsState === 'unavailable'
+          ? 'Verifique se a Localização do celular está ligada e tente em área aberta.'
+          : gpsState === 'timeout'
+            ? 'Saia de áreas cobertas e tente novamente.'
+            : gpsState === 'unsupported'
+              ? 'Este navegador não oferece GPS ou o site não está em HTTPS.'
+              : gpsState === 'idle'
+                ? 'O navegador exige um toque para liberar a localização.'
+                : null
+
   // ── Header ──────────────────────────────────────────────────────────────
   function renderHeader() {
     const isCateg = tela === 'categorias'
@@ -517,7 +636,15 @@ export function MonitoramentoOcorrenciaView({ fazenda, fazendaId, talhao, onBack
           <div className="title-h">{titulo}</div>
           <div className="title-s">{subtitulo}</div>
         </div>
-        <span className={`gps-mini ${gpsOk ? '' : 'warn'}`}>{gpsStatus}</span>
+        <button
+          type="button"
+          className={`gps-mini ${gpsOk ? '' : 'warn'}`}
+          onClick={() => { if (!gpsOk) solicitarGps() }}
+          aria-label={gpsOk ? `GPS ativo · ${gpsStatus}` : 'Ativar GPS'}
+          title={gpsOk ? 'GPS ativo' : 'Toque para ativar GPS'}
+        >
+          {gpsStatus}
+        </button>
         {isCateg && (
           <button className="m-finalizar" onClick={finalizarESair}>Finalizar</button>
         )}
@@ -563,10 +690,24 @@ export function MonitoramentoOcorrenciaView({ fazenda, fazendaId, talhao, onBack
           </div>
         </div>
 
-        {gpsError && (
+        {gpsBannerVisible && (
           <div className="m-gps-warn">
             <div className="ic">!</div>
-            <div>{gpsError}</div>
+            <div className="m-gps-warn-body">
+              <div className="m-gps-warn-title">{gpsBannerTitle}</div>
+              {gpsBannerHelp && <div className="m-gps-warn-help">{gpsBannerHelp}</div>}
+            </div>
+            <button type="button" className="m-gps-warn-cta" onClick={solicitarGps}>
+              {gpsState === 'idle' ? 'Ativar' : 'Tentar'}
+            </button>
+            <button
+              type="button"
+              className="m-gps-warn-x"
+              onClick={() => setGpsBannerDismissed(true)}
+              aria-label="Fechar aviso"
+            >
+              <Icon.Close />
+            </button>
           </div>
         )}
 
