@@ -16,27 +16,27 @@ import '../../styles/monitoramento.css'
 const CATEGORIAS = [
   {
     id: 'praga',
-    label: 'Praga',
+    label: 'Pragas',
     meta: 'Insetos · lagartas · percevejos',
     tipoDB: 'praga',
     accent: '#b54a3f',
-    foto: 'https://images.unsplash.com/photo-1593069567131-53a0614dde1d?w=600&q=70'
+    foto: '/images/monitoramento/menu/pragas.png'
   },
   {
     id: 'doenca',
-    label: 'Doença',
+    label: 'Doenças',
     meta: 'Folha · caule · raiz',
     tipoDB: 'doenca',
     accent: '#8a5a3c',
-    foto: 'https://images.unsplash.com/photo-1530836369250-ef72a3f5cda8?w=600&q=70'
+    foto: '/images/monitoramento/menu/doencas.png'
   },
   {
     id: 'daninha',
-    label: 'Planta Daninha',
+    label: 'Plantas Daninhas',
     meta: 'Ervas · invasoras',
     tipoDB: 'daninha',
     accent: '#5a8a3a',
-    foto: 'https://images.unsplash.com/photo-1466692476868-aef1dfb1e735?w=600&q=70'
+    foto: '/images/monitoramento/menu/plantas-daninhas.png'
   },
   {
     id: 'estadio',
@@ -44,7 +44,7 @@ const CATEGORIAS = [
     meta: 'Confirmar estágio atual',
     tipoDB: null,
     accent: '#4a7c4e',
-    foto: 'https://images.unsplash.com/photo-1416664806563-bb6be3be8a0c?w=600&q=70'
+    foto: '/images/monitoramento/menu/estadio-fenologico.png'
   },
   {
     id: 'outras',
@@ -52,7 +52,7 @@ const CATEGORIAS = [
     meta: 'Foto + texto livre',
     tipoDB: null,
     accent: '#8a5a3c',
-    foto: 'https://images.unsplash.com/photo-1500076656116-558758c991c1?w=600&q=70'
+    foto: '/images/monitoramento/menu/outras-ocorrencias.png'
   },
   {
     id: 'plantio',
@@ -60,7 +60,7 @@ const CATEGORIAS = [
     meta: 'Coef. de variação',
     tipoDB: null,
     accent: '#a3c14a',
-    foto: 'https://images.unsplash.com/photo-1500595046743-cd271d694d30?w=600&q=70'
+    foto: '/images/monitoramento/menu/plantio.png'
   },
   {
     id: 'colheita',
@@ -68,7 +68,7 @@ const CATEGORIAS = [
     meta: 'Perda em sc/ha',
     tipoDB: null,
     accent: '#d99a2b',
-    foto: 'https://images.unsplash.com/photo-1535912559178-30627e4cbdec?w=600&q=70'
+    foto: '/images/monitoramento/menu/colheita.png'
   }
 ]
 
