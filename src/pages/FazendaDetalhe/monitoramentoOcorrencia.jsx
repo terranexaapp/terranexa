@@ -1,45 +1,76 @@
-// Monitoring occurrence view: GPS caminhamento + drafts por ponto + registro agrupado
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { theme } from '../../styles/theme'
+// Monitoring occurrence view — design v2 (Variant A · bottom sheet sobre mapa)
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   criarMonitoramento,
   criarMonitoramentoPonto,
-  salvarCaminhamento,
-  ESCALAS_SEVERIDADE
+  salvarCaminhamento
 } from '../../lib/monitoramentos'
 import { listarPragasDoencas } from '../../lib/pragasDoencas'
 import { uploadFotoMonitoramento, getPublicUrl } from '../../lib/storage'
 import { requestOfflineStorage, saveMonitoringPointOffline } from './offline'
+import { SimpleFarmMap } from './maps'
+import { normalizeFeature } from './utils'
+import '../../styles/monitoramento.css'
 
-const C = theme.normal
-
-// ─── Categorias fixas ────────────────────────────────────────────────────────
-// foto: URL pública de imagem agronômica de fundo do card
+// ─── Categorias (paleta v2 Terranexa) ────────────────────────────────────────
 const CATEGORIAS = [
-  { id: 'praga',    label: 'Praga',              tipoDB: 'praga',    gradFrom: '#8B2A1A', gradTo: '#E85A3A', icone: '🐛',
-    foto: 'https://images.unsplash.com/photo-1593069567131-53a0614dde1d?w=400&q=70' },
-  { id: 'doenca',   label: 'Doença',             tipoDB: 'doenca',   gradFrom: '#4A0A0A', gradTo: '#B03020', icone: '🍂',
-    foto: 'https://images.unsplash.com/photo-1530836369250-ef72a3f5cda8?w=400&q=70' },
-  { id: 'daninha',  label: 'Planta Daninha',     tipoDB: 'daninha',  gradFrom: '#1A4A0A', gradTo: '#5AAE38', icone: '🌿',
-    foto: 'https://images.unsplash.com/photo-1466692476868-aef1dfb1e735?w=400&q=70' },
-  { id: 'estadio',  label: 'Estádio Fenológico', tipoDB: null,       gradFrom: '#0A2A4A', gradTo: '#4A8AB8', icone: '🌱',
-    foto: 'https://images.unsplash.com/photo-1416664806563-bb6be3be8a0c?w=400&q=70' },
-  { id: 'outras',   label: 'Outras Ocorrências', tipoDB: null,       gradFrom: '#3A2010', gradTo: '#A0714F', icone: '📌',
-    foto: 'https://images.unsplash.com/photo-1500076656116-558758c991c1?w=400&q=70' },
-  { id: 'plantio',  label: 'Plantio',            tipoDB: null,       gradFrom: '#1A3A0A', gradTo: '#7EC850', icone: '🌾',
-    foto: 'https://images.unsplash.com/photo-1500595046743-cd271d694d30?w=400&q=70' },
-  { id: 'colheita', label: 'Colheita',           tipoDB: null,       gradFrom: '#4A2A00', gradTo: '#E8A84C', icone: '🌽',
-    foto: 'https://images.unsplash.com/photo-1535912559178-30627e4cbdec?w=400&q=70' },
+  {
+    id: 'praga',
+    label: 'Praga',
+    meta: 'Insetos · lagartas · percevejos',
+    tipoDB: 'praga',
+    accent: '#b54a3f',
+    foto: 'https://images.unsplash.com/photo-1593069567131-53a0614dde1d?w=600&q=70'
+  },
+  {
+    id: 'doenca',
+    label: 'Doença',
+    meta: 'Folha · caule · raiz',
+    tipoDB: 'doenca',
+    accent: '#8a5a3c',
+    foto: 'https://images.unsplash.com/photo-1530836369250-ef72a3f5cda8?w=600&q=70'
+  },
+  {
+    id: 'daninha',
+    label: 'Planta Daninha',
+    meta: 'Ervas · invasoras',
+    tipoDB: 'daninha',
+    accent: '#5a8a3a',
+    foto: 'https://images.unsplash.com/photo-1466692476868-aef1dfb1e735?w=600&q=70'
+  },
+  {
+    id: 'estadio',
+    label: 'Estádio Fenológico',
+    meta: 'Confirmar estágio atual',
+    tipoDB: null,
+    accent: '#4a7c4e',
+    foto: 'https://images.unsplash.com/photo-1416664806563-bb6be3be8a0c?w=600&q=70'
+  },
+  {
+    id: 'outras',
+    label: 'Outras Ocorrências',
+    meta: 'Foto + texto livre',
+    tipoDB: null,
+    accent: '#8a5a3c',
+    foto: 'https://images.unsplash.com/photo-1500076656116-558758c991c1?w=600&q=70'
+  },
+  {
+    id: 'plantio',
+    label: 'Plantio',
+    meta: 'Coef. de variação',
+    tipoDB: null,
+    accent: '#a3c14a',
+    foto: 'https://images.unsplash.com/photo-1500595046743-cd271d694d30?w=600&q=70'
+  },
+  {
+    id: 'colheita',
+    label: 'Colheita',
+    meta: 'Perda em sc/ha',
+    tipoDB: null,
+    accent: '#d99a2b',
+    foto: 'https://images.unsplash.com/photo-1535912559178-30627e4cbdec?w=600&q=70'
+  }
 ]
-
-// Ícones por tipo de praga (fallback quando praga.foto_url não existe)
-const ICONE_TIPO = {
-  praga: '🐛',
-  doenca: '🍂',
-  daninha: '🌿',
-  deficiencia: '🍃',
-  outro: '📌'
-}
 
 const ESTADIOS = [
   'VE – Emergência', 'VC – Cotilédone', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6',
@@ -48,6 +79,7 @@ const ESTADIOS = [
   'R6 – Grão cheio', 'R7 – Início maturação', 'R8 – Maturação plena'
 ]
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 function detectFormType(praga, categoria) {
   if (praga) {
     const nome = (praga.nome_comum || '').toLowerCase()
@@ -56,7 +88,6 @@ function detectFormType(praga, categoria) {
     if (praga.tipo === 'daninha') return 'daninha'
     return 'generica'
   }
-  // Sem praga selecionada: usa categoria
   const cat = categoria?.id
   if (cat === 'estadio' || cat === 'plantio' || cat === 'colheita' || cat === 'outras') return cat
   if (cat === 'daninha') return 'daninha'
@@ -67,9 +98,10 @@ function calcularCV(valores) {
   const nums = valores.map(Number).filter(n => !isNaN(n) && n >= 0)
   if (nums.length < 2) return null
   const media = nums.reduce((a, b) => a + b, 0) / nums.length
-  if (media === 0) return 0
+  if (media === 0) return { cv: 0, media: 0, dp: 0 }
   const variancia = nums.reduce((acc, v) => acc + (v - media) ** 2, 0) / nums.length
-  return ((Math.sqrt(variancia) / media) * 100).toFixed(1)
+  const dp = Math.sqrt(variancia)
+  return { cv: ((dp / media) * 100).toFixed(1), media: media.toFixed(1), dp: dp.toFixed(2) }
 }
 
 function calcularSacosHa(gramas, metros) {
@@ -87,10 +119,34 @@ function uuid() {
   })
 }
 
+function fmtTempo(ms) {
+  const total = Math.max(0, Math.floor(ms / 1000))
+  const m = Math.floor(total / 60)
+  const s = total % 60
+  if (m >= 60) {
+    const h = Math.floor(m / 60)
+    return `${h}h${(m % 60).toString().padStart(2, '0')}`
+  }
+  return `${m}min${m < 10 ? ' ' + s.toString().padStart(2, '0') + 's' : ''}`
+}
+
+function distanciaTotal(trilha) {
+  if (!trilha || trilha.length < 2) return 0
+  let total = 0
+  for (let i = 1; i < trilha.length; i++) {
+    const a = trilha[i - 1]
+    const b = trilha[i]
+    const dLat = (b.lat - a.lat) * 110540
+    const dLng = (b.lng - a.lng) * 111320 * Math.cos((a.lat * Math.PI) / 180)
+    total += Math.sqrt(dLat * dLat + dLng * dLng)
+  }
+  return total
+}
+
 function resumoDraft(d) {
   if (d.categoria.id === 'plantio') {
-    const cv = calcularCV(d.form.distancias || [])
-    return cv != null ? `CV ${cv}%` : `${(d.form.distancias || []).length} medições`
+    const r = calcularCV(d.form.distancias || [])
+    return r ? `CV ${r.cv}%` : `${(d.form.distancias || []).length} medições`
   }
   if (d.categoria.id === 'colheita') {
     const s = calcularSacosHa(d.form.gramas, d.form.metros_quadrados)
@@ -101,127 +157,110 @@ function resumoDraft(d) {
   }
   if (d.formType === 'lagarta') {
     const total = (Number(d.form.pequenas_m) || 0) + (Number(d.form.medias_m) || 0) + (Number(d.form.grandes_m) || 0)
-    return `${total}/m · ${d.form.dano || ''}`
+    return `${total}/m · ${d.form.dano || ''}`.replace(/·\s*$/, '')
   }
   if (d.formType === 'percevejo') {
     return `${Number(d.form.adultos_m) || 0}A + ${Number(d.form.ninfas_m) || 0}N por m`
   }
   if (d.formType === 'daninha') {
-    return `${d.form.desenvolvimento || ''} · ${d.form.pressao || ''}`.trim()
+    return `${d.form.desenvolvimento || ''} · ${d.form.pressao || ''}`.replace(/^\s*·\s*|\s*·\s*$/g, '').trim()
   }
-  if (d.form.severidade) return d.form.severidade
+  if (d.form.severidade) return `Severidade ${d.form.severidade}`
   return d.categoria.label
 }
 
-// ─── Estilos ──────────────────────────────────────────────────────────────────
-const s = {
-  // Container externo: ocupa todo o espaço disponível, fundo neutro
-  outer: { display: 'flex', flexDirection: 'column', height: '100%', background: C.bgSoft, overflow: 'hidden' },
-  // Container interno: centralizado com max-width pra ficar parecido com mobile no desktop
-  root: { display: 'flex', flexDirection: 'column', height: '100%', maxWidth: 560, width: '100%', margin: '0 auto', background: C.bg, overflow: 'hidden', position: 'relative', boxShadow: '0 0 0 1px ' + C.border },
-  header: { display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: C.greenDk, flexShrink: 0 },
-  btnBack: { background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: 8, color: '#fff', fontSize: 20, cursor: 'pointer', padding: '4px 10px', lineHeight: 1 },
-  btnFinalizar: { background: 'rgba(255,255,255,0.25)', border: 'none', borderRadius: 8, color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', padding: '6px 12px' },
-  headerTitle: { color: '#fff', fontWeight: 700, fontSize: 15, flex: 1, margin: 0 },
-  headerSub: { color: 'rgba(255,255,255,0.8)', fontSize: 12, margin: 0 },
-  gpsBar: { display: 'flex', alignItems: 'center', gap: 8, padding: '6px 14px', background: C.greenLight, borderBottom: `1px solid ${C.border}`, flexShrink: 0 },
-  gpsDot: ok => ({ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: ok ? C.green : C.amber }),
-  gpsText: { fontSize: 12, color: C.textMid, flex: 1 },
-  pointsBadge: { background: C.green, color: '#fff', borderRadius: 20, fontSize: 11, fontWeight: 700, padding: '2px 8px' },
-  body: { flex: 1, overflowY: 'auto', padding: 14 },
-
-  // Drafts list
-  draftCard: { display: 'flex', alignItems: 'center', gap: 10, background: C.bgLight, border: `1.5px solid ${C.border}`, borderRadius: 10, padding: '10px 12px', marginBottom: 8 },
-  draftDot: cor => ({ width: 10, height: 10, borderRadius: '50%', background: cor, flexShrink: 0 }),
-  draftTexts: { flex: 1, minWidth: 0 },
-  draftTitulo: { fontSize: 13, fontWeight: 700, color: C.textDk, margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
-  draftResumo: { fontSize: 11, color: C.textMid, margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
-  draftRemove: { background: 'none', border: 'none', color: C.red, fontSize: 18, cursor: 'pointer', padding: '2px 6px', lineHeight: 1 },
-
-  sectionTitle: { fontSize: 11, fontWeight: 700, color: C.textDim, textTransform: 'uppercase', letterSpacing: 0.5, margin: '4px 0 8px' },
-
-  // Footer fixo com botões registrar/finalizar
-  footer: { padding: '12px 14px', background: C.bg, borderTop: `1px solid ${C.border}`, display: 'flex', gap: 8, flexShrink: 0 },
-
-  // Category cards
-  grid2: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 },
-  categoryCard: (gradFrom, gradTo) => ({
-    position: 'relative', borderRadius: 14, overflow: 'hidden',
-    aspectRatio: '4/3', cursor: 'pointer', border: 'none', padding: 0,
-    background: `linear-gradient(160deg, ${gradFrom} 0%, ${gradTo} 100%)`
-  }),
-  categoryCardImg: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.55 },
-  categoryCardOverlay: { position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.15) 55%, rgba(0,0,0,0.4) 100%)' },
-  categoryCardIcon: { position: 'absolute', top: 12, right: 14, fontSize: 32, lineHeight: 1, filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.5))' },
-  categoryCardLabel: { position: 'absolute', left: 0, right: 0, bottom: 0, color: '#fff', fontWeight: 700, fontSize: 14, padding: '0 12px 10px', textAlign: 'left', textShadow: '0 1px 3px rgba(0,0,0,0.7)' },
-
-  pestCard: (gradFrom, gradTo) => ({
-    position: 'relative', borderRadius: 12, overflow: 'hidden',
-    aspectRatio: '1/1', cursor: 'pointer', border: 'none', padding: 0,
-    background: `linear-gradient(160deg, ${gradFrom} 0%, ${gradTo} 100%)`
-  }),
-  pestCardImg: { position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.65 },
-  pestCardOverlay: { position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.1) 50%, rgba(0,0,0,0.3) 100%)' },
-  pestCardIcon: { position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -60%)', fontSize: 48, lineHeight: 1, filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.6))', pointerEvents: 'none' },
-  pestCardLabel: { position: 'absolute', left: 0, right: 0, bottom: 0, color: '#fff', fontWeight: 600, fontSize: 12, padding: '0 8px 8px', textAlign: 'left', textShadow: '0 1px 3px rgba(0,0,0,0.8)' },
-
-  // Forms
-  formSection: { marginBottom: 18 },
-  label: { fontSize: 12, fontWeight: 600, color: C.textMid, marginBottom: 4, display: 'block' },
-  input: { width: '100%', padding: '9px 12px', borderRadius: 8, border: `1.5px solid ${C.border}`, fontSize: 14, outline: 'none', boxSizing: 'border-box', background: C.bg, color: C.textDk },
-  textarea: { width: '100%', padding: '9px 12px', borderRadius: 8, border: `1.5px solid ${C.border}`, fontSize: 14, outline: 'none', boxSizing: 'border-box', background: C.bg, color: C.textDk, minHeight: 80, resize: 'vertical', fontFamily: 'inherit' },
-  segmented: { display: 'flex', gap: 6, flexWrap: 'wrap' },
-  segBtn: (active, cor) => ({ padding: '7px 14px', borderRadius: 20, fontSize: 13, fontWeight: 600, cursor: 'pointer', border: `1.5px solid ${cor}`, background: active ? cor : 'transparent', color: active ? '#fff' : cor }),
-  resultBox: { background: C.greenLight, borderRadius: 10, padding: '10px 14px', border: `1.5px solid ${C.green}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
-  resultLabel: { fontSize: 12, color: C.textMid, fontWeight: 600 },
-  resultValue: { fontSize: 20, fontWeight: 700, color: C.greenDk },
-
-  btnPrimary: { flex: 1, padding: '13px', borderRadius: 10, background: C.green, border: 'none', color: '#fff', fontWeight: 700, fontSize: 15, cursor: 'pointer' },
-  btnPrimaryDisabled: { flex: 1, padding: '13px', borderRadius: 10, background: C.border, border: 'none', color: C.textVery, fontWeight: 700, fontSize: 15, cursor: 'not-allowed' },
-  btnSecondary: { flex: 1, padding: '13px', borderRadius: 10, background: 'transparent', border: `1.5px solid ${C.border}`, color: C.textMid, fontWeight: 600, fontSize: 14, cursor: 'pointer' },
-
-  btnCamera: { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderRadius: 10, background: C.bgLight, border: `1.5px solid ${C.border}`, color: C.textDk, fontSize: 13, fontWeight: 600, cursor: 'pointer' },
-  fotoPreview: { width: '100%', maxHeight: 200, borderRadius: 10, objectFit: 'cover', border: `1.5px solid ${C.border}`, marginTop: 8 },
-
-  distanciaScroll: { display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 6 },
-  distanciaItem: { display: 'flex', alignItems: 'center', gap: 4, background: C.greenLight, border: `1px solid ${C.green}`, borderRadius: 20, padding: '4px 10px', flexShrink: 0 },
-  distanciaText: { fontSize: 13, color: C.greenDk, fontWeight: 600 },
-  distanciaRemove: { background: 'none', border: 'none', color: C.textDim, cursor: 'pointer', fontSize: 14, padding: '0 2px', lineHeight: 1 },
-  btnAdd: { background: C.green, border: 'none', borderRadius: 20, color: '#fff', fontSize: 18, width: 32, height: 32, cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  addRow: { display: 'flex', gap: 8, alignItems: 'center' },
-  addInput: { flex: 1, padding: '8px 12px', borderRadius: 8, border: `1.5px solid ${C.border}`, fontSize: 14, outline: 'none', boxSizing: 'border-box' },
-
-  empty: { textAlign: 'center', color: C.textDim, fontSize: 13, padding: '20px 0' }
+// ─── Ícones SVG (mesmos do design v2) ────────────────────────────────────────
+const Icon = {
+  Back: p => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}>
+      <line x1="19" y1="12" x2="5" y2="12" /><polyline points="12 19 5 12 12 5" />
+    </svg>
+  ),
+  Chevron: p => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}>
+      <polyline points="9 18 15 12 9 6" />
+    </svg>
+  ),
+  Footprint: p => (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" {...p}>
+      <path d="M7 4c1.4 0 2.5 1.4 2.5 3.1 0 1.7-1.1 3.1-2.5 3.1S4.5 8.8 4.5 7.1C4.5 5.4 5.6 4 7 4zm0 9c1.5 0 3 .7 3 2.5 0 1.5-1.3 4.5-3 4.5s-3-3-3-4.5C4 13.7 5.5 13 7 13zm10-9c1.4 0 2.5 1.4 2.5 3.1 0 1.7-1.1 3.1-2.5 3.1s-2.5-1.4-2.5-3.1C14.5 5.4 15.6 4 17 4zm0 9c1.5 0 3 .7 3 2.5 0 1.5-1.3 4.5-3 4.5s-3-3-3-4.5c0-1.8 1.5-2.5 3-2.5z" />
+    </svg>
+  ),
+  Camera: p => (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}>
+      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+      <circle cx="12" cy="13" r="4" />
+    </svg>
+  ),
+  Save: p => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}>
+      <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+      <polyline points="17 21 17 13 7 13 7 21" /><polyline points="7 3 7 8 15 8" />
+    </svg>
+  ),
+  Pin: p => (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}>
+      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" />
+    </svg>
+  ),
+  Plus: p => (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" {...p}>
+      <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+    </svg>
+  ),
+  Calc: p => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}>
+      <rect x="4" y="2" width="16" height="20" rx="2" />
+      <line x1="8" y1="6" x2="16" y2="6" /><line x1="8" y1="10" x2="10" y2="10" />
+      <line x1="12" y1="10" x2="14" y2="10" /><line x1="16" y1="10" x2="16" y2="10" />
+      <line x1="8" y1="14" x2="10" y2="14" /><line x1="12" y1="14" x2="14" y2="14" />
+      <line x1="16" y1="14" x2="16" y2="18" /><line x1="8" y1="18" x2="14" y2="18" />
+    </svg>
+  ),
+  Search: p => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}>
+      <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+    </svg>
+  ),
+  Close: p => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...p}>
+      <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+    </svg>
+  )
 }
 
 // ─── Componente principal ─────────────────────────────────────────────────────
 export function MonitoramentoOcorrenciaView({ fazenda, fazendaId, talhao, onBack }) {
-  // Navegação interna: 'categorias' | 'lista' | 'formulario'
-  const [tela, setTela] = useState('categorias')
+  // Navegação interna
+  const [tela, setTela] = useState('categorias') // 'categorias' | 'lista' | 'formulario'
   const [categoriaSel, setCategoriaSel] = useState(null)
   const [pragaSel, setPragaSel] = useState(null)
+  const [buscaPraga, setBuscaPraga] = useState('')
 
-  // Catálogo de pragas/doenças
   const [catalogo, setCatalogo] = useState([])
 
   // GPS
-  const [gpsStatus, setGpsStatus] = useState('Aguardando GPS...')
+  const [gpsStatus, setGpsStatus] = useState('Aguardando GPS…')
   const [gpsOk, setGpsOk] = useState(false)
+  const [gpsPos, setGpsPos] = useState(null) // { lat, lng, precisao }
+  const [gpsError, setGpsError] = useState(null)
   const watchRef = useRef(null)
   const trilhaRef = useRef([])
   const ultimaPosRef = useRef(null)
   const iniciadoEmRef = useRef(new Date().toISOString())
+  const inicioMsRef = useRef(Date.now())
+
+  // métricas reativas (Trilha / Pontos / Tempo)
+  const [metricaPontos, setMetricaPontos] = useState(0)
+  const [metricaTrilhaM, setMetricaTrilhaM] = useState(0)
+  const [tempoMs, setTempoMs] = useState(0)
 
   // Monitoramento Supabase (lazy)
   const monitoramentoIdRef = useRef(null)
   const monitoramentoCreateRef = useRef(null)
 
-  // Drafts: ocorrências acumuladas para o ponto atual
-  // [{ id, categoria, praga, formType, form, fotoFile, fotoPreview }]
+  // Drafts atuais
   const [drafts, setDrafts] = useState([])
-
-  // Total de pontos efetivamente registrados na sessão
-  const [pontosRegistrados, setPontosRegistrados] = useState(0)
 
   // Formulário ativo
   const [form, setForm] = useState({})
@@ -234,7 +273,7 @@ export function MonitoramentoOcorrenciaView({ fazenda, fazendaId, talhao, onBack
 
   const cameraRef = useRef(null)
 
-  // ── Carregar catálogo ─────────────────────────────────────────────────────
+  // ── Catálogo ─────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!fazendaId) return
     listarPragasDoencas(fazendaId)
@@ -242,29 +281,35 @@ export function MonitoramentoOcorrenciaView({ fazenda, fazendaId, talhao, onBack
       .catch(() => setCatalogo([]))
   }, [fazendaId])
 
-  // ── GPS watch contínuo (caminhamento) ────────────────────────────────────
+  // ── GPS watch contínuo ──────────────────────────────────────────────────
   useEffect(() => {
     requestOfflineStorage().catch(() => {})
 
     if (!navigator.geolocation) {
-      setGpsStatus('GPS indisponível neste navegador')
+      setGpsStatus('GPS indisponível')
+      setGpsError('GPS indisponível neste navegador')
       return
     }
 
-    setGpsStatus('Solicitando GPS...')
+    setGpsStatus('Solicitando GPS…')
     watchRef.current = navigator.geolocation.watchPosition(
       pos => {
         const lat = pos.coords.latitude
         const lng = pos.coords.longitude
         const precisao = pos.coords.accuracy
-        ultimaPosRef.current = { lat, lng, precisao }
+        const novo = { lat, lng, precisao }
+        ultimaPosRef.current = novo
         trilhaRef.current.push({ lat, lng, ts: new Date().toISOString() })
         setGpsOk(true)
-        setGpsStatus(`GPS ativo · ±${Math.round(precisao || 0)}m`)
+        setGpsPos(novo)
+        setGpsStatus(`±${Math.round(precisao || 0)}m`)
+        setGpsError(null)
+        setMetricaTrilhaM(Math.round(distanciaTotal(trilhaRef.current)))
       },
       err => {
         setGpsOk(false)
-        setGpsStatus(err.message || 'Sem sinal GPS')
+        setGpsError(err.message || 'Sem sinal GPS')
+        setGpsStatus('Sem GPS')
       },
       { enableHighAccuracy: true, timeout: 20000, maximumAge: 3000 }
     )
@@ -274,7 +319,29 @@ export function MonitoramentoOcorrenciaView({ fazenda, fazendaId, talhao, onBack
     }
   }, [])
 
-  // ── Sair: salva caminhamento ──────────────────────────────────────────────
+  // ── Cronômetro ──────────────────────────────────────────────────────────
+  useEffect(() => {
+    const id = setInterval(() => setTempoMs(Date.now() - inicioMsRef.current), 1000)
+    return () => clearInterval(id)
+  }, [])
+
+  // ── Mapa: feature do talhão ─────────────────────────────────────────────
+  const mapFeatures = useMemo(() => {
+    if (!talhao?.geometria) return []
+    const feat = normalizeFeature(talhao.geometria, talhao.codigo)
+    return feat ? [feat] : []
+  }, [talhao])
+
+  const devicePosition = useMemo(() => {
+    if (!gpsOk || !gpsPos) return null
+    return {
+      latitude: gpsPos.lat,
+      longitude: gpsPos.lng,
+      accuracy: gpsPos.precisao
+    }
+  }, [gpsOk, gpsPos])
+
+  // ── Sair: salva caminhamento ────────────────────────────────────────────
   const finalizarESair = useCallback(async () => {
     try {
       if (monitoramentoIdRef.current && trilhaRef.current.length > 0) {
@@ -298,7 +365,6 @@ export function MonitoramentoOcorrenciaView({ fazenda, fazendaId, talhao, onBack
     return monitoramentoCreateRef.current
   }
 
-  // ── Abrir formulário ──────────────────────────────────────────────────────
   function iniciarFormulario(categoria, praga = null) {
     setCategoriaSel(categoria)
     setPragaSel(praga)
@@ -317,7 +383,6 @@ export function MonitoramentoOcorrenciaView({ fazenda, fazendaId, talhao, onBack
     setFotoPreview(URL.createObjectURL(file))
   }
 
-  // ── "Salvar ocorrência" → adiciona ao draft, NÃO grava no DB ─────────────
   function adicionarOcorrencia() {
     const formType = detectFormType(pragaSel, categoriaSel)
     const draft = {
@@ -337,14 +402,12 @@ export function MonitoramentoOcorrenciaView({ fazenda, fazendaId, talhao, onBack
     setDrafts(d => d.filter(x => x.id !== id))
   }
 
-  // ── "Registrar Ponto" → captura GPS, salva todos os drafts agrupados ─────
   async function registrarPonto() {
     if (drafts.length === 0) return
     setRegistrando(true)
     setErro(null)
 
     try {
-      // 1. Captura GPS único para o ponto
       const gps = await new Promise(resolve => {
         if (!navigator.geolocation) return resolve(ultimaPosRef.current)
         navigator.geolocation.getCurrentPosition(
@@ -359,11 +422,9 @@ export function MonitoramentoOcorrenciaView({ fazenda, fazendaId, talhao, onBack
         return
       }
 
-      // 2. Garante monitoramento
       const monitoramentoId = await ensureMonitoramento()
       const grupoId = uuid()
 
-      // 3. Salva cada draft
       for (const d of drafts) {
         let foto_url = null
         if (d.fotoFile && fazendaId) {
@@ -393,14 +454,13 @@ export function MonitoramentoOcorrenciaView({ fazenda, fazendaId, talhao, onBack
         })
       }
 
-      // 4. Cache offline
       saveMonitoringPointOffline(
         { tipo: 'ponto', lat: gps.lat, lng: gps.lng, hora: new Date().toLocaleString('pt-BR'), ocorrencias: drafts.length },
         { fazendaId, fazendaNome: fazenda?.nome || '', talhaoId: talhao?.id || null, talhaoCodigo: talhao?.codigo || '' }
       )
 
       setDrafts([])
-      setPontosRegistrados(n => n + 1)
+      setMetricaPontos(n => n + 1)
     } catch (err) {
       setErro(err.message || 'Erro ao registrar ponto')
     } finally {
@@ -408,98 +468,403 @@ export function MonitoramentoOcorrenciaView({ fazenda, fazendaId, talhao, onBack
     }
   }
 
-  function catalogoPorTipo(tipoDB) {
-    if (!tipoDB) return []
-    return catalogo.filter(p => p.tipo === tipoDB)
-  }
+  const pontoAtual = `P-${String(metricaPontos + 1).padStart(3, '0')}`
+  const coordText = gpsPos
+    ? `${gpsPos.lat.toFixed(4)}, ${gpsPos.lng.toFixed(4)}`
+    : '—'
 
   function setField(key, val) { setForm(f => ({ ...f, [key]: val })) }
 
-  // ─── Header ───────────────────────────────────────────────────────────────
+  function counterDelta(key, delta) {
+    setForm(f => {
+      const cur = Number(f[key] || 0)
+      const next = Math.max(0, cur + delta)
+      return { ...f, [key]: next }
+    })
+  }
+
+  // ── Header ──────────────────────────────────────────────────────────────
   function renderHeader() {
+    const isCateg = tela === 'categorias'
+    const subtitulo = talhao?.codigo
+      ? `Talhão ${talhao.codigo}${isCateg ? ' · em andamento' : ''}`
+      : 'Em andamento'
+    const titulo = isCateg
+      ? 'Monitorar'
+      : tela === 'lista'
+        ? categoriaSel?.label
+        : pragaSel?.nome_comum || categoriaSel?.label
+
     return (
-      <div style={s.header}>
-        {tela !== 'categorias' ? (
+      <div className="m-topbar">
+        {isCateg ? (
+          <button className="back" onClick={finalizarESair} aria-label="Sair">
+            <Icon.Close />
+          </button>
+        ) : (
           <button
-            style={s.btnBack}
+            className="back"
             onClick={() => {
               if (tela === 'formulario') setTela(categoriaSel?.tipoDB ? 'lista' : 'categorias')
               else setTela('categorias')
             }}
-          >←</button>
-        ) : (
-          <button style={s.btnBack} onClick={finalizarESair}>✕</button>
+            aria-label="Voltar"
+          >
+            <Icon.Back />
+          </button>
         )}
-        <div style={{ flex: 1 }}>
-          <p style={s.headerTitle}>
-            {tela === 'categorias' ? 'Monitoramento'
-              : tela === 'lista' ? categoriaSel?.label
-              : pragaSel?.nome_comum || categoriaSel?.label}
-          </p>
-          {talhao?.codigo && (<p style={s.headerSub}>Talhão {talhao.codigo}</p>)}
+        <div className="title">
+          <div className="title-h">{titulo}</div>
+          <div className="title-s">{subtitulo}</div>
         </div>
-        {tela === 'categorias' && (
-          <button style={s.btnFinalizar} onClick={finalizarESair}>Finalizar</button>
+        <span className={`gps-mini ${gpsOk ? '' : 'warn'}`}>{gpsStatus}</span>
+        {isCateg && (
+          <button className="m-finalizar" onClick={finalizarESair}>Finalizar</button>
         )}
       </div>
     )
   }
 
-  function renderGPSBar() {
-    return (
-      <div style={s.gpsBar}>
-        <div style={s.gpsDot(gpsOk)} />
-        <span style={s.gpsText}>{gpsStatus}</span>
-        {pontosRegistrados > 0 && (
-          <span style={s.pointsBadge}>{pontosRegistrados} ponto{pontosRegistrados !== 1 ? 's' : ''}</span>
-        )}
-      </div>
-    )
-  }
-
-  // ─── Tela: categorias + drafts atuais ─────────────────────────────────────
+  // ── Tela: categorias com bottom sheet sobre mapa ────────────────────────
   function renderCategorias() {
     return (
-      <div style={s.body}>
-        {drafts.length > 0 && (
-          <>
-            <p style={s.sectionTitle}>Ocorrências deste ponto ({drafts.length})</p>
-            {drafts.map(d => (
-              <div key={d.id} style={s.draftCard}>
-                <div style={s.draftDot(d.categoria.gradTo)} />
-                <div style={s.draftTexts}>
-                  <p style={s.draftTitulo}>
-                    {d.praga?.nome_comum || d.categoria.label}
-                  </p>
-                  <p style={s.draftResumo}>{resumoDraft(d)}</p>
+      <div className="m-body with-map">
+        {/* Mapa Leaflet de fundo */}
+        <div className="m-map-host">
+          {mapFeatures.length > 0 ? (
+            <SimpleFarmMap
+              features={mapFeatures}
+              height="100%"
+              fullBleed
+              selectedCode={talhao?.codigo}
+              selectedMode="monitoramento"
+              pluviometros={[]}
+              devicePosition={devicePosition}
+            />
+          ) : null}
+        </div>
+
+        {/* Walk strip */}
+        <div className="m-walk-top">
+          <div className="ic"><Icon.Footprint /></div>
+          <div className="cols">
+            <div>
+              <div className="l">Trilha</div>
+              <div className="v">{metricaTrilhaM}m</div>
+            </div>
+            <div>
+              <div className="l">Pontos</div>
+              <div className="v">{metricaPontos}</div>
+            </div>
+            <div>
+              <div className="l">Tempo</div>
+              <div className="v">{fmtTempo(tempoMs)}</div>
+            </div>
+          </div>
+        </div>
+
+        {gpsError && (
+          <div className="m-gps-warn">
+            <div className="ic">!</div>
+            <div>{gpsError}</div>
+          </div>
+        )}
+
+        {/* Bottom sheet */}
+        <div className="m-sheet">
+          <div className="m-sheet-grab" />
+          <div className="m-sheet-header">
+            <div className="m-sheet-title">Registrar ocorrência</div>
+            <div className="m-sheet-sub">
+              Ponto {pontoAtual} · {drafts.length > 0 ? `${drafts.length} ocorrência${drafts.length > 1 ? 's' : ''} no ponto` : 'selecione a categoria'}
+            </div>
+          </div>
+
+          <div className="m-sheet-body">
+            {drafts.length > 0 && (
+              <>
+                <div className="m-section-label">Ocorrências deste ponto</div>
+                {drafts.map(d => (
+                  <div key={d.id} className="m-draft-item">
+                    <div className="m-draft-dot" style={{ background: d.categoria.accent }} />
+                    <div className="m-draft-texts">
+                      <div className="m-draft-title">{d.praga?.nome_comum || d.categoria.label}</div>
+                      <div className="m-draft-sub">{resumoDraft(d)}</div>
+                    </div>
+                    <button className="m-draft-rm" onClick={() => removerDraft(d.id)} aria-label="Remover">
+                      <Icon.Close />
+                    </button>
+                  </div>
+                ))}
+                <div className="m-section-label">Adicionar outra ocorrência</div>
+              </>
+            )}
+
+            <div className="m-cats-list">
+              {CATEGORIAS.map(cat => (
+                <button
+                  key={cat.id}
+                  className="m-cat-card-wide"
+                  onClick={() => {
+                    if (cat.tipoDB) { setCategoriaSel(cat); setBuscaPraga(''); setTela('lista') }
+                    else iniciarFormulario(cat, null)
+                  }}
+                >
+                  <div
+                    className="bg"
+                    style={cat.foto ? { backgroundImage: `url(${cat.foto})` } : { background: cat.accent }}
+                  />
+                  <div className="ov" />
+                  <div className="body">
+                    <div className="name">{cat.label}</div>
+                    <div className="meta">{cat.meta}</div>
+                  </div>
+                  <div className="chev"><Icon.Chevron /></div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="m-sheet-footer">
+            {erro && <div className="m-err" style={{ flex: 1, margin: 0 }}>{erro}</div>}
+            <div className="m-footer-meta">
+              <Icon.Pin style={{ verticalAlign: '-2px', marginRight: 4 }} />
+              <b>{pontoAtual}</b> · {coordText}
+            </div>
+            <button
+              className="m-btn primary"
+              disabled={drafts.length === 0 || registrando}
+              onClick={registrarPonto}
+            >
+              <Icon.Save />
+              {registrando
+                ? 'Registrando…'
+                : `Registrar ponto${drafts.length > 0 ? ` (${drafts.length})` : ''}`}
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Tela: lista de pragas/doenças/daninhas ──────────────────────────────
+  function renderListaPragas() {
+    const lista = catalogo
+      .filter(p => p.tipo === categoriaSel?.tipoDB)
+      .filter(p => {
+        if (!buscaPraga.trim()) return true
+        const q = buscaPraga.toLowerCase()
+        return (p.nome_comum || '').toLowerCase().includes(q) ||
+               (p.nome_cientifico || '').toLowerCase().includes(q)
+      })
+
+    return (
+      <div className="m-body">
+        <div className="m-search">
+          <span className="ic"><Icon.Search /></span>
+          <input
+            placeholder={`Buscar ${categoriaSel?.label?.toLowerCase() || ''}…`}
+            value={buscaPraga}
+            onChange={e => setBuscaPraga(e.target.value)}
+          />
+        </div>
+
+        {lista.length === 0 ? (
+          <div className="m-pest-empty">
+            Nenhuma {categoriaSel?.label?.toLowerCase()} cadastrada para esta fazenda.
+            <div style={{ marginTop: 16 }}>
+              <button className="m-btn outline" onClick={() => iniciarFormulario(categoriaSel, null)}>
+                Registrar sem especificar
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="m-pest-grid">
+            {lista.map(praga => (
+              <button
+                key={praga.id}
+                className="m-pest-card"
+                onClick={() => iniciarFormulario(categoriaSel, praga)}
+              >
+                <div
+                  className="bg"
+                  style={praga.foto_url ? { backgroundImage: `url(${praga.foto_url})` } : { background: categoriaSel?.accent || '#5a8a3a' }}
+                />
+                <div className="ov" />
+                <div className="body">
+                  <div className="name">{praga.nome_comum}</div>
+                  {praga.nome_cientifico && <div className="sci">{praga.nome_cientifico}</div>}
                 </div>
-                <button style={s.draftRemove} onClick={() => removerDraft(d.id)}>✕</button>
+              </button>
+            ))}
+            <button className="m-pest-card" onClick={() => iniciarFormulario(categoriaSel, null)}>
+              <div className="bg" style={{ background: '#5a6657' }} />
+              <div className="ov" />
+              <div className="body">
+                <div className="name">Outra / não identificada</div>
+                <div className="sci">Registro livre</div>
+              </div>
+            </button>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // ── Formulário: hero + secciones ────────────────────────────────────────
+  function heroData() {
+    if (pragaSel) {
+      return {
+        name: pragaSel.nome_comum,
+        sci: pragaSel.nome_cientifico,
+        bg: pragaSel.foto_url
+      }
+    }
+    return {
+      name: categoriaSel?.label,
+      sci: categoriaSel?.meta,
+      bg: categoriaSel?.foto
+    }
+  }
+
+  function FormLagarta() {
+    return (
+      <>
+        <div className="m-form-section">
+          <div className="m-form-label">Contagem por metro</div>
+          <div className="m-counter-grid">
+            {[
+              { k: 'pequenas_m', lbl: 'Pequenas' },
+              { k: 'medias_m',   lbl: 'Médias' },
+              { k: 'grandes_m',  lbl: 'Grandes' }
+            ].map(c => (
+              <div key={c.k} className="m-counter">
+                <div className="lbl">{c.lbl}</div>
+                <div className="row">
+                  <button className="btn" onClick={() => counterDelta(c.k, -1)}>−</button>
+                  <div className="v">{Number(form[c.k] || 0)}</div>
+                  <button className="btn" onClick={() => counterDelta(c.k, +1)}>+</button>
+                </div>
               </div>
             ))}
-            <p style={s.sectionTitle}>Adicionar outra ocorrência</p>
-          </>
-        )}
-        {drafts.length === 0 && (
-          <p style={{ fontSize: 13, color: C.textMid, marginBottom: 12 }}>
-            Selecione uma categoria para adicionar a primeira ocorrência deste ponto.
-          </p>
-        )}
-        <div style={s.grid2}>
-          {CATEGORIAS.map(cat => (
+          </div>
+        </div>
+
+        <div className="m-form-section">
+          <div className="m-form-label">Dano encontrado</div>
+          <div className="m-seg three">
+            {[
+              { id: 'leve', lbl: 'Leve', cls: 'leve' },
+              { id: 'moderada', lbl: 'Moderada', cls: 'mod' },
+              { id: 'severa', lbl: 'Severa', cls: 'sev' }
+            ].map(b => (
+              <button
+                key={b.id}
+                className={`m-seg-btn ${b.cls} ${form.dano === b.id ? 'active' : ''}`}
+                onClick={() => setField('dano', b.id)}
+              >
+                <span className="dot" /> {b.lbl}
+              </button>
+            ))}
+          </div>
+        </div>
+      </>
+    )
+  }
+
+  function FormPercevejo() {
+    const adultos = Number(form.adultos_m || 0)
+    const ninfas = Number(form.ninfas_m || 0)
+    const total = adultos + ninfas
+    return (
+      <>
+        <div className="m-form-section">
+          <div className="m-form-label">Pano-de-batida · por metro</div>
+          <div className="m-counter-grid two">
+            {[
+              { k: 'adultos_m', lbl: 'Adultos' },
+              { k: 'ninfas_m',  lbl: 'Ninfas' }
+            ].map(c => (
+              <div key={c.k} className="m-counter">
+                <div className="lbl">{c.lbl}</div>
+                <div className="row">
+                  <button className="btn" onClick={() => counterDelta(c.k, -1)}>−</button>
+                  <div className="v">{Number(form[c.k] || 0)}</div>
+                  <button className="btn" onClick={() => counterDelta(c.k, +1)}>+</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="m-form-section">
+          <div className="m-calc">
+            <div>
+              <div className="lbl">Total / m</div>
+              <div className="v">{total}<span className="u">/m</span></div>
+            </div>
+          </div>
+        </div>
+      </>
+    )
+  }
+
+  function FormDaninha() {
+    return (
+      <>
+        <div className="m-form-section">
+          <div className="m-form-label">Estágio de desenvolvimento</div>
+          <div className="m-seg three">
+            {['Inicial', 'Vegetativo', 'Reprodutivo'].map(d => (
+              <button
+                key={d}
+                className={`m-seg-btn ${form.desenvolvimento === d ? 'active' : ''}`}
+                onClick={() => setField('desenvolvimento', d)}
+              >
+                <span className="dot" /> {d}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="m-form-section">
+          <div className="m-form-label">Pressão da infestação</div>
+          <div className="m-seg three">
+            {[
+              { id: 'Baixa', cls: 'leve' },
+              { id: 'Média', cls: 'mod' },
+              { id: 'Alta', cls: 'sev' }
+            ].map(p => (
+              <button
+                key={p.id}
+                className={`m-seg-btn ${p.cls} ${form.pressao === p.id ? 'active' : ''}`}
+                onClick={() => setField('pressao', p.id)}
+              >
+                <span className="dot" /> {p.id}
+              </button>
+            ))}
+          </div>
+        </div>
+      </>
+    )
+  }
+
+  function FormGenerica() {
+    return (
+      <div className="m-form-section">
+        <div className="m-form-label">Severidade</div>
+        <div className="m-seg three">
+          {[
+            { id: 'leve', lbl: 'Leve', cls: 'leve' },
+            { id: 'moderada', lbl: 'Moderada', cls: 'mod' },
+            { id: 'severa', lbl: 'Severa', cls: 'sev' }
+          ].map(b => (
             <button
-              key={cat.id}
-              style={s.categoryCard(cat.gradFrom, cat.gradTo)}
-              onClick={() => {
-                if (cat.tipoDB) { setCategoriaSel(cat); setTela('lista') }
-                else iniciarFormulario(cat, null)
-              }}
+              key={b.id}
+              className={`m-seg-btn ${b.cls} ${form.severidade === b.id ? 'active' : ''}`}
+              onClick={() => setField('severidade', b.id)}
             >
-              {cat.foto && (
-                <img src={cat.foto} alt="" style={s.categoryCardImg} loading="lazy" onError={e => { e.target.style.display = 'none' }} />
-              )}
-              <div style={s.categoryCardOverlay} />
-              <span style={s.categoryCardIcon}>{cat.icone}</span>
-              <span style={s.categoryCardLabel}>{cat.label}</span>
+              <span className="dot" /> {b.lbl}
             </button>
           ))}
         </div>
@@ -507,174 +872,28 @@ export function MonitoramentoOcorrenciaView({ fazenda, fazendaId, talhao, onBack
     )
   }
 
-  function renderFooter() {
-    if (tela !== 'categorias') return null
-    const podeRegistrar = drafts.length > 0 && !registrando
+  function FormEstadio() {
     return (
-      <div style={s.footer}>
-        {erro && <p style={{ color: C.red, fontSize: 12, margin: 0, alignSelf: 'center' }}>{erro}</p>}
-        <button
-          style={podeRegistrar ? s.btnPrimary : s.btnPrimaryDisabled}
-          disabled={!podeRegistrar}
-          onClick={registrarPonto}
+      <div className="m-form-section">
+        <div className="m-form-label">Estádio fenológico</div>
+        <select
+          className="m-select"
+          value={form.estadio || ''}
+          onChange={e => setField('estadio', e.target.value)}
         >
-          {registrando ? 'Registrando...' : `Registrar ponto${drafts.length > 0 ? ` (${drafts.length})` : ''}`}
-        </button>
-      </div>
-    )
-  }
-
-  // ─── Tela: lista de pragas/doenças da categoria ───────────────────────────
-  function renderListaPragas() {
-    const lista = catalogoPorTipo(categoriaSel?.tipoDB)
-    if (lista.length === 0) {
-      return (
-        <div style={{ ...s.body, display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 40, gap: 12 }}>
-          <p style={{ color: C.textDim, fontSize: 14, textAlign: 'center' }}>
-            Nenhuma {categoriaSel?.label?.toLowerCase()} cadastrada para esta fazenda.
-          </p>
-          <button style={{ ...s.btnSecondary, flex: 'none' }} onClick={() => iniciarFormulario(categoriaSel, null)}>
-            Registrar sem especificar
-          </button>
-        </div>
-      )
-    }
-    const gradFrom = categoriaSel?.gradFrom || '#222'
-    const gradTo   = categoriaSel?.gradTo   || '#555'
-    return (
-      <div style={s.body}>
-        <div style={s.grid2}>
-          {lista.map(praga => {
-            const icone = ICONE_TIPO[praga.tipo] || categoriaSel?.icone || '🔍'
-            return (
-              <button key={praga.id} style={s.pestCard(gradFrom, gradTo)} onClick={() => iniciarFormulario(categoriaSel, praga)}>
-                {praga.foto_url ? (
-                  <img src={praga.foto_url} alt={praga.nome_comum} style={s.pestCardImg} loading="lazy" onError={e => { e.target.style.display = 'none' }} />
-                ) : null}
-                <div style={s.pestCardOverlay} />
-                {!praga.foto_url && <span style={s.pestCardIcon}>{icone}</span>}
-                <span style={s.pestCardLabel}>
-                  {praga.nome_comum}
-                  {praga.nome_cientifico && (
-                    <><br /><span style={{ fontSize: 10, fontStyle: 'italic', opacity: 0.8 }}>{praga.nome_cientifico}</span></>
-                  )}
-                </span>
-              </button>
-            )
-          })}
-          <button style={s.pestCard('#555', '#888')} onClick={() => iniciarFormulario(categoriaSel, null)}>
-            <div style={s.pestCardOverlay} />
-            <span style={s.pestCardIcon}>➕</span>
-            <span style={s.pestCardLabel}>Outra / não identificada</span>
-          </button>
-        </div>
-      </div>
-    )
-  }
-
-  // ─── Formulários específicos ──────────────────────────────────────────────
-  function renderFormLagarta() {
-    return (
-      <>
-        <div style={s.formSection}>
-          <label style={s.label}>Lagartas pequenas / metro</label>
-          <input style={s.input} type="number" min="0" value={form.pequenas_m || ''} onChange={e => setField('pequenas_m', e.target.value)} placeholder="0" />
-        </div>
-        <div style={s.formSection}>
-          <label style={s.label}>Lagartas médias / metro</label>
-          <input style={s.input} type="number" min="0" value={form.medias_m || ''} onChange={e => setField('medias_m', e.target.value)} placeholder="0" />
-        </div>
-        <div style={s.formSection}>
-          <label style={s.label}>Lagartas grandes / metro</label>
-          <input style={s.input} type="number" min="0" value={form.grandes_m || ''} onChange={e => setField('grandes_m', e.target.value)} placeholder="0" />
-        </div>
-        <div style={s.formSection}>
-          <label style={s.label}>Dano</label>
-          <div style={s.segmented}>
-            {['leve','moderada','severa'].map(d => (
-              <button key={d} style={s.segBtn(form.dano === d, d === 'leve' ? C.green : d === 'moderada' ? C.amber : C.red)} onClick={() => setField('dano', d)}>
-                {d.charAt(0).toUpperCase() + d.slice(1)}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div style={s.formSection}>
-          <label style={s.label}>Ação sugerida</label>
-          <input style={s.input} value={form.acao_sugerida || ''} onChange={e => setField('acao_sugerida', e.target.value)} placeholder="Ex: aplicar inseticida X" />
-        </div>
-      </>
-    )
-  }
-
-  function renderFormPercevejo() {
-    return (
-      <>
-        <div style={s.formSection}>
-          <label style={s.label}>Adultos / metro</label>
-          <input style={s.input} type="number" min="0" value={form.adultos_m || ''} onChange={e => setField('adultos_m', e.target.value)} placeholder="0" />
-        </div>
-        <div style={s.formSection}>
-          <label style={s.label}>Ninfas / metro</label>
-          <input style={s.input} type="number" min="0" value={form.ninfas_m || ''} onChange={e => setField('ninfas_m', e.target.value)} placeholder="0" />
-        </div>
-      </>
-    )
-  }
-
-  function renderFormDaninha() {
-    return (
-      <>
-        <div style={s.formSection}>
-          <label style={s.label}>Desenvolvimento</label>
-          <div style={s.segmented}>
-            {['Inicial','Vegetativo','Reprodutivo'].map(d => (
-              <button key={d} style={s.segBtn(form.desenvolvimento === d, C.green)} onClick={() => setField('desenvolvimento', d)}>{d}</button>
-            ))}
-          </div>
-        </div>
-        <div style={s.formSection}>
-          <label style={s.label}>Pressão de infestação</label>
-          <div style={s.segmented}>
-            {['Alta','Média','Baixa'].map(p => (
-              <button key={p} style={s.segBtn(form.pressao === p, p === 'Alta' ? C.red : p === 'Média' ? C.amber : C.green)} onClick={() => setField('pressao', p)}>{p}</button>
-            ))}
-          </div>
-        </div>
-      </>
-    )
-  }
-
-  function renderFormGenerica() {
-    return (
-      <div style={s.formSection}>
-        <label style={s.label}>Severidade</label>
-        <div style={s.segmented}>
-          {ESCALAS_SEVERIDADE.map(e => (
-            <button key={e.id} style={s.segBtn(form.severidade === e.id, e.cor)} onClick={() => setField('severidade', e.id)}>{e.label}</button>
-          ))}
-        </div>
-      </div>
-    )
-  }
-
-  function renderFormEstadio() {
-    return (
-      <div style={s.formSection}>
-        <label style={s.label}>Estádio fenológico</label>
-        <select style={s.input} value={form.estadio || ''} onChange={e => setField('estadio', e.target.value)}>
-          <option value="">Selecione...</option>
+          <option value="">Selecione…</option>
           {ESTADIOS.map(e => <option key={e} value={e}>{e}</option>)}
         </select>
       </div>
     )
   }
 
-  function renderFormPlantio() {
+  function FormPlantio() {
     const distancias = form.distancias || []
-    const cv = calcularCV(distancias)
+    const r = calcularCV(distancias)
 
     function addDistancia() {
-      const v = parseFloat(distanciaInput)
+      const v = parseFloat(distanciaInput.replace(',', '.'))
       if (isNaN(v)) return
       setForm(f => ({ ...f, distancias: [...(f.distancias || []), v] }))
       setDistanciaInput('')
@@ -683,55 +902,169 @@ export function MonitoramentoOcorrenciaView({ fazenda, fazendaId, talhao, onBack
       setForm(f => { const arr = [...(f.distancias || [])]; arr.splice(idx, 1); return { ...f, distancias: arr } })
     }
 
+    const qualidade = r
+      ? r.cv > 25 ? { lbl: 'Ruim', color: '#b54a3f' }
+      : r.cv > 15 ? { lbl: 'Regular', color: '#d99a2b' }
+      : { lbl: 'Excelente', color: '#a3c14a' }
+      : null
+
     return (
       <>
-        <div style={s.formSection}>
-          <label style={s.label}>Metros avaliados</label>
-          <input style={s.input} type="number" min="0" value={form.metros_avaliados || ''} onChange={e => setField('metros_avaliados', e.target.value)} placeholder="Ex: 10" />
+        <div className="m-form-section">
+          <div className="m-form-label">Metros avaliados</div>
+          <input
+            className="m-input"
+            type="number"
+            min="0"
+            value={form.metros_avaliados || ''}
+            onChange={e => setField('metros_avaliados', e.target.value)}
+            placeholder="Ex: 5"
+          />
         </div>
-        <div style={s.formSection}>
-          <label style={s.label}>Espaçamentos entre sementes (cm)</label>
-          <div style={{ ...s.distanciaScroll, marginBottom: 8 }}>
+
+        <div className="m-form-section">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+            <div className="m-form-label" style={{ margin: 0 }}>Distâncias entre sementes</div>
+            <span style={{ fontFamily: 'var(--m-font-mono)', fontSize: 10, color: 'var(--m-ink-3)' }}>
+              {distancias.length} · cm
+            </span>
+          </div>
+          <div className="m-dist-rail">
             {distancias.map((d, i) => (
-              <div key={i} style={s.distanciaItem}>
-                <span style={s.distanciaText}>{d}</span>
-                <button style={s.distanciaRemove} onClick={() => removeDistancia(i)}>✕</button>
+              <div key={i} className="m-dist-item">
+                <button className="rm" onClick={() => removeDistancia(i)} aria-label="Remover">×</button>
+                <div className="idx">#{String(i + 1).padStart(2, '0')}</div>
+                <div className="v">{Number(d).toFixed(1)}</div>
+                <div className="u">cm</div>
               </div>
             ))}
-          </div>
-          <div style={s.addRow}>
-            <input style={s.addInput} type="number" min="0" value={distanciaInput} onChange={e => setDistanciaInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && addDistancia()} placeholder="cm" />
-            <button style={s.btnAdd} onClick={addDistancia}>+</button>
+            <input
+              className="m-dist-input"
+              type="number"
+              inputMode="decimal"
+              step="0.1"
+              placeholder="cm"
+              value={distanciaInput}
+              onChange={e => setDistanciaInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && addDistancia()}
+            />
+            <button className="m-dist-add" onClick={addDistancia} aria-label="Adicionar">
+              <Icon.Plus />
+            </button>
           </div>
         </div>
-        {distancias.length >= 2 && (
-          <div style={{ ...s.resultBox, marginBottom: 16 }}>
-            <span style={s.resultLabel}>CV (coef. variação)</span>
-            <span style={{ ...s.resultValue, color: cv > 25 ? C.red : cv > 15 ? C.amber : C.greenDk }}>{cv}%</span>
+
+        {r && (
+          <div className="m-form-section">
+            <div className="m-calc">
+              <div>
+                <div className="lbl">Coef. de variação</div>
+                <div className="v">{r.cv}<span className="u">%</span></div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div className="lbl">Qualidade</div>
+                <div className="badge" style={{ color: qualidade.color }}>{qualidade.lbl}</div>
+              </div>
+            </div>
           </div>
         )}
       </>
     )
   }
 
-  function renderFormColheita() {
+  function FormColheita() {
     const sacosHa = calcularSacosHa(form.gramas, form.metros_quadrados)
     return (
       <>
-        <div style={s.formSection}>
-          <label style={s.label}>Metros quadrados avaliados</label>
-          <input style={s.input} type="number" min="0" value={form.metros_quadrados || ''} onChange={e => setField('metros_quadrados', e.target.value)} placeholder="Ex: 2" />
+        <div className="m-form-section">
+          <div className="m-form-label">Área avaliada (m²)</div>
+          <input
+            className="m-input"
+            type="number"
+            min="0"
+            value={form.metros_quadrados || ''}
+            onChange={e => setField('metros_quadrados', e.target.value)}
+            placeholder="Ex: 2"
+          />
         </div>
-        <div style={s.formSection}>
-          <label style={s.label}>Grãos coletados (gramas)</label>
-          <input style={s.input} type="number" min="0" value={form.gramas || ''} onChange={e => setField('gramas', e.target.value)} placeholder="Ex: 150" />
+
+        <div className="m-form-section">
+          <div className="m-form-label">Grãos coletados (gramas)</div>
+          <input
+            className="m-input"
+            type="number"
+            min="0"
+            value={form.gramas || ''}
+            onChange={e => setField('gramas', e.target.value)}
+            placeholder="Ex: 36,4"
+          />
         </div>
+
+        <div className="m-form-section">
+          <div className="m-form-label">Origem da perda</div>
+          <div className="m-seg two">
+            {['Plataforma', 'Trilha', 'Pré-colheita', 'Não ident.'].map(o => (
+              <button
+                key={o}
+                className={`m-seg-btn ${form.origem === o ? 'active' : ''}`}
+                onClick={() => setField('origem', o)}
+              >
+                <span className="dot" /> {o}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {sacosHa && (
-          <div style={{ ...s.resultBox, marginBottom: 16 }}>
-            <span style={s.resultLabel}>Sacos perdidos / ha</span>
-            <span style={s.resultValue}>{sacosHa}</span>
+          <div className="m-form-section">
+            <div className="m-calc">
+              <div>
+                <div className="lbl">Perda estimada</div>
+                <div className="v">{sacosHa}<span className="u">sc/ha</span></div>
+              </div>
+            </div>
           </div>
         )}
+      </>
+    )
+  }
+
+  function FormOutras() {
+    return (
+      <>
+        <div className="m-form-section">
+          <div className="m-form-label">Tipo (opcional)</div>
+          <div className="m-chip-row">
+            {['Deficiência', 'Compactação', 'Erosão', 'Falha stand', 'Geada', 'Fauna', 'Outro'].map(t => (
+              <button
+                key={t}
+                className={`m-chip ${form.tipo_outras === t ? 'active' : ''}`}
+                onClick={() => setField('tipo_outras', t)}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="m-form-section">
+          <div className="m-form-label">Severidade percebida</div>
+          <div className="m-seg three">
+            {[
+              { id: 'leve', lbl: 'Leve', cls: 'leve' },
+              { id: 'moderada', lbl: 'Moderada', cls: 'mod' },
+              { id: 'severa', lbl: 'Severa', cls: 'sev' }
+            ].map(b => (
+              <button
+                key={b.id}
+                className={`m-seg-btn ${b.cls} ${form.severidade === b.id ? 'active' : ''}`}
+                onClick={() => setField('severidade', b.id)}
+              >
+                <span className="dot" /> {b.lbl}
+              </button>
+            ))}
+          </div>
+        </div>
       </>
     )
   }
@@ -739,64 +1072,92 @@ export function MonitoramentoOcorrenciaView({ fazenda, fazendaId, talhao, onBack
   function renderFormulario() {
     const catId = categoriaSel?.id
     const formType = detectFormType(pragaSel, categoriaSel)
-    const mostrarObservacoes = catId !== 'plantio' && catId !== 'colheita'
+    const mostrarObs = catId !== 'plantio'
     const mostrarCamera = catId !== 'plantio' && catId !== 'colheita'
+    const hero = heroData()
+    const saveLabel = catId === 'plantio' || catId === 'colheita' ? 'Salvar avaliação' : 'Salvar ocorrência'
 
     return (
-      <>
-        <div style={s.body}>
-          {pragaSel && (
-            <div style={{ marginBottom: 16, padding: '10px 14px', background: C.greenLight, borderRadius: 10, border: `1px solid ${C.green}` }}>
-              <p style={{ margin: 0, fontWeight: 700, fontSize: 14, color: C.greenDk }}>{pragaSel.nome_comum}</p>
-              {pragaSel.nome_cientifico && (<p style={{ margin: '2px 0 0', fontSize: 12, color: C.textMid, fontStyle: 'italic' }}>{pragaSel.nome_cientifico}</p>)}
-              {pragaSel.nivel_dano_economico && (<p style={{ margin: '4px 0 0', fontSize: 12, color: C.textMid }}>NDE: {pragaSel.nivel_dano_economico}</p>)}
-            </div>
-          )}
+      <div className="m-body">
+        <div className="m-hero">
+          <div
+            className="bg"
+            style={hero.bg ? { backgroundImage: `url(${hero.bg})` } : { background: categoriaSel?.accent || '#5a8a3a' }}
+          />
+          <div className="ov" />
+          <div className="body">
+            <div className="name">{hero.name}</div>
+            {hero.sci && <div className="sci">{hero.sci}</div>}
+          </div>
+        </div>
 
-          {formType === 'lagarta'   && renderFormLagarta()}
-          {formType === 'percevejo' && renderFormPercevejo()}
-          {formType === 'daninha'   && renderFormDaninha()}
-          {catId === 'estadio'      && renderFormEstadio()}
-          {catId === 'plantio'      && renderFormPlantio()}
-          {catId === 'colheita'     && renderFormColheita()}
-          {formType === 'generica' && catId !== 'outras' && catId !== 'estadio' && catId !== 'plantio' && catId !== 'colheita' && renderFormGenerica()}
+        <div className="m-form">
+          {formType === 'lagarta'   && <FormLagarta />}
+          {formType === 'percevejo' && <FormPercevejo />}
+          {formType === 'daninha'   && <FormDaninha />}
+          {catId === 'estadio'      && <FormEstadio />}
+          {catId === 'plantio'      && <FormPlantio />}
+          {catId === 'colheita'     && <FormColheita />}
+          {catId === 'outras'       && <FormOutras />}
+          {formType === 'generica' && catId !== 'outras' && catId !== 'estadio' && catId !== 'plantio' && catId !== 'colheita' && <FormGenerica />}
 
-          {mostrarObservacoes && (
-            <div style={s.formSection}>
-              <label style={s.label}>Observações</label>
-              <textarea style={s.textarea} value={form.observacoes || ''} onChange={e => setField('observacoes', e.target.value)} placeholder="Descreva o que observou..." />
+          {mostrarObs && (
+            <div className="m-form-section">
+              <div className="m-form-label">Observações</div>
+              <textarea
+                className="m-textarea"
+                value={form.observacoes || ''}
+                onChange={e => setField('observacoes', e.target.value)}
+                placeholder="Descreva o que observou…"
+              />
             </div>
           )}
 
           {mostrarCamera && (
-            <div style={{ marginBottom: 20 }}>
-              <input ref={cameraRef} type="file" accept="image/*" capture="environment" onChange={handleFotoChange} style={{ display: 'none' }} />
-              <button style={s.btnCamera} onClick={() => cameraRef.current?.click()}>
-                <span>📷</span><span>{fotoPreview ? 'Trocar foto' : 'Tirar foto'}</span>
+            <div className="m-form-section">
+              <div className="m-form-label">Foto</div>
+              <input
+                ref={cameraRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={handleFotoChange}
+                style={{ display: 'none' }}
+              />
+              <button className="m-photo" onClick={() => cameraRef.current?.click()}>
+                <div className="ic"><Icon.Camera /></div>
+                <div>
+                  <strong>{fotoPreview ? 'Trocar foto' : 'Tocar para capturar'}</strong>
+                  <span>Câmera nativa · sem upload</span>
+                </div>
               </button>
-              {fotoPreview && (<img src={fotoPreview} alt="preview" style={s.fotoPreview} />)}
+              {fotoPreview && <img src={fotoPreview} alt="" className="m-photo-preview" />}
             </div>
           )}
+
+          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+            <button className="m-btn outline block" onClick={() => {
+              if (categoriaSel?.tipoDB) setTela('lista')
+              else setTela('categorias')
+            }}>
+              Cancelar
+            </button>
+            <button className="m-btn primary block" onClick={adicionarOcorrencia}>
+              <Icon.Save /> {saveLabel}
+            </button>
+          </div>
         </div>
-        <div style={s.footer}>
-          <button style={s.btnPrimary} onClick={adicionarOcorrencia}>
-            Salvar ocorrência
-          </button>
-        </div>
-      </>
+      </div>
     )
   }
 
-  // ─── Render principal ─────────────────────────────────────────────────────
   return (
-    <div style={s.outer}>
-      <div style={s.root}>
+    <div className="monit-app">
+      <div className="monit-frame">
         {renderHeader()}
-        {renderGPSBar()}
         {tela === 'categorias' && renderCategorias()}
         {tela === 'lista'      && renderListaPragas()}
         {tela === 'formulario' && renderFormulario()}
-        {tela === 'categorias' && renderFooter()}
       </div>
     </div>
   )
