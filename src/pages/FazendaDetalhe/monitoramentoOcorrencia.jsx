@@ -502,11 +502,14 @@ export function MonitoramentoOcorrenciaView({ fazenda, fazendaId, talhao, onBack
           }
         })
         .catch(() => {
-          // Sem Permissions API (Safari antigo): tentamos o 1o fix direto.
-          solicitarGps()
+          // Alguns browsers mobile (principalmente Safari/iOS) falham nessa
+          // consulta. Nesse caso tambem aguardamos gesto do usuario.
+          setGpsState('idle')
         })
     } else {
-      solicitarGps()
+      // Sem Permissions API: nao pedimos GPS no mount para nao queimar o
+      // prompt de permissao em mobile. O botao "Ativar GPS" chama solicitarGps.
+      setGpsState('idle')
     }
 
     return () => {
@@ -1383,14 +1386,14 @@ export function MonitoramentoOcorrenciaView({ fazenda, fazendaId, talhao, onBack
         </div>
 
         <div className="m-form">
-          {formType === 'lagarta'   && <FormLagarta />}
-          {formType === 'percevejo' && <FormPercevejo />}
-          {formType === 'daninha'   && <FormDaninha />}
-          {catId === 'estadio'      && <FormEstadio />}
-          {catId === 'plantio'      && <FormPlantio />}
-          {catId === 'colheita'     && <FormColheita />}
-          {catId === 'outras'       && <FormOutras />}
-          {formType === 'generica' && catId !== 'outras' && catId !== 'estadio' && catId !== 'plantio' && catId !== 'colheita' && <FormGenerica />}
+          {formType === 'lagarta'   && FormLagarta()}
+          {formType === 'percevejo' && FormPercevejo()}
+          {formType === 'daninha'   && FormDaninha()}
+          {catId === 'estadio'      && FormEstadio()}
+          {catId === 'plantio'      && FormPlantio()}
+          {catId === 'colheita'     && FormColheita()}
+          {catId === 'outras'       && FormOutras()}
+          {formType === 'generica' && catId !== 'outras' && catId !== 'estadio' && catId !== 'plantio' && catId !== 'colheita' && FormGenerica()}
 
           {mostrarObs && (
             <div className="m-form-section">
