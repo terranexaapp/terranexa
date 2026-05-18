@@ -80,6 +80,12 @@ export function useDevicePosition(enabled = true) {
   return position
 }
 
+function isIosSafariLike() {
+  if (typeof navigator === 'undefined') return false
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+}
+
 // Hook robusto disparado por interação do usuário (clique no botão GPS).
 // Em mobile (iOS Safari em especial) o prompt de permissão só aparece em
 // resposta a um gesto, então separamos request() do efeito automático.
@@ -88,7 +94,9 @@ export function useGpsRequest() {
     status: 'idle',
     position: null,
     error: null,
-    blockedReason: null
+    blockedReason: null,
+    errorCode: null,
+    permissionState: null
   })
   const watchRef = useRef(null)
   const mountedRef = useRef(true)
@@ -116,7 +124,9 @@ export function useGpsRequest() {
         updatedAt: result.timestamp
       },
       error: null,
-      blockedReason: null
+      blockedReason: null,
+      errorCode: null,
+      permissionState: null
     })
   }, [])
 
@@ -130,7 +140,9 @@ export function useGpsRequest() {
       status: prev.position ? 'active' : status,
       position: prev.position,
       error: err?.message || null,
-      blockedReason: prev.blockedReason
+      blockedReason: prev.blockedReason,
+      errorCode: err?.code || null,
+      permissionState: prev.permissionState
     }))
 
     // Quando deu denied, consulta Permissions API pra distinguir bloqueio
@@ -143,11 +155,22 @@ export function useGpsRequest() {
           if (!mountedRef.current) return
           setState(prev =>
             prev.status === 'denied'
-              ? { ...prev, blockedReason: perm.state === 'denied' ? 'blocked' : 'prompt-dismissed' }
+              ? {
+                  ...prev,
+                  permissionState: perm.state,
+                  blockedReason: perm.state === 'denied' ? 'blocked' : 'prompt-dismissed'
+                }
               : prev
           )
         })
-        .catch(() => {})
+        .catch(() => {
+          if (!mountedRef.current) return
+          setState(prev =>
+            prev.status === 'denied' && isIosSafariLike()
+              ? { ...prev, blockedReason: 'prompt-dismissed' }
+              : prev
+          )
+        })
     }
   }, [])
 
@@ -157,7 +180,9 @@ export function useGpsRequest() {
         status: 'unsupported',
         position: null,
         error: null,
-        blockedReason: null
+        blockedReason: null,
+        errorCode: null,
+        permissionState: null
       })
       return
     }
@@ -166,19 +191,42 @@ export function useGpsRequest() {
         status: 'unsupported',
         position: null,
         error: 'GPS requer HTTPS',
-        blockedReason: null
+        blockedReason: null,
+        errorCode: null,
+        permissionState: null
       })
       return
     }
-    setState(prev => ({ status: 'requesting', position: prev.position, error: null, blockedReason: null }))
+    setState(prev => ({
+      status: 'requesting',
+      position: prev.position,
+      error: null,
+      blockedReason: null,
+      errorCode: null,
+      permissionState: null
+    }))
 
-    // getCurrentPosition entrega o 1o fix rápido. Só ligamos o watch contínuo
-    // depois do sucesso — assim, em caso de denied, evitamos disparar 2 erros
-    // (e 2 prompts em alguns browsers) e o usuário recebe um aviso claro.
+    if (watchRef.current != null) {
+      navigator.geolocation.clearWatch(watchRef.current)
+      watchRef.current = null
+    }
+
+    // No iOS/Safari, watchPosition costuma ser mais confiável que
+    // getCurrentPosition para abrir o prompt e manter o fix ativo.
+    if (isIosSafariLike()) {
+      watchRef.current = navigator.geolocation.watchPosition(onSuccess, onError, {
+        enableHighAccuracy: false,
+        maximumAge: 0,
+        timeout: 45000
+      })
+      return
+    }
+
+    // Nos demais browsers, getCurrentPosition entrega o 1o fix rápido. Só
+    // ligamos o watch contínuo depois do sucesso para evitar erros duplicados.
     navigator.geolocation.getCurrentPosition(
       result => {
         onSuccess(result)
-        if (watchRef.current != null) navigator.geolocation.clearWatch(watchRef.current)
         watchRef.current = navigator.geolocation.watchPosition(onSuccess, onError, {
           enableHighAccuracy: true,
           maximumAge: 0,
@@ -195,7 +243,14 @@ export function useGpsRequest() {
       navigator.geolocation.clearWatch(watchRef.current)
       watchRef.current = null
     }
-    setState({ status: 'idle', position: null, error: null, blockedReason: null })
+    setState({
+      status: 'idle',
+      position: null,
+      error: null,
+      blockedReason: null,
+      errorCode: null,
+      permissionState: null
+    })
   }, [])
 
   return { ...state, request, clear }
