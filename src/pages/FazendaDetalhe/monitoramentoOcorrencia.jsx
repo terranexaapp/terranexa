@@ -292,6 +292,48 @@ export function MonitoramentoOcorrenciaView({ fazenda, fazendaId, talhao, onBack
 
   const cameraRef = useRef(null)
 
+  // ── Mapa: recentralizar GPS via nonce + sheet draggable ─────────────────
+  const [centerNonce, setCenterNonce] = useState(0)
+  // sheetSnap: 'low' (compacto, mostra so o titulo) | 'mid' (default) | 'high' (expandido)
+  const [sheetSnap, setSheetSnap] = useState('mid')
+  const sheetDragRef = useRef({ active: false, startY: 0, startSnap: 'mid', delta: 0 })
+  const [dragDelta, setDragDelta] = useState(0)
+
+  function recenterMap() {
+    if (gpsOk) setCenterNonce(n => n + 1)
+    else solicitarGps()
+  }
+
+  function onSheetPointerDown(e) {
+    sheetDragRef.current = {
+      active: true,
+      startY: e.clientY ?? e.touches?.[0]?.clientY ?? 0,
+      startSnap: sheetSnap,
+      delta: 0
+    }
+    e.currentTarget.setPointerCapture?.(e.pointerId)
+  }
+  function onSheetPointerMove(e) {
+    if (!sheetDragRef.current.active) return
+    const y = e.clientY ?? e.touches?.[0]?.clientY ?? 0
+    const delta = y - sheetDragRef.current.startY
+    sheetDragRef.current.delta = delta
+    setDragDelta(delta)
+  }
+  function onSheetPointerUp() {
+    if (!sheetDragRef.current.active) return
+    const { delta, startSnap } = sheetDragRef.current
+    sheetDragRef.current.active = false
+    setDragDelta(0)
+    // Threshold de 60px decide se sobe/desce de snap
+    const THRESH = 60
+    const order = ['low', 'mid', 'high']
+    let idx = order.indexOf(startSnap)
+    if (delta < -THRESH) idx = Math.min(order.length - 1, idx + 1)
+    else if (delta > THRESH) idx = Math.max(0, idx - 1)
+    setSheetSnap(order[idx])
+  }
+
   // ── Catálogo ─────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!fazendaId) return
@@ -667,9 +709,28 @@ export function MonitoramentoOcorrenciaView({ fazenda, fazendaId, talhao, onBack
               selectedMode="monitoramento"
               pluviometros={[]}
               devicePosition={devicePosition}
+              centerOnDeviceNonce={centerNonce}
             />
           ) : null}
         </div>
+
+        {/* Botao recentralizar GPS */}
+        <button
+          type="button"
+          className={`m-gps-fab ${gpsOk ? '' : 'warn'}`}
+          onClick={recenterMap}
+          aria-label={gpsOk ? 'Recentralizar GPS' : 'Ativar GPS'}
+          title={gpsOk ? 'Recentralizar' : 'Ativar GPS'}
+        >
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="3" />
+            <circle cx="12" cy="12" r="8" />
+            <line x1="12" y1="2" x2="12" y2="4" />
+            <line x1="12" y1="20" x2="12" y2="22" />
+            <line x1="2" y1="12" x2="4" y2="12" />
+            <line x1="20" y1="12" x2="22" y2="12" />
+          </svg>
+        </button>
 
         {/* Walk strip */}
         <div className="m-walk-top">
@@ -712,8 +773,25 @@ export function MonitoramentoOcorrenciaView({ fazenda, fazendaId, talhao, onBack
         )}
 
         {/* Bottom sheet */}
-        <div className="m-sheet">
-          <div className="m-sheet-grab" />
+        <div
+          className={`m-sheet snap-${sheetSnap}${sheetDragRef.current.active ? ' dragging' : ''}`}
+          style={dragDelta !== 0 ? { transform: `translateY(${dragDelta}px)` } : undefined}
+        >
+          <div
+            className="m-sheet-grab"
+            onPointerDown={onSheetPointerDown}
+            onPointerMove={onSheetPointerMove}
+            onPointerUp={onSheetPointerUp}
+            onPointerCancel={onSheetPointerUp}
+            onClick={() => {
+              // tap rapido cicla entre snaps
+              if (Math.abs(sheetDragRef.current.delta) < 4) {
+                setSheetSnap(s => (s === 'low' ? 'mid' : s === 'mid' ? 'high' : 'low'))
+              }
+            }}
+            role="button"
+            aria-label="Arrastar para ajustar painel"
+          />
           <div className="m-sheet-header">
             <div className="m-sheet-title">Registrar ocorrência</div>
             <div className="m-sheet-sub">
