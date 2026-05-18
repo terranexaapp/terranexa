@@ -9,7 +9,6 @@ import {
   TILE_MIN_ZOOM,
   TILE_MAX_ZOOM
 } from './constants'
-import { useMediaQuery } from './hooks'
 import { loadLeafletAssets } from './leafletLoader'
 import {
   normalizeFeature,
@@ -29,11 +28,6 @@ import {
   simpleMapFullStyle,
   leafletMapCanvasStyle,
   satelliteShadeStyle,
-  satelliteControlsStyle,
-  satelliteControlsMobileStyle,
-  satelliteControlButtonStyle,
-  satelliteGpsButtonStyle,
-  satelliteBadgeStyle,
   mapEmptyHintStyle,
   mapDrawHintStyle
 } from './styles'
@@ -116,9 +110,6 @@ function LeafletFarmMap({
   const tileLayerRef = useRef(null)
   const [leafletReady, setLeafletReady] = useState(false)
   const [leafletError, setLeafletError] = useState('')
-  const [manualDevicePosition, setManualDevicePosition] = useState(null)
-  const [locatingDevice, setLocatingDevice] = useState(false)
-  const controlsOnRight = useMediaQuery('(max-width: 899px)')
   const featureSignature = normalized
     .map(({ feature, index }) => {
       const ring = getFeatureRing(feature) || []
@@ -134,7 +125,7 @@ function LeafletFarmMap({
       nome: item.nome || `Pluviometro ${index + 1}`
     }))
     .filter(item => item.ativo !== false && Number.isFinite(item.latitude) && Number.isFinite(item.longitude))
-  const liveDevicePosition = devicePosition || manualDevicePosition
+  const liveDevicePosition = devicePosition
   const deviceMarker =
     Number.isFinite(Number(liveDevicePosition?.latitude)) && Number.isFinite(Number(liveDevicePosition?.longitude))
       ? {
@@ -333,45 +324,6 @@ function LeafletFarmMap({
     return 42 + (seed % 86)
   }
 
-  function changeZoom(e, delta) {
-    e.stopPropagation()
-    if (!mapRef.current) return
-    if (delta > 0) mapRef.current.zoomIn(1)
-    else mapRef.current.zoomOut(1)
-  }
-
-  function centerDeviceMarker(marker) {
-    if (!mapRef.current) return
-    mapRef.current.setView([marker.latitude, marker.longitude], Math.max(mapRef.current.getZoom(), 16), {
-      animate: true
-    })
-  }
-
-  function centerOnDevice(e) {
-    e.stopPropagation()
-    if (deviceMarker) {
-      centerDeviceMarker(deviceMarker)
-      return
-    }
-    if (typeof navigator === 'undefined' || !navigator.geolocation || locatingDevice) return
-    setLocatingDevice(true)
-    navigator.geolocation.getCurrentPosition(
-      position => {
-        const coords = position.coords || {}
-        const marker = {
-          latitude: coords.latitude,
-          longitude: coords.longitude,
-          accuracy: coords.accuracy
-        }
-        setManualDevicePosition(marker)
-        centerDeviceMarker(marker)
-        setLocatingDevice(false)
-      },
-      () => setLocatingDevice(false),
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 3000 }
-    )
-  }
-
   return (
     <div
       style={{
@@ -382,39 +334,6 @@ function LeafletFarmMap({
     >
       <div ref={mapNodeRef} style={leafletMapCanvasStyle} />
       <div style={satelliteShadeStyle} />
-      <div
-        style={controlsOnRight ? satelliteControlsMobileStyle : satelliteControlsStyle}
-        onPointerDown={e => e.stopPropagation()}
-        onWheel={e => e.stopPropagation()}
-        onDoubleClick={e => e.stopPropagation()}
-      >
-        <button
-          type="button"
-          aria-label="Aproximar mapa"
-          onClick={e => changeZoom(e, 1)}
-          style={satelliteControlButtonStyle}
-        >
-          +
-        </button>
-        <button
-          type="button"
-          aria-label="Afastar mapa"
-          onClick={e => changeZoom(e, -1)}
-          style={satelliteControlButtonStyle}
-        >
-          -
-        </button>
-        <button
-          type="button"
-          aria-label="Centralizar no GPS"
-          title="Centralizar no GPS"
-          onClick={centerOnDevice}
-          style={satelliteGpsButtonStyle}
-        >
-          {locatingDevice ? '...' : 'GPS'}
-        </button>
-      </div>
-      <div style={satelliteBadgeStyle}>{MAPBOX_TOKEN ? 'Mapbox Satelite' : 'Satelite'}</div>
       {leafletError && <div style={mapEmptyHintStyle}>{leafletError}</div>}
       {!leafletError && normalized.length === 0 && (
         <div style={mapEmptyHintStyle}>Nenhum talhão com geometria cadastrada</div>
