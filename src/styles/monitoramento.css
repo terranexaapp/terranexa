@@ -1,0 +1,931 @@
+/* Terranexa · Monitoramento (Variant A oficial)
+   Estilos baseados no design v2. Escopados em .monit-app
+   para não vazarem para outras telas. */
+
+.monit-app {
+  --m-bg: #f6f5f0;
+  --m-surface: #ffffff;
+  --m-surface-2: #faf9f4;
+  --m-ink: #1a2017;
+  --m-ink-2: #4a5447;
+  --m-ink-3: #7a8276;
+  --m-line: #e6e3d8;
+  --m-line-2: #efece2;
+
+  --m-forest: #1f3a2a;
+  --m-forest-2: #2d5a3f;
+  --m-leaf: #4a7c4e;
+  --m-lime: #a3c14a;
+  --m-earth: #8a5a3c;
+  --m-terracotta: #c47648;
+  --m-amber: #d99a2b;
+  --m-crimson: #b54a3f;
+
+  --m-sev-leve: #5a8a3a;
+  --m-sev-mod: #d99a2b;
+  --m-sev-sev: #b54a3f;
+
+  --m-font-ui: 'Inter', -apple-system, system-ui, 'Segoe UI', sans-serif;
+  --m-font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Monaco, 'Courier New', monospace;
+  --m-font-display: 'Inter', sans-serif;
+
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #2a2a26;
+  font-family: var(--m-font-ui);
+  color: var(--m-ink);
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+.monit-frame {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+  background: var(--m-bg);
+  position: relative;
+  box-shadow: 0 0 0 1px var(--m-line);
+  overflow: hidden;
+}
+
+/* ============ Top bar ============ */
+.monit-app .m-topbar {
+  height: 56px;
+  background: var(--m-surface);
+  border-bottom: 1px solid var(--m-line);
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.monit-app .m-topbar .back {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: transparent;
+  border: 1px solid var(--m-line);
+  display: grid;
+  place-items: center;
+  color: var(--m-ink-2);
+  flex-shrink: 0;
+  cursor: pointer;
+  padding: 0;
+}
+.monit-app .m-topbar .back.brand {
+  background: var(--m-forest);
+  color: #d8e8c4;
+  border: none;
+  font-weight: 800;
+  font-size: 14px;
+  font-family: var(--m-font-display);
+}
+.monit-app .m-topbar .title { flex: 1; min-width: 0; }
+.monit-app .m-topbar .title-h {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+  color: var(--m-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.monit-app .m-topbar .title-s {
+  font-size: 11px;
+  color: var(--m-ink-3);
+  font-family: var(--m-font-mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  line-height: 1.2;
+  margin-top: 2px;
+}
+.monit-app .m-topbar .gps-mini {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: #eef5e8;
+  color: var(--m-forest);
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--m-font-mono);
+  flex-shrink: 0;
+}
+.monit-app .m-topbar .gps-mini::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--m-leaf);
+  box-shadow: 0 0 0 3px rgba(74, 124, 78, 0.2);
+}
+.monit-app .m-topbar .gps-mini.warn {
+  background: #fdecd5;
+  color: #8a5a14;
+}
+.monit-app .m-topbar .gps-mini.warn::before {
+  background: var(--m-amber);
+  box-shadow: 0 0 0 3px rgba(217, 154, 43, 0.2);
+}
+.monit-app .m-topbar .m-finalizar {
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--m-forest);
+  background: var(--m-forest);
+  color: #f0f5e8;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: var(--m-font-ui);
+  cursor: pointer;
+}
+
+/* ============ Body ============ */
+.monit-app .m-body {
+  flex: 1;
+  overflow-y: auto;
+  position: relative;
+  background: var(--m-bg);
+}
+.monit-app .m-body.with-map { padding: 0; overflow: hidden; }
+
+/* ============ Walk strip ============ */
+.monit-app .m-walk-top {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  right: 12px;
+  background: var(--m-surface);
+  border: 1px solid var(--m-line);
+  border-radius: 12px;
+  padding: 10px 14px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  z-index: 4;
+}
+.monit-app .m-walk-top .ic { color: var(--m-forest); display: flex; }
+.monit-app .m-walk-top .cols {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+.monit-app .m-walk-top .l {
+  font-size: 9px;
+  color: var(--m-ink-3);
+  font-family: var(--m-font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.monit-app .m-walk-top .v {
+  font-size: 13px;
+  font-weight: 700;
+  font-family: var(--m-font-mono);
+  letter-spacing: -0.01em;
+  color: var(--m-ink);
+  margin-top: 1px;
+}
+
+.monit-app .m-gps-warn {
+  position: absolute;
+  top: 76px;
+  left: 12px;
+  right: 12px;
+  background: #fff4d8;
+  border: 1px solid #e8d4a4;
+  border-radius: 10px;
+  padding: 8px 12px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 11.5px;
+  color: var(--m-ink-2);
+  z-index: 4;
+}
+.monit-app .m-gps-warn .ic {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--m-amber);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  font-family: var(--m-font-mono);
+  font-weight: 700;
+  font-size: 10px;
+}
+
+/* ============ Bottom sheet ============ */
+.monit-app .m-sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--m-surface);
+  border-radius: 22px 22px 0 0;
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.08);
+  display: flex;
+  flex-direction: column;
+  max-height: 78%;
+  z-index: 5;
+}
+.monit-app .m-sheet-grab {
+  height: 22px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+.monit-app .m-sheet-grab::before {
+  content: '';
+  width: 36px;
+  height: 4px;
+  border-radius: 2px;
+  background: #c7c8b8;
+}
+.monit-app .m-sheet-header {
+  padding: 0 18px 14px;
+  flex-shrink: 0;
+}
+.monit-app .m-sheet-title {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
+.monit-app .m-sheet-sub {
+  font-size: 11px;
+  color: var(--m-ink-3);
+  font-family: var(--m-font-mono);
+  margin-top: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.monit-app .m-sheet-body {
+  padding: 0 16px 12px;
+  overflow-y: auto;
+  flex: 1;
+}
+.monit-app .m-sheet-footer {
+  border-top: 1px solid var(--m-line);
+  padding: 12px 14px;
+  flex-shrink: 0;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  background: var(--m-surface);
+  border-radius: 0 0 0 0;
+}
+
+/* ============ Wide category cards ============ */
+.monit-app .m-cats-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.monit-app .m-cat-card-wide {
+  position: relative;
+  border-radius: 14px;
+  overflow: hidden;
+  height: 88px;
+  border: 1px solid var(--m-line);
+  background: var(--m-surface-2);
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  padding: 0;
+  font-family: inherit;
+  display: block;
+}
+.monit-app .m-cat-card-wide .bg {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+}
+.monit-app .m-cat-card-wide .ov {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg,
+    rgba(255, 255, 255, 0.97) 0%,
+    rgba(255, 255, 255, 0.85) 45%,
+    rgba(255, 255, 255, 0.1) 100%);
+}
+.monit-app .m-cat-card-wide .body {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  right: 56px;
+}
+.monit-app .m-cat-card-wide .name {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--m-ink);
+  line-height: 1.1;
+}
+.monit-app .m-cat-card-wide .meta {
+  font-size: 10px;
+  color: var(--m-ink-3);
+  font-family: var(--m-font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-top: 4px;
+}
+.monit-app .m-cat-card-wide .chev {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--m-ink-3);
+}
+
+/* ============ Drafts list (within sheet) ============ */
+.monit-app .m-draft-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--m-surface-2);
+  border: 1px solid var(--m-line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+}
+.monit-app .m-draft-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.monit-app .m-draft-texts { flex: 1; min-width: 0; }
+.monit-app .m-draft-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--m-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.monit-app .m-draft-sub {
+  font-size: 10.5px;
+  color: var(--m-ink-3);
+  font-family: var(--m-font-mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 2px;
+}
+.monit-app .m-draft-rm {
+  background: transparent;
+  border: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  color: var(--m-ink-3);
+  font-size: 16px;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+.monit-app .m-draft-rm:hover { background: var(--m-line-2); color: var(--m-crimson); }
+
+.monit-app .m-section-label {
+  font-size: 10.5px;
+  color: var(--m-ink-3);
+  font-family: var(--m-font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin: 4px 0 10px;
+  font-weight: 600;
+}
+
+/* ============ Buttons ============ */
+.monit-app .m-btn {
+  height: 48px;
+  border-radius: 12px;
+  border: none;
+  font-family: var(--m-font-ui);
+  font-weight: 600;
+  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  padding: 0 18px;
+  letter-spacing: -0.005em;
+}
+.monit-app .m-btn.primary { background: var(--m-forest); color: #f0f5e8; }
+.monit-app .m-btn.primary:disabled {
+  background: var(--m-line);
+  color: var(--m-ink-3);
+  cursor: not-allowed;
+}
+.monit-app .m-btn.outline {
+  background: var(--m-surface);
+  color: var(--m-ink);
+  border: 1px solid var(--m-line);
+}
+.monit-app .m-btn.block { width: 100%; flex: 1; }
+
+.monit-app .m-footer-meta {
+  font-family: var(--m-font-mono);
+  font-size: 10px;
+  color: var(--m-ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  line-height: 1.3;
+  flex: 1;
+}
+.monit-app .m-footer-meta b { color: var(--m-ink-2); font-weight: 600; }
+
+.monit-app .m-err {
+  background: #fde2dc;
+  border: 1px solid #f1b3a8;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 12.5px;
+  color: var(--m-crimson);
+  margin-bottom: 10px;
+}
+
+/* ============ Pest list ============ */
+.monit-app .m-search {
+  height: 44px;
+  background: var(--m-surface);
+  border: 1px solid var(--m-line);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  gap: 10px;
+  margin: 12px 14px 0;
+}
+.monit-app .m-search input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 14px;
+  font-family: var(--m-font-ui);
+  color: var(--m-ink);
+}
+.monit-app .m-search .ic { color: var(--m-ink-3); display: flex; }
+
+.monit-app .m-pest-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  padding: 14px 14px 18px;
+}
+.monit-app .m-pest-card {
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  aspect-ratio: 1.1;
+  border: 1px solid var(--m-line);
+  background: var(--m-surface-2);
+  cursor: pointer;
+  padding: 0;
+  font-family: inherit;
+  text-align: left;
+}
+.monit-app .m-pest-card .bg {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+}
+.monit-app .m-pest-card .ov {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(0deg, rgba(255, 255, 255, 0.98) 0%, rgba(255, 255, 255, 0.68) 32%, transparent 65%);
+}
+.monit-app .m-pest-card .body {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 10px;
+}
+.monit-app .m-pest-card .name {
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--m-ink);
+  line-height: 1.15;
+}
+.monit-app .m-pest-card .sci {
+  font-size: 10px;
+  font-style: italic;
+  color: var(--m-ink-3);
+  margin-top: 2px;
+}
+.monit-app .m-pest-empty {
+  padding: 30px 24px;
+  text-align: center;
+  color: var(--m-ink-3);
+  font-size: 13px;
+}
+
+/* ============ Form hero ============ */
+.monit-app .m-hero {
+  height: 180px;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: flex-end;
+  padding: 16px 18px 18px;
+}
+.monit-app .m-hero .bg {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+}
+.monit-app .m-hero .ov {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(0deg, rgba(255, 255, 255, 0.98) 0%, rgba(255, 255, 255, 0.7) 35%, rgba(0, 0, 0, 0.15) 100%);
+}
+.monit-app .m-hero .body { position: relative; }
+.monit-app .m-hero .name {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.015em;
+  line-height: 1.12;
+  color: var(--m-ink);
+}
+.monit-app .m-hero .sci {
+  font-size: 12px;
+  font-style: italic;
+  color: var(--m-ink-2);
+  margin-top: 4px;
+}
+
+/* ============ Form sections ============ */
+.monit-app .m-form { padding: 16px 16px 24px; }
+.monit-app .m-form-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--m-ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-family: var(--m-font-mono);
+  margin-bottom: 8px;
+}
+.monit-app .m-form-section { margin-bottom: 18px; }
+.monit-app .m-input {
+  width: 100%;
+  height: 52px;
+  padding: 0 14px;
+  background: var(--m-surface);
+  border: 1px solid var(--m-line);
+  border-radius: 10px;
+  font-family: var(--m-font-mono);
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--m-ink);
+  outline: none;
+}
+.monit-app .m-textarea {
+  width: 100%;
+  min-height: 92px;
+  padding: 12px 14px;
+  background: var(--m-surface);
+  border: 1px solid var(--m-line);
+  border-radius: 10px;
+  font-family: var(--m-font-ui);
+  font-size: 14px;
+  color: var(--m-ink);
+  resize: vertical;
+  line-height: 1.5;
+  outline: none;
+}
+.monit-app .m-select {
+  width: 100%;
+  height: 52px;
+  padding: 0 14px;
+  background: var(--m-surface);
+  border: 1px solid var(--m-line);
+  border-radius: 10px;
+  font-family: var(--m-font-ui);
+  font-size: 15px;
+  color: var(--m-ink);
+  outline: none;
+}
+
+/* Counter grid */
+.monit-app .m-counter-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.monit-app .m-counter-grid.two { grid-template-columns: repeat(2, 1fr); }
+.monit-app .m-counter {
+  background: var(--m-surface);
+  border: 1px solid var(--m-line);
+  border-radius: 12px;
+  padding: 12px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.monit-app .m-counter .lbl {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--m-ink-3);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  text-align: center;
+  font-family: var(--m-font-mono);
+}
+.monit-app .m-counter .row { display: flex; align-items: center; gap: 8px; }
+.monit-app .m-counter .btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1px solid var(--m-line);
+  background: var(--m-surface-2);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--m-ink);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  padding: 0;
+}
+.monit-app .m-counter .v {
+  font-family: var(--m-font-mono);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--m-ink);
+  letter-spacing: -0.02em;
+  min-width: 26px;
+  text-align: center;
+}
+
+/* Segmented */
+.monit-app .m-seg { display: grid; gap: 8px; }
+.monit-app .m-seg.three { grid-template-columns: repeat(3, 1fr); }
+.monit-app .m-seg.two { grid-template-columns: repeat(2, 1fr); }
+.monit-app .m-seg-btn {
+  height: 46px;
+  background: var(--m-surface);
+  border: 1px solid var(--m-line);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--m-ink-2);
+  cursor: pointer;
+  letter-spacing: -0.005em;
+  font-family: var(--m-font-ui);
+}
+.monit-app .m-seg-btn .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--m-line);
+}
+.monit-app .m-seg-btn.active {
+  background: var(--m-forest);
+  border-color: var(--m-forest);
+  color: #f0f5e8;
+}
+.monit-app .m-seg-btn.leve .dot { background: var(--m-sev-leve); }
+.monit-app .m-seg-btn.mod .dot { background: var(--m-sev-mod); }
+.monit-app .m-seg-btn.sev .dot { background: var(--m-sev-sev); }
+.monit-app .m-seg-btn.leve.active { background: var(--m-sev-leve); border-color: var(--m-sev-leve); }
+.monit-app .m-seg-btn.mod.active { background: var(--m-sev-mod); border-color: var(--m-sev-mod); }
+.monit-app .m-seg-btn.sev.active { background: var(--m-sev-sev); border-color: var(--m-sev-sev); }
+.monit-app .m-seg-btn.active .dot { background: rgba(255, 255, 255, 0.9); }
+
+/* Photo capture */
+.monit-app .m-photo {
+  background: var(--m-surface);
+  border: 1.5px dashed #c7c8b8;
+  border-radius: 12px;
+  padding: 18px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
+}
+.monit-app .m-photo .ic {
+  width: 50px;
+  height: 50px;
+  border-radius: 12px;
+  background: var(--m-forest);
+  color: #d8e8c4;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+.monit-app .m-photo strong {
+  display: block;
+  font-size: 14px;
+  color: var(--m-ink);
+  font-weight: 600;
+}
+.monit-app .m-photo span {
+  font-size: 11px;
+  color: var(--m-ink-3);
+}
+.monit-app .m-photo-preview {
+  width: 100%;
+  max-height: 220px;
+  border-radius: 12px;
+  object-fit: cover;
+  border: 1px solid var(--m-line);
+  margin-top: 8px;
+}
+
+/* Chip row */
+.monit-app .m-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.monit-app .m-chip {
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: var(--m-surface);
+  border: 1px solid var(--m-line);
+  font-size: 12px;
+  color: var(--m-ink-2);
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  font-family: var(--m-font-ui);
+}
+.monit-app .m-chip.active {
+  background: var(--m-forest);
+  border-color: var(--m-forest);
+  color: #f0f5e8;
+}
+
+/* Distance rail */
+.monit-app .m-dist-rail {
+  background: var(--m-surface);
+  border: 1px solid var(--m-line);
+  border-radius: 12px;
+  padding: 12px 0 12px 12px;
+  overflow-x: auto;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  scrollbar-width: thin;
+}
+.monit-app .m-dist-rail::-webkit-scrollbar { height: 5px; }
+.monit-app .m-dist-rail::-webkit-scrollbar-thumb { background: var(--m-line); border-radius: 3px; }
+.monit-app .m-dist-item {
+  flex-shrink: 0;
+  min-width: 64px;
+  height: 60px;
+  border-radius: 10px;
+  background: var(--m-bg);
+  border: 1px solid var(--m-line);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+.monit-app .m-dist-item .idx {
+  font-size: 9px;
+  color: var(--m-ink-3);
+  font-family: var(--m-font-mono);
+  letter-spacing: 0.05em;
+}
+.monit-app .m-dist-item .v {
+  font-family: var(--m-font-mono);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--m-ink);
+  margin-top: 2px;
+}
+.monit-app .m-dist-item .u {
+  font-size: 8px;
+  color: var(--m-ink-3);
+  font-family: var(--m-font-mono);
+}
+.monit-app .m-dist-item .rm {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--m-ink-3);
+  font-size: 10px;
+  cursor: pointer;
+  padding: 0;
+  display: grid;
+  place-items: center;
+}
+.monit-app .m-dist-item .rm:hover { background: var(--m-line-2); color: var(--m-crimson); }
+.monit-app .m-dist-add {
+  flex-shrink: 0;
+  width: 54px;
+  height: 60px;
+  border-radius: 10px;
+  border: 1.5px dashed #c7c8b8;
+  background: transparent;
+  color: var(--m-forest);
+  display: grid;
+  place-items: center;
+  margin-right: 12px;
+  cursor: pointer;
+  padding: 0;
+}
+.monit-app .m-dist-input {
+  flex-shrink: 0;
+  width: 80px;
+  height: 60px;
+  border-radius: 10px;
+  border: 1px solid var(--m-line);
+  background: var(--m-surface);
+  padding: 0 8px;
+  font-family: var(--m-font-mono);
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+  color: var(--m-ink);
+  outline: none;
+}
+
+/* Calc result panel */
+.monit-app .m-calc {
+  background: var(--m-forest);
+  color: #e8eedb;
+  border-radius: 14px;
+  padding: 16px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.monit-app .m-calc .lbl {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-family: var(--m-font-mono);
+  opacity: 0.7;
+}
+.monit-app .m-calc .v {
+  font-family: var(--m-font-mono);
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #fff;
+  margin-top: 2px;
+}
+.monit-app .m-calc .u {
+  font-size: 13px;
+  opacity: 0.8;
+  font-family: var(--m-font-mono);
+  margin-left: 4px;
+}
+.monit-app .m-calc .badge {
+  font-family: var(--m-font-ui);
+  font-size: 14px;
+  font-weight: 700;
+  margin-top: 4px;
+}
+
+/* Map host (for Leaflet) */
+.monit-app .m-map-host {
+  position: absolute;
+  inset: 0;
+  background: #b9c9a5;
+  overflow: hidden;
+}
+.monit-app .m-map-host > div {
+  height: 100% !important;
+  width: 100% !important;
+  min-height: 0 !important;
+  border-radius: 0 !important;
+}
+.monit-app .m-map-host .leaflet-container {
+  height: 100% !important;
+  width: 100% !important;
+}

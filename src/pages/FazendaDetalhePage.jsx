@@ -13,10 +13,10 @@ import { RelatoriosView } from './FazendaDetalhe/panels'
 import {
   FarmDesktopSidebar,
   DashboardView,
-  MonitoramentoDashboardView,
   InterpolacaoView
 } from './FazendaDetalhe/views'
 import { MonitoramentoCockpitView } from './FazendaDetalhe/monitoramentoCockpit'
+import { MonitoramentoInboxView } from './FazendaDetalhe/monitoramentoInbox'
 import { MonitoramentoOcorrenciaView } from './FazendaDetalhe/monitoramentoOcorrencia'
 import { FazendaMapaPrincipal } from './FazendaDetalhe/mapaPrincipal'
 import { GerencialView } from './FazendaDetalhe/gerencial'
@@ -201,7 +201,7 @@ export function FazendaDetalhePage() {
     <div
       style={{ minHeight: '100vh', background: isMapView ? '#102316' : C.bg, display: 'flex', flexDirection: 'column' }}
     >
-      <header style={showDesktopShell ? desktopTopbarStyle : floatingHeaderStyle}>
+      <header style={showDesktopShell ? desktopTopbarStyle : isMapView ? { display: 'none' } : floatingHeaderStyle}>
         {showDesktopShell && (
           <>
             <div style={desktopTopbarBrandStyle}>
@@ -375,13 +375,10 @@ export function FazendaDetalhePage() {
                 monitoramentosResumo={monitoramentosResumo}
                 talhaoSel={talhaoSel}
                 operacoes={operacoes}
-                custos={custos}
-                totalCusto={totalCusto}
-                loadOps={loadOps}
                 alternarTalhao={alternarTalhao}
                 navigate={navigate}
                 setActiveView={setActiveView}
-                setShowNovaOp={setShowNovaOp}
+                setMenuOpen={setMenuOpen}
               />
             )}
             {activeView === 'dashboard' && (
@@ -407,6 +404,17 @@ export function FazendaDetalhePage() {
             )}
             {activeView === 'monitoramento' && (
               <MonitoramentoCockpitView
+                fazendaId={id}
+                fazenda={fazenda}
+                talhoes={talhoes}
+                monitoramentosResumo={monitoramentosResumo}
+                abrirTalhao={abrirTalhao}
+                setActiveView={setActiveView}
+                navigate={navigate}
+              />
+            )}
+            {activeView === 'monitoramento-inbox' && (
+              <MonitoramentoInboxView
                 fazendaId={id}
                 fazenda={fazenda}
                 talhoes={talhoes}

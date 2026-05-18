@@ -1,83 +1,474 @@
-import { useState } from 'react'
+// Tela Mapa — redesign V3 (Dock + widgets flutuantes)
+// Substitui o painel verde de 5 abas por: rail de ícones à esquerda,
+// chip do talhão no topo-direito e dock inferior com KPIs + CTA primário.
+
+import { useRef, useState } from 'react'
 import { theme } from '../../styles/theme'
 import { getCategoriaInfo } from '../../lib/operacoes'
-import { MONITORAMENTO_LEGEND } from './constants'
-import { useMediaQuery, useDevicePosition } from './hooks'
+import { useGpsRequest, useMediaQuery } from './hooks'
 import { SimpleFarmMap } from './maps'
 import { requestOfflineStorage } from './offline'
-import { normalizeFeature, getMonitoramentoMeta, formatCultura, formatShortDate, money } from './utils'
-import {
-  eyebrowStyle,
-  mapMainPageStyle,
-  mapMainPageMobileStyle,
-  timelineDockStyle,
-  timelineMobileStyle,
-  timelineHeaderStyle,
-  timelineHeaderMobileStyle,
-  timelineMobileEyebrowStyle,
-  timelineTitleStyle,
-  timelineMobileTitleStyle,
-  timelineAreaPillStyle,
-  timelineActionsStyle,
-  timelineActionButtonStyle,
-  timelineMobileActionButtonStyle,
-  timelineModeTabsStyle,
-  timelineModeTabsMobileStyle,
-  timelineModeButtonStyle,
-  timelineMobileModeButtonStyle,
-  timelineSummaryCardStyle,
-  timelineCardTitleStyle,
-  timelineSummaryRowsStyle,
-  timelineSummaryRowStyle,
-  timelineSummaryLabelStyle,
-  timelineSummaryValueStyle,
-  timelineTextButtonStyle,
-  timelineTableHorizontalStyle,
-  timelineInfoHorizontalCardStyle,
-  timelineMetricHorizontalCardStyle,
-  timelineInputHorizontalCardStyle,
-  timelineCtaHorizontalStyle,
-  timelineScrollEndStyle,
-  timelineMonitoringStatusStyle,
-  timelineLegendGridStyle,
-  timelineLegendItemStyle,
-  timelineLegendDotStyle,
-  timelineLegendRangeStyle,
-  timelineMonitoringHorizontalCardStyle,
-  timelineLegendHorizontalCardStyle,
-  timelineTableDesktopStyle,
-  timelineCellStyle,
-  timelineCellHorizontalStyle,
-  timelineRainLayoutStyle,
-  timelineDateGridStyle,
-  timelineDateLabelStyle,
-  timelineDateInputStyle,
-  timelinePrimaryButtonStyle,
-  timelineRainGridStyle,
-  timelineRainMetricStyle
-} from './styles'
+import { normalizeFeature, getMonitoramentoMeta, formatCultura, formatShortDate } from './utils'
 
 const C = theme.normal
 
+const FONTS = {
+  serif: "Georgia, 'Times New Roman', serif",
+  sans: "system-ui, -apple-system, 'Segoe UI', sans-serif",
+  mono: "'SF Mono', Monaco, 'Courier New', monospace"
+}
+
+const Ico = {
+  Menu: props => (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" {...props}>
+      <line x1="4" y1="7" x2="20" y2="7" />
+      <line x1="4" y1="12" x2="20" y2="12" />
+      <line x1="4" y1="17" x2="20" y2="17" />
+    </svg>
+  ),
+  Sum: props => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" {...props}>
+      <rect x="4" y="4" width="16" height="16" rx="2" />
+      <line x1="4" y1="9" x2="20" y2="9" />
+    </svg>
+  ),
+  Leaf: props => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" {...props}>
+      <path d="M5 19c0-9 5-14 14-14 0 9-5 14-14 14z" />
+      <path d="M5 19l9-9" />
+    </svg>
+  ),
+  History: props => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" {...props}>
+      <path d="M3 12a9 9 0 1 0 3-6.7" />
+      <polyline points="3 4 3 9 8 9" />
+      <polyline points="12 7 12 12 15 14" />
+    </svg>
+  ),
+  Drop: props => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" {...props}>
+      <path d="M12 3c-3 4-6 8-6 12a6 6 0 0 0 12 0c0-4-3-8-6-12z" />
+    </svg>
+  ),
+  Soil: props => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" {...props}>
+      <path d="M3 18c4 0 4-3 9-3s5 3 9 3" />
+      <path d="M3 14c4 0 4-3 9-3s5 3 9 3" />
+      <path d="M3 22h18" />
+    </svg>
+  ),
+  Order: props => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" {...props}>
+      <rect x="4" y="4" width="16" height="16" rx="2" />
+      <line x1="8" y1="9" x2="16" y2="9" />
+      <line x1="8" y1="13" x2="16" y2="13" />
+    </svg>
+  ),
+  Eye: props => (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" {...props}>
+      <path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  ),
+  ChevR: props => (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" {...props}>
+      <polyline points="9 6 15 12 9 18" />
+    </svg>
+  ),
+  Plus: props => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" {...props}>
+      <line x1="12" y1="5" x2="12" y2="19" />
+      <line x1="5" y1="12" x2="19" y2="12" />
+    </svg>
+  ),
+  X: props => (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" {...props}>
+      <line x1="6" y1="6" x2="18" y2="18" />
+      <line x1="6" y1="18" x2="18" y2="6" />
+    </svg>
+  ),
+  Gps: props => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <circle cx="12" cy="12" r="3" />
+      <circle cx="12" cy="12" r="8" />
+      <line x1="12" y1="2" x2="12" y2="4" />
+      <line x1="12" y1="20" x2="12" y2="22" />
+      <line x1="2" y1="12" x2="4" y2="12" />
+      <line x1="20" y1="12" x2="22" y2="12" />
+    </svg>
+  )
+}
+
+const GPS_STATUS_TEXT = {
+  requesting: 'Solicitando GPS...',
+  denied: 'GPS bloqueado. Libere nas permissoes do navegador',
+  unavailable: 'GPS indisponivel no dispositivo',
+  timeout: 'GPS demorou demais. Tente novamente',
+  unsupported: 'Geolocalizacao indisponivel',
+  error: 'Falha ao ler GPS'
+}
+
+function GpsBanner({ status, error, accuracy, onRetry, onDismiss }) {
+  if (status === 'idle' || status === 'active') return null
+  const isError = status !== 'requesting'
+  const bg = isError ? '#fff5e5' : 'rgba(255,255,255,0.96)'
+  const fg = isError ? '#8a4a00' : C.textDk
+  return (
+    <div
+      role={isError ? 'alert' : 'status'}
+      style={{
+        position: 'absolute',
+        top: 76,
+        left: '50%',
+        transform: 'translateX(-50%)',
+        background: bg,
+        color: fg,
+        border: `1px solid ${isError ? '#f0c98c' : C.border}`,
+        borderRadius: 12,
+        padding: '10px 14px',
+        fontSize: 12,
+        fontWeight: 700,
+        boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
+        zIndex: 7,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        maxWidth: 'min(92vw, 420px)'
+      }}
+    >
+      <span style={{ flex: 1, lineHeight: 1.3 }}>
+        {GPS_STATUS_TEXT[status] || 'GPS'}
+        {accuracy ? <span style={{ color: C.textMid, fontWeight: 600 }}> · ±{Math.round(accuracy)}m</span> : null}
+        {error && status !== 'requesting' ? (
+          <span style={{ display: 'block', fontWeight: 500, marginTop: 2, fontSize: 11 }}>{error}</span>
+        ) : null}
+      </span>
+      {isError && (
+        <button
+          onClick={onRetry}
+          style={{
+            background: C.greenDp,
+            color: '#f0f5e8',
+            border: 'none',
+            borderRadius: 8,
+            padding: '6px 10px',
+            fontSize: 11,
+            fontWeight: 800,
+            cursor: 'pointer'
+          }}
+        >
+          Tentar
+        </button>
+      )}
+      {isError && (
+        <button
+          onClick={onDismiss}
+          aria-label="Fechar aviso"
+          style={{
+            background: 'transparent',
+            color: fg,
+            border: 'none',
+            cursor: 'pointer',
+            padding: 2,
+            display: 'grid',
+            placeItems: 'center'
+          }}
+        >
+          <Ico.X />
+        </button>
+      )}
+    </div>
+  )
+}
+
+const pageStyle = {
+  position: 'relative',
+  width: '100%',
+  minHeight: 'calc(100vh - 0px)',
+  overflow: 'hidden',
+  background: '#0d1e14'
+}
+
+const pageMobileStyle = {
+  position: 'relative',
+  width: '100%',
+  minHeight: '100dvh',
+  overflow: 'hidden',
+  background: '#0d1e14'
+}
+
+const railStyle = {
+  position: 'absolute',
+  top: 16,
+  left: 16,
+  width: 56,
+  padding: '8px 6px',
+  background: 'rgba(255,255,255,0.96)',
+  border: `1px solid ${C.border}`,
+  borderRadius: 14,
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  gap: 4,
+  boxShadow: '0 10px 30px rgba(0,0,0,0.18)',
+  backdropFilter: 'blur(10px)',
+  zIndex: 6
+}
+
+const railIconStyle = active => ({
+  width: 44,
+  height: 44,
+  display: 'grid',
+  placeItems: 'center',
+  border: 'none',
+  borderRadius: 10,
+  background: active ? C.greenDp : 'transparent',
+  color: active ? C.bg : C.textMid,
+  cursor: 'pointer',
+  position: 'relative',
+  transition: 'background 120ms ease'
+})
+
+const railDividerStyle = {
+  width: 32,
+  height: 1,
+  background: C.borderSoft,
+  margin: '4px 0',
+  border: 'none'
+}
+
+const railBadgeStyle = {
+  position: 'absolute',
+  top: 8,
+  right: 8,
+  width: 7,
+  height: 7,
+  borderRadius: 99,
+  background: C.red,
+  boxShadow: '0 0 0 2px rgba(255,255,255,0.96)'
+}
+
+const crumbStyle = {
+  position: 'absolute',
+  top: 24,
+  left: 88,
+  background: 'rgba(255,255,255,0.96)',
+  border: `1px solid ${C.border}`,
+  borderRadius: 12,
+  padding: '8px 14px',
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 8,
+  color: C.textMid,
+  fontSize: 12,
+  fontFamily: FONTS.mono,
+  letterSpacing: '0.4px',
+  fontWeight: 700,
+  boxShadow: '0 4px 12px rgba(0,0,0,0.10)',
+  backdropFilter: 'blur(10px)',
+  zIndex: 5,
+  maxWidth: 'calc(100% - 440px)',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap'
+}
+
+const talhaoChipStyle = {
+  position: 'absolute',
+  top: 16,
+  right: 16,
+  background: 'rgba(255,255,255,0.96)',
+  border: `1px solid ${C.border}`,
+  borderRadius: 14,
+  padding: '12px 14px',
+  display: 'flex',
+  alignItems: 'center',
+  gap: 14,
+  boxShadow: '0 10px 30px rgba(0,0,0,0.15)',
+  backdropFilter: 'blur(10px)',
+  zIndex: 5,
+  maxWidth: 360
+}
+
+const areaPillStyle = {
+  background: '#eef5e8',
+  color: C.greenDp,
+  borderRadius: 9,
+  padding: '6px 10px',
+  fontFamily: FONTS.mono,
+  fontWeight: 900,
+  fontSize: 12,
+  letterSpacing: '0.3px',
+  whiteSpace: 'nowrap'
+}
+
+const dockStyle = {
+  position: 'absolute',
+  bottom: 16,
+  left: 88,
+  right: 16,
+  background: 'rgba(255,255,255,0.97)',
+  border: `1px solid ${C.border}`,
+  borderRadius: 18,
+  padding: '14px 18px',
+  display: 'grid',
+  gridTemplateColumns: 'auto 1fr auto',
+  gap: 22,
+  alignItems: 'center',
+  boxShadow: '0 -10px 30px rgba(0,0,0,0.12), 0 12px 36px rgba(0,0,0,0.20)',
+  backdropFilter: 'blur(10px)',
+  zIndex: 5
+}
+
+const dockIdStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 12,
+  paddingRight: 18,
+  borderRight: `1px solid ${C.borderSoft}`
+}
+
+const dockIdAvatarStyle = {
+  width: 42,
+  height: 42,
+  borderRadius: 11,
+  background: C.greenDp,
+  color: '#d8e8c4',
+  display: 'grid',
+  placeItems: 'center',
+  fontFamily: FONTS.serif,
+  fontWeight: 900,
+  fontSize: 19,
+  flexShrink: 0
+}
+
+const dockKpisStyle = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+  gap: 16,
+  minWidth: 0
+}
+
+const dockKpiStyle = { display: 'flex', alignItems: 'flex-start', gap: 10, minWidth: 0 }
+
+const dockKpiIconWrap = (bg, fg) => ({
+  width: 32,
+  height: 32,
+  borderRadius: 9,
+  background: bg || '#FBFBF7',
+  color: fg || C.textDk,
+  border: `1px solid ${C.border}`,
+  display: 'grid',
+  placeItems: 'center',
+  flexShrink: 0
+})
+
+const dockKpiLabelStyle = {
+  margin: 0,
+  fontSize: 9,
+  color: C.textDim,
+  fontFamily: FONTS.mono,
+  letterSpacing: '0.8px',
+  fontWeight: 800,
+  textTransform: 'uppercase'
+}
+
+const dockKpiValueStyle = {
+  margin: '3px 0 0',
+  fontSize: 13,
+  color: C.textDk,
+  fontWeight: 800,
+  lineHeight: 1.25,
+  whiteSpace: 'nowrap',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis'
+}
+
+const dockKpiSubStyle = { color: C.textMid, fontWeight: 600 }
+
+const primaryCtaStyle = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 8,
+  background: C.greenDp,
+  color: '#f0f5e8',
+  border: 'none',
+  borderRadius: 12,
+  padding: '11px 18px',
+  fontWeight: 900,
+  fontSize: 13,
+  cursor: 'pointer',
+  fontFamily: FONTS.sans,
+  boxShadow: '0 6px 16px rgba(61,138,34,0.28)'
+}
+
+const ghostCtaStyle = {
+  ...primaryCtaStyle,
+  background: 'transparent',
+  color: C.greenDp,
+  border: `1px solid ${C.greenDp}`,
+  boxShadow: 'none'
+}
+
+const eyebrowStyle = {
+  margin: 0,
+  fontSize: 9,
+  color: C.textDim,
+  fontFamily: FONTS.mono,
+  letterSpacing: '1.4px',
+  fontWeight: 800,
+  textTransform: 'uppercase'
+}
+
+const statusTagStyle = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 5,
+  marginLeft: 6,
+  height: 16,
+  padding: '0 7px',
+  borderRadius: 99,
+  background: '#eef5e8',
+  color: C.greenDp,
+  fontSize: 9,
+  fontWeight: 900,
+  letterSpacing: '0.4px',
+  fontFamily: FONTS.mono,
+  textTransform: 'uppercase'
+}
+
 export function FazendaMapaPrincipal({
+  fazenda,
   talhoes,
   pluviometros = [],
   monitoramentosResumo = {},
   talhaoSel,
   operacoes,
-  loadOps,
   alternarTalhao,
   navigate,
   setActiveView,
-  setShowNovaOp
+  setMenuOpen
 }) {
-  const timelineIsDocked = useMediaQuery('(min-width: 900px)')
-  const devicePosition = useDevicePosition(!timelineIsDocked)
-  const [timelineMode, setTimelineMode] = useState('resumo')
-  const [chuvaInicio, setChuvaInicio] = useState('2026-05-01')
-  const [chuvaFim, setChuvaFim] = useState('2026-05-15')
+  const isDesktop = useMediaQuery('(min-width: 900px)')
+  const gps = useGpsRequest()
+  const centerNonceRef = useRef(0)
+  const [centerNonce, setCenterNonce] = useState(0)
+  const [gpsBannerDismissed, setGpsBannerDismissed] = useState(false)
+
+  function handleGpsClick() {
+    setGpsBannerDismissed(false)
+    // sempre incrementa nonce — usuário clicando = quer recentralizar mesmo se
+    // a posição já está conhecida.
+    centerNonceRef.current += 1
+    setCenterNonce(centerNonceRef.current)
+    gps.request()
+  }
+
+  const gpsActive = gps.status === 'active'
+  const showGpsBanner = !gpsBannerDismissed && gps.status !== 'idle' && gps.status !== 'active'
+
   const features = talhoes
-    .map(talhao => ({ talhao, feature: normalizeFeature(talhao.geometria, talhao.codigo) }))
+    .map(t => ({ talhao: t, feature: normalizeFeature(t.geometria, t.codigo) }))
     .filter(item => item.feature)
   const selected = talhaoSel || null
   const selectedMonitoring = getMonitoramentoMeta(selected ? monitoramentosResumo[selected.id] : null)
@@ -85,68 +476,30 @@ export function FazendaMapaPrincipal({
     const monitoramento = getMonitoramentoMeta(monitoramentosResumo[item.talhao.id])
     return {
       ...item.feature,
-      properties: {
-        ...item.feature.properties,
-        codigo: item.talhao.codigo,
-        monitoramento
-      }
+      properties: { ...item.feature.properties, codigo: item.talhao.codigo, monitoramento }
     }
   })
+
+  const ultimaOp = operacoes[0] || null
+  const ultimaOpInfo = ultimaOp ? getCategoriaInfo(ultimaOp.categoria) : null
+  const ultimaOpAberta = ultimaOp && ultimaOp.status && ultimaOp.status !== 'executada' && ultimaOp.status !== 'concluida'
+
+  const activePluvio = pluviometros.filter(p => p.ativo !== false)
+  // Estimativa sintética da última chuva quando há pluviômetros (mantém parity com os dados existentes
+  // até integração com leitura real por pluviômetro).
   const chuvaSeed = selected
-    ? String(selected.codigo || '')
-        .split('')
-        .reduce((sum, char) => sum + char.charCodeAt(0), 0)
+    ? String(selected.codigo || '').split('').reduce((s, c) => s + c.charCodeAt(0), 0)
     : 0
-  const chuvaAcumulada = selected ? (82 + (chuvaSeed % 88) + (Number(selected.area_ha || 0) % 18)).toFixed(1) : '0.0'
-  const chuvaMediaDia = selected ? (Number(chuvaAcumulada) / 15).toFixed(1) : '0.0'
-  const maiorChuva = selected ? (18 + (chuvaSeed % 24)).toFixed(1) : '0.0'
-  const menorChuva = selected ? (2 + (chuvaSeed % 9)).toFixed(1) : '0.0'
-  const ultimaOperacao = operacoes[0] || null
-  const ultimaOperacaoInfo = ultimaOperacao ? getCategoriaInfo(ultimaOperacao.categoria) : null
-  const activePluviometros = pluviometros.filter(p => p.ativo !== false)
-  const resumoRows = [
-    {
-      label: 'Situacao atual',
-      value: loadOps
-        ? 'Carregando operacoes'
-        : operacoes.length
-          ? 'Com historico registrado'
-          : 'Sem operacoes registradas'
-    },
-    { label: 'Proxima acao', value: operacoes.length ? 'Revisar monitoramento de campo' : 'Monitoramento de campo' },
-    {
-      label: 'Ultima chuva',
-      value: activePluviometros.length ? `${chuvaAcumulada} mm no periodo` : 'Sem registro no periodo'
-    },
-    {
-      label: 'Ultima operacao',
-      value: ultimaOperacao
-        ? `${formatShortDate(ultimaOperacao.data_operacao)} · ${ultimaOperacaoInfo.label}`
-        : 'Nenhuma operacao cadastrada'
-    }
-  ]
-  const timeline =
-    operacoes.length > 0
-      ? operacoes.map(op => ({
-          data: formatShortDate(op.data_operacao),
-          titulo: getCategoriaInfo(op.categoria).label,
-          status: 'Executada',
-          valor: money(
-            (op.insumos || []).reduce((s, i) => s + Number(i.custo_total || 0), 0) + Number(op.custo_aplicacao || 0)
-          )
-        }))
-      : [
-          { data: 'Hoje', titulo: 'Sem operacoes', status: 'Pendente', valor: 'Adicionar registro' },
-          { data: 'Proximo passo', titulo: 'Monitoramento', status: 'Aberta', valor: 'Scouting' },
-          { data: 'Proximo passo', titulo: 'Ordem servico', status: 'Aberta', valor: 'Planejar' }
-        ]
+  const chuvaMm = activePluvio.length ? (8 + (chuvaSeed % 14)).toFixed(1) : null
+  const chuvaData =
+    activePluvio.length && selected
+      ? new Date(Date.now() - 86400000 * (1 + (chuvaSeed % 5))).toISOString().slice(0, 10)
+      : null
 
   async function handleFeatureClick(index) {
-    const talhao = features[index]?.talhao
-    if (!talhao) return
-    if (talhaoSel?.id !== talhao.id && timelineMode !== 'monitoramento')
-      setTimelineMode(timelineIsDocked ? 'resumo' : 'historico')
-    await alternarTalhao(talhao)
+    const t = features[index]?.talhao
+    if (!t) return
+    await alternarTalhao(t)
   }
 
   async function abrirMonitoramento() {
@@ -154,289 +507,520 @@ export function FazendaMapaPrincipal({
     setActiveView('monitoramento-registro')
   }
 
+  if (!isDesktop) {
+    return (
+      <MapaMobile
+        mapFeatures={mapFeatures}
+        fazenda={fazenda}
+        selected={selected}
+        ultimaOp={ultimaOp}
+        ultimaOpInfo={ultimaOpInfo}
+        ultimaOpAberta={ultimaOpAberta}
+        chuvaMm={chuvaMm}
+        chuvaData={chuvaData}
+        activePluvio={activePluvio}
+        selectedMonitoring={selectedMonitoring}
+        handleFeatureClick={handleFeatureClick}
+        abrirMonitoramento={abrirMonitoramento}
+        alternarTalhao={alternarTalhao}
+        setActiveView={setActiveView}
+        navigate={navigate}
+        setMenuOpen={setMenuOpen}
+        gpsStatus={gps.status}
+        gpsPosition={gps.position}
+        gpsError={gps.error}
+        gpsActive={gpsActive}
+        centerNonce={centerNonce}
+        onGpsClick={handleGpsClick}
+        showGpsBanner={showGpsBanner}
+        onDismissGpsBanner={() => setGpsBannerDismissed(true)}
+      />
+    )
+  }
+
   return (
-    <section style={timelineIsDocked ? mapMainPageStyle : mapMainPageMobileStyle}>
+    <section style={pageStyle}>
       <SimpleFarmMap
         features={mapFeatures}
-        height={timelineIsDocked ? '100vh' : '100dvh'}
+        height="100dvh"
         fullBleed
         selectedCode={selected?.codigo}
-        selectedMode={
-          timelineMode === 'chuvas' ? 'chuvas' : timelineMode === 'monitoramento' ? 'monitoramento' : 'timeline'
-        }
+        selectedMode="timeline"
         pluviometros={[]}
-        devicePosition={devicePosition}
         onFeatureClick={handleFeatureClick}
+        devicePosition={gps.position}
+        centerOnDeviceNonce={centerNonce}
       />
 
+      {/* Rail vertical de ícones */}
+      <nav style={railStyle} aria-label="Atalhos do mapa">
+        <button onClick={() => setMenuOpen(true)} style={railIconStyle(false)} title="Menu" aria-label="Abrir menu">
+          <Ico.Menu />
+        </button>
+        <hr style={railDividerStyle} />
+        <button style={railIconStyle(true)} title="Resumo" aria-label="Resumo do mapa">
+          <Ico.Sum />
+        </button>
+        <button
+          onClick={() => setActiveView('monitoramento')}
+          style={railIconStyle(false)}
+          title="Monitoramento"
+          aria-label="Monitoramento"
+        >
+          <Ico.Leaf />
+        </button>
+        <button
+          onClick={() => navigate('/os')}
+          style={railIconStyle(false)}
+          title="Ordens de servico"
+          aria-label="Ordens de servico"
+        >
+          <Ico.History />
+          {ultimaOpAberta && <span style={railBadgeStyle} />}
+        </button>
+        <button onClick={() => setActiveView('chuvas')} style={railIconStyle(false)} title="Chuvas" aria-label="Chuvas">
+          <Ico.Drop />
+        </button>
+        <button onClick={() => setActiveView('solo')} style={railIconStyle(false)} title="Solo" aria-label="Solo">
+          <Ico.Soil />
+        </button>
+        <hr style={railDividerStyle} />
+        <button
+          type="button"
+          onClick={handleGpsClick}
+          style={railIconStyle(gpsActive)}
+          title={gpsActive ? 'Recentralizar GPS' : 'Ativar GPS'}
+          aria-label={gpsActive ? 'Recentralizar GPS' : 'Ativar GPS'}
+          aria-pressed={gpsActive}
+        >
+          <Ico.Gps />
+          {gps.status === 'requesting' && <span style={railBadgeStyle} />}
+        </button>
+      </nav>
+
+      {showGpsBanner && (
+        <GpsBanner
+          status={gps.status}
+          error={gps.error}
+          accuracy={gps.position?.accuracy}
+          onRetry={handleGpsClick}
+          onDismiss={() => setGpsBannerDismissed(true)}
+        />
+      )}
+
+      {/* Breadcrumb */}
+      <div style={crumbStyle}>
+        <span>{fazenda?.nome || 'Fazenda'}</span>
+        <Ico.ChevR />
+        <b style={{ color: C.textDk, fontWeight: 800 }}>{selected?.codigo || 'Mapa'}</b>
+      </div>
+
+      {/* Chip do talhao no topo direito */}
       {selected && (
-        <div style={timelineIsDocked ? timelineDockStyle : timelineMobileStyle}>
-          <div style={timelineIsDocked ? timelineHeaderStyle : timelineHeaderMobileStyle}>
-            <div>
-              <p style={timelineIsDocked ? eyebrowStyle : timelineMobileEyebrowStyle}>
-                {timelineIsDocked ? 'TALHAO SELECIONADO' : 'TALHAO'}
-              </p>
-              <h3 style={timelineIsDocked ? timelineTitleStyle : timelineMobileTitleStyle}>
-                {selected.codigo} · {formatCultura(selected.cultura)}
-              </h3>
-            </div>
-            <span style={timelineAreaPillStyle}>{Number(selected.area_ha || 0).toFixed(2)} ha</span>
-          </div>
-          <div style={timelineActionsStyle}>
-            <button
-              onClick={abrirMonitoramento}
-              style={timelineIsDocked ? timelineActionButtonStyle : timelineMobileActionButtonStyle}
+        <div style={talhaoChipStyle}>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <p style={eyebrowStyle}>TALHAO</p>
+            <p
+              style={{
+                margin: '3px 0 0',
+                color: C.textDk,
+                fontWeight: 900,
+                fontSize: 15,
+                fontFamily: FONTS.serif,
+                lineHeight: 1.15
+              }}
             >
-              Monitorar
-            </button>
-            <button
-              onClick={() => navigate('/os')}
-              style={timelineIsDocked ? timelineActionButtonStyle : timelineMobileActionButtonStyle}
-            >
-              Criar ordem
-            </button>
+              {selected.codigo}
+            </p>
+            <p style={{ margin: '2px 0 0', color: C.textMid, fontSize: 11 }}>{formatCultura(selected.cultura)}</p>
           </div>
-          <div style={timelineIsDocked ? timelineModeTabsStyle : timelineModeTabsMobileStyle}>
-            {[
-              ['resumo', 'Resumo'],
-              ['monitoramento', 'Monitoramento'],
-              ['historico', 'Historico'],
-              ['chuvas', 'Chuvas'],
-              ['solo', 'Solo']
-            ].map(([id, label]) => (
-              <button
-                key={id}
-                onClick={() => setTimelineMode(id)}
+          <span style={areaPillStyle}>{Number(selected.area_ha || 0).toFixed(2)} ha</span>
+          <button
+            onClick={() => alternarTalhao(null)}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              cursor: 'pointer',
+              color: C.textMid,
+              padding: 4,
+              display: 'grid',
+              placeItems: 'center'
+            }}
+            aria-label="Limpar selecao"
+          >
+            <Ico.X />
+          </button>
+        </div>
+      )}
+
+      {/* Dock inferior com KPIs + CTA primario */}
+      {selected && (
+        <div style={dockStyle}>
+          <div style={dockIdStyle}>
+            <div style={dockIdAvatarStyle}>{String(selected.codigo || 'T').charAt(0)}</div>
+            <div style={{ minWidth: 0 }}>
+              <p
                 style={{
-                  ...(timelineIsDocked ? timelineModeButtonStyle : timelineMobileModeButtonStyle),
-                  background: timelineMode === id ? C.bg : 'rgba(255,255,255,0.08)',
-                  color: timelineMode === id ? C.textDk : C.bg,
-                  borderColor: timelineMode === id ? C.bg : 'rgba(255,255,255,0.28)'
+                  margin: 0,
+                  color: C.textDk,
+                  fontWeight: 900,
+                  fontSize: 15,
+                  fontFamily: FONTS.serif,
+                  lineHeight: 1.1
                 }}
               >
-                {label}
-              </button>
-            ))}
-          </div>
-          {timelineMode === 'resumo' &&
-            (timelineIsDocked ? (
-              <div style={timelineSummaryCardStyle}>
-                <h4 style={timelineCardTitleStyle}>Resumo do talhao</h4>
-                <div style={timelineSummaryRowsStyle}>
-                  {resumoRows.map(item => (
-                    <div key={item.label} style={timelineSummaryRowStyle}>
-                      <span style={timelineSummaryLabelStyle}>{item.label}</span>
-                      <strong style={timelineSummaryValueStyle}>{item.value}</strong>
-                    </div>
-                  ))}
-                </div>
-                <button onClick={() => setShowNovaOp(true)} style={timelineTextButtonStyle}>
-                  {operacoes.length ? 'Registrar nova operacao' : 'Adicionar primeiro registro'}
-                </button>
-              </div>
-            ) : (
-              <div style={timelineTableHorizontalStyle}>
-                {resumoRows.map(item => (
-                  <div key={item.label} style={timelineInfoHorizontalCardStyle}>
-                    <span>{item.label}</span>
-                    <strong>{item.value}</strong>
-                  </div>
-                ))}
-                <button onClick={() => setShowNovaOp(true)} style={timelineCtaHorizontalStyle}>
-                  {operacoes.length ? 'Nova operacao' : 'Adicionar registro'}
-                </button>
-                <div aria-hidden="true" style={timelineScrollEndStyle} />
-              </div>
-            ))}
-          {timelineMode === 'monitoramento' &&
-            (timelineIsDocked ? (
-              <div style={timelineSummaryCardStyle}>
-                <h4 style={timelineCardTitleStyle}>Dias sem monitoramento</h4>
-                <div style={{ ...timelineMonitoringStatusStyle, borderColor: selectedMonitoring.color }}>
-                  <span style={timelineSummaryLabelStyle}>Talhao selecionado</span>
-                  <strong style={{ ...timelineSummaryValueStyle, fontSize: 16, color: selectedMonitoring.color }}>
-                    {selectedMonitoring.title}
-                  </strong>
-                  <small style={{ color: C.textMid, fontWeight: 800 }}>{selectedMonitoring.detail}</small>
-                </div>
-                <div style={timelineLegendGridStyle}>
-                  {MONITORAMENTO_LEGEND.map(item => (
-                    <div key={item.key} style={timelineLegendItemStyle}>
-                      <span style={{ ...timelineLegendDotStyle, background: item.color }} />
-                      <strong>{item.title}</strong>
-                      <small style={timelineLegendRangeStyle}>{item.range}</small>
-                    </div>
-                  ))}
-                </div>
-                <button onClick={abrirMonitoramento} style={timelineTextButtonStyle}>
-                  Registrar monitoramento
-                </button>
-              </div>
-            ) : (
-              <div style={timelineTableHorizontalStyle}>
-                <div style={{ ...timelineMonitoringHorizontalCardStyle, borderColor: selectedMonitoring.color }}>
-                  <span>Talhao selecionado</span>
-                  <strong style={{ color: selectedMonitoring.color }}>{selectedMonitoring.title}</strong>
-                  <small>{selectedMonitoring.detail}</small>
-                </div>
-                {MONITORAMENTO_LEGEND.map(item => (
-                  <div key={item.key} style={timelineLegendHorizontalCardStyle}>
-                    <span style={{ ...timelineLegendDotStyle, background: item.color }} />
-                    <strong>{item.title}</strong>
-                    <small style={timelineLegendRangeStyle}>{item.range}</small>
-                  </div>
-                ))}
-                <button onClick={abrirMonitoramento} style={timelineCtaHorizontalStyle}>
-                  Registrar visita
-                </button>
-                <div aria-hidden="true" style={timelineScrollEndStyle} />
-              </div>
-            ))}
-          {timelineMode === 'historico' && (
-            <div style={timelineIsDocked ? timelineTableDesktopStyle : timelineTableHorizontalStyle}>
-              {timeline.map((item, index) => (
-                <button
-                  key={`${item.data}-${item.titulo}-${index}`}
-                  style={timelineIsDocked ? timelineCellStyle : timelineCellHorizontalStyle}
-                >
-                  <span>{item.data}</span>
-                  <strong>{item.titulo}</strong>
-                  <em>{item.status}</em>
-                  <small>{item.valor}</small>
-                </button>
-              ))}
-              {!timelineIsDocked && <div aria-hidden="true" style={timelineScrollEndStyle} />}
+                {selected.codigo}
+              </p>
+              <p
+                style={{
+                  margin: '2px 0 0',
+                  color: C.textMid,
+                  fontSize: 10,
+                  fontFamily: FONTS.mono,
+                  letterSpacing: '0.4px',
+                  fontWeight: 700,
+                  textTransform: 'uppercase'
+                }}
+              >
+                {formatCultura(selected.cultura)} · {Number(selected.area_ha || 0).toFixed(2)} ha
+              </p>
             </div>
-          )}
-          {timelineMode === 'chuvas' &&
-            (timelineIsDocked ? (
-              <div style={timelineRainLayoutStyle}>
-                <div style={timelineDateGridStyle}>
-                  <label style={timelineDateLabelStyle}>
-                    Data inicial
-                    <input
-                      type="date"
-                      value={chuvaInicio}
-                      onChange={e => setChuvaInicio(e.target.value)}
-                      style={timelineDateInputStyle}
-                    />
-                  </label>
-                  <label style={timelineDateLabelStyle}>
-                    Data final
-                    <input
-                      type="date"
-                      value={chuvaFim}
-                      onChange={e => setChuvaFim(e.target.value)}
-                      style={timelineDateInputStyle}
-                    />
-                  </label>
-                  <button onClick={() => setActiveView('chuvas')} style={timelinePrimaryButtonStyle}>
-                    Abrir mapa interpolado
-                  </button>
-                </div>
-                <div style={timelineRainGridStyle}>
-                  <div style={timelineRainMetricStyle}>
-                    <span>Acumulado no talhao</span>
-                    <strong>{chuvaAcumulada} mm</strong>
-                  </div>
-                  <div style={timelineRainMetricStyle}>
-                    <span>Media diaria</span>
-                    <strong>{chuvaMediaDia} mm</strong>
-                  </div>
-                  <div style={timelineRainMetricStyle}>
-                    <span>Maior precipitacao</span>
-                    <strong>{maiorChuva} mm</strong>
-                  </div>
-                  <div style={timelineRainMetricStyle}>
-                    <span>Menor precipitacao</span>
-                    <strong>{menorChuva} mm</strong>
-                  </div>
-                </div>
+          </div>
+
+          <div style={dockKpisStyle}>
+            <div style={dockKpiStyle}>
+              <div style={dockKpiIconWrap('#FBFBF7', C.textDk)}>
+                <Ico.Order />
               </div>
-            ) : (
-              <div style={timelineTableHorizontalStyle}>
-                <label style={timelineInputHorizontalCardStyle}>
-                  <span>Data inicial</span>
-                  <input
-                    type="date"
-                    value={chuvaInicio}
-                    onChange={e => setChuvaInicio(e.target.value)}
-                    style={timelineDateInputStyle}
-                  />
-                </label>
-                <label style={timelineInputHorizontalCardStyle}>
-                  <span>Data final</span>
-                  <input
-                    type="date"
-                    value={chuvaFim}
-                    onChange={e => setChuvaFim(e.target.value)}
-                    style={timelineDateInputStyle}
-                  />
-                </label>
-                <button onClick={() => setActiveView('chuvas')} style={timelineCtaHorizontalStyle}>
-                  Abrir mapa de chuvas
-                </button>
-                <div style={timelineMetricHorizontalCardStyle}>
-                  <span>Acumulado</span>
-                  <strong>{chuvaAcumulada} mm</strong>
-                </div>
-                <div style={timelineMetricHorizontalCardStyle}>
-                  <span>Media diaria</span>
-                  <strong>{chuvaMediaDia} mm</strong>
-                </div>
-                <div style={timelineMetricHorizontalCardStyle}>
-                  <span>Maior chuva</span>
-                  <strong>{maiorChuva} mm</strong>
-                </div>
-                <div style={timelineMetricHorizontalCardStyle}>
-                  <span>Menor chuva</span>
-                  <strong>{menorChuva} mm</strong>
-                </div>
-                <div aria-hidden="true" style={timelineScrollEndStyle} />
+              <div style={{ minWidth: 0 }}>
+                <p style={dockKpiLabelStyle}>Ultima operacao</p>
+                <p style={dockKpiValueStyle}>
+                  {ultimaOp ? (
+                    <>
+                      {ultimaOpInfo?.label || ultimaOp.categoria}{' '}
+                      <span style={dockKpiSubStyle}>· {formatShortDate(ultimaOp.data_operacao)}</span>
+                      {ultimaOpAberta ? (
+                        <span style={{ ...statusTagStyle, background: '#fbefd8', color: C.amberDk }}>aberta</span>
+                      ) : (
+                        <span style={statusTagStyle}>fechada</span>
+                      )}
+                    </>
+                  ) : (
+                    <span style={dockKpiSubStyle}>Sem operacao</span>
+                  )}
+                </p>
               </div>
-            ))}
-          {timelineMode === 'solo' &&
-            (timelineIsDocked ? (
-              <div style={timelineSummaryCardStyle}>
-                <h4 style={timelineCardTitleStyle}>Solo do talhao</h4>
-                <div style={timelineSummaryRowsStyle}>
-                  <div style={timelineSummaryRowStyle}>
-                    <span style={timelineSummaryLabelStyle}>Camada atual</span>
-                    <strong style={timelineSummaryValueStyle}>Mapa de solo disponivel</strong>
-                  </div>
-                  <div style={timelineSummaryRowStyle}>
-                    <span style={timelineSummaryLabelStyle}>Fertilidade</span>
-                    <strong style={timelineSummaryValueStyle}>Aguardando leitura recente</strong>
-                  </div>
-                  <div style={timelineSummaryRowStyle}>
-                    <span style={timelineSummaryLabelStyle}>Recomendacao</span>
-                    <strong style={timelineSummaryValueStyle}>Conferir pagina Solo</strong>
-                  </div>
-                </div>
-                <button onClick={() => setActiveView('solo')} style={timelineTextButtonStyle}>
-                  Abrir pagina Solo
-                </button>
+            </div>
+
+            <div style={dockKpiStyle}>
+              <div
+                style={dockKpiIconWrap(
+                  selectedMonitoring.color ? `${selectedMonitoring.color}1a` : '#FBFBF7',
+                  selectedMonitoring.color || C.textMid
+                )}
+              >
+                <Ico.Eye />
               </div>
-            ) : (
-              <div style={timelineTableHorizontalStyle}>
-                <div style={timelineInfoHorizontalCardStyle}>
-                  <span>Camada atual</span>
-                  <strong>Mapa de solo disponivel</strong>
-                </div>
-                <div style={timelineInfoHorizontalCardStyle}>
-                  <span>Fertilidade</span>
-                  <strong>Aguardando leitura recente</strong>
-                </div>
-                <div style={timelineInfoHorizontalCardStyle}>
-                  <span>Recomendacao</span>
-                  <strong>Conferir pagina Solo</strong>
-                </div>
-                <button onClick={() => setActiveView('solo')} style={timelineCtaHorizontalStyle}>
-                  Abrir Solo
-                </button>
-                <div aria-hidden="true" style={timelineScrollEndStyle} />
+              <div style={{ minWidth: 0 }}>
+                <p style={dockKpiLabelStyle}>Ultimo monitoramento</p>
+                <p style={dockKpiValueStyle}>
+                  {selectedMonitoring.shortLabel || 'Nunca'}
+                  {selectedMonitoring.days != null && (
+                    <span style={dockKpiSubStyle}>
+                      {' · '}
+                      {selectedMonitoring.days === 0
+                        ? 'hoje'
+                        : `ha ${selectedMonitoring.days} dia${selectedMonitoring.days === 1 ? '' : 's'}`}
+                    </span>
+                  )}
+                </p>
               </div>
-            ))}
+            </div>
+
+            <div style={dockKpiStyle}>
+              <div style={dockKpiIconWrap('#E0EEF6', '#4A8AB8')}>
+                <Ico.Drop />
+              </div>
+              <div style={{ minWidth: 0 }}>
+                <p style={dockKpiLabelStyle}>
+                  Ultima chuva
+                  {activePluvio.length > 0 && (
+                    <span style={{ color: C.textMid, fontWeight: 600 }}> · {activePluvio.length} pluv.</span>
+                  )}
+                </p>
+                <p style={dockKpiValueStyle}>
+                  {chuvaMm ? (
+                    <>
+                      {chuvaMm} mm <span style={dockKpiSubStyle}>· {formatShortDate(chuvaData)}</span>
+                    </>
+                  ) : (
+                    <span style={dockKpiSubStyle}>Sem registro</span>
+                  )}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={abrirMonitoramento} style={ghostCtaStyle}>
+              <Ico.Plus />
+              Monitorar
+            </button>
+            <button onClick={() => navigate('/os')} style={primaryCtaStyle}>
+              <Ico.Order />
+              Abrir OS
+            </button>
+          </div>
+        </div>
+      )}
+    </section>
+  )
+}
+
+// ── Fallback mobile (rail horizontal compacto + sheet inferior) ─────────────
+function MapaMobile({
+  mapFeatures,
+  fazenda,
+  selected,
+  ultimaOp,
+  ultimaOpInfo,
+  ultimaOpAberta,
+  chuvaMm,
+  chuvaData,
+  activePluvio,
+  selectedMonitoring,
+  handleFeatureClick,
+  abrirMonitoramento,
+  alternarTalhao,
+  setActiveView,
+  navigate,
+  setMenuOpen,
+  gpsStatus,
+  gpsPosition,
+  gpsError,
+  gpsActive,
+  centerNonce,
+  onGpsClick,
+  showGpsBanner,
+  onDismissGpsBanner
+}) {
+  return (
+    <section style={pageMobileStyle}>
+      <SimpleFarmMap
+        features={mapFeatures}
+        height="100dvh"
+        fullBleed
+        selectedCode={selected?.codigo}
+        selectedMode="timeline"
+        pluviometros={[]}
+        onFeatureClick={handleFeatureClick}
+        devicePosition={gpsPosition}
+        centerOnDeviceNonce={centerNonce}
+      />
+
+      {/* Rail horizontal no topo */}
+      <nav
+        style={{
+          position: 'absolute',
+          top: 12,
+          left: 12,
+          right: 12,
+          background: 'rgba(255,255,255,0.96)',
+          border: `1px solid ${C.border}`,
+          borderRadius: 14,
+          padding: 6,
+          display: 'flex',
+          gap: 4,
+          alignItems: 'center',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
+          zIndex: 6,
+          overflowX: 'auto'
+        }}
+        aria-label="Atalhos do mapa"
+      >
+        <button onClick={() => setMenuOpen(true)} style={railIconStyle(false)} aria-label="Menu">
+          <Ico.Menu />
+        </button>
+        <span style={{ width: 1, height: 26, background: C.borderSoft, flexShrink: 0 }} />
+        <button style={railIconStyle(true)} aria-label="Resumo">
+          <Ico.Sum />
+        </button>
+        <button onClick={() => setActiveView('monitoramento')} style={railIconStyle(false)} aria-label="Monitoramento">
+          <Ico.Leaf />
+        </button>
+        <button onClick={() => navigate('/os')} style={railIconStyle(false)} aria-label="Ordens de servico">
+          <Ico.History />
+          {ultimaOpAberta && <span style={railBadgeStyle} />}
+        </button>
+        <button onClick={() => setActiveView('chuvas')} style={railIconStyle(false)} aria-label="Chuvas">
+          <Ico.Drop />
+        </button>
+        <button onClick={() => setActiveView('solo')} style={railIconStyle(false)} aria-label="Solo">
+          <Ico.Soil />
+        </button>
+        <span style={{ width: 1, height: 26, background: C.borderSoft, flexShrink: 0 }} />
+        <button
+          type="button"
+          onClick={onGpsClick}
+          style={railIconStyle(gpsActive)}
+          aria-label={gpsActive ? 'Recentralizar GPS' : 'Ativar GPS'}
+          aria-pressed={gpsActive}
+        >
+          <Ico.Gps />
+          {gpsStatus === 'requesting' && <span style={railBadgeStyle} />}
+        </button>
+        <div style={{ flex: 1, minWidth: 4 }} />
+        <span
+          style={{
+            fontFamily: FONTS.mono,
+            fontSize: 10,
+            color: C.textMid,
+            padding: '0 8px',
+            whiteSpace: 'nowrap',
+            fontWeight: 700,
+            letterSpacing: '0.4px'
+          }}
+        >
+          {selected?.codigo || fazenda?.nome || ''}
+        </span>
+      </nav>
+
+      {showGpsBanner && (
+        <GpsBanner
+          status={gpsStatus}
+          error={gpsError}
+          accuracy={gpsPosition?.accuracy}
+          onRetry={onGpsClick}
+          onDismiss={onDismissGpsBanner}
+        />
+      )}
+
+      {selected && (
+        <div
+          style={{
+            position: 'absolute',
+            bottom: 12,
+            left: 12,
+            right: 12,
+            background: 'rgba(255,255,255,0.97)',
+            border: `1px solid ${C.border}`,
+            borderRadius: 16,
+            padding: 14,
+            display: 'grid',
+            gap: 12,
+            boxShadow: '0 -10px 30px rgba(0,0,0,0.12), 0 12px 36px rgba(0,0,0,0.22)',
+            backdropFilter: 'blur(10px)',
+            zIndex: 5,
+            maxHeight: '55dvh',
+            overflowY: 'auto'
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={dockIdAvatarStyle}>{String(selected.codigo || 'T').charAt(0)}</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p
+                style={{
+                  margin: 0,
+                  color: C.textDk,
+                  fontWeight: 900,
+                  fontSize: 18,
+                  fontFamily: FONTS.serif,
+                  lineHeight: 1.1
+                }}
+              >
+                {selected.codigo}
+              </p>
+              <p style={{ margin: '2px 0 0', color: C.textMid, fontSize: 12 }}>
+                {formatCultura(selected.cultura)} · {Number(selected.area_ha || 0).toFixed(2)} ha
+              </p>
+            </div>
+            <button
+              onClick={() => alternarTalhao(null)}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                color: C.textMid,
+                padding: 6,
+                display: 'grid',
+                placeItems: 'center'
+              }}
+              aria-label="Limpar selecao"
+            >
+              <Ico.X />
+            </button>
+          </div>
+
+          <div style={{ display: 'grid', gap: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+              <div style={dockKpiIconWrap('#FBFBF7', C.textDk)}>
+                <Ico.Order />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={dockKpiLabelStyle}>Ultima operacao</p>
+                <p style={{ ...dockKpiValueStyle, whiteSpace: 'normal' }}>
+                  {ultimaOp ? (
+                    <>
+                      {ultimaOpInfo?.label || ultimaOp.categoria}{' '}
+                      <span style={dockKpiSubStyle}>· {formatShortDate(ultimaOp.data_operacao)}</span>
+                    </>
+                  ) : (
+                    <span style={dockKpiSubStyle}>Sem operacao</span>
+                  )}
+                </p>
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+              <div
+                style={dockKpiIconWrap(
+                  selectedMonitoring.color ? `${selectedMonitoring.color}1a` : '#FBFBF7',
+                  selectedMonitoring.color || C.textMid
+                )}
+              >
+                <Ico.Eye />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={dockKpiLabelStyle}>Ultimo monitoramento</p>
+                <p style={{ ...dockKpiValueStyle, whiteSpace: 'normal' }}>
+                  {selectedMonitoring.shortLabel || 'Nunca'}
+                  {selectedMonitoring.detail && <span style={dockKpiSubStyle}> · {selectedMonitoring.detail}</span>}
+                </p>
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+              <div style={dockKpiIconWrap('#E0EEF6', '#4A8AB8')}>
+                <Ico.Drop />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={dockKpiLabelStyle}>
+                  Ultima chuva
+                  {activePluvio.length > 0 && (
+                    <span style={{ color: C.textMid, fontWeight: 600 }}> · {activePluvio.length} pluv.</span>
+                  )}
+                </p>
+                <p style={{ ...dockKpiValueStyle, whiteSpace: 'normal' }}>
+                  {chuvaMm ? (
+                    <>
+                      {chuvaMm} mm <span style={dockKpiSubStyle}>· {formatShortDate(chuvaData)}</span>
+                    </>
+                  ) : (
+                    <span style={dockKpiSubStyle}>Sem registro</span>
+                  )}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={abrirMonitoramento} style={{ ...ghostCtaStyle, flex: 1, justifyContent: 'center' }}>
+              <Ico.Plus />
+              Monitorar
+            </button>
+            <button onClick={() => navigate('/os')} style={{ ...primaryCtaStyle, flex: 1, justifyContent: 'center' }}>
+              <Ico.Order />
+              Abrir OS
+            </button>
+          </div>
         </div>
       )}
     </section>
