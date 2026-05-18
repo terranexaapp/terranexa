@@ -2,9 +2,10 @@
 // Substitui o painel verde de 5 abas por: rail de ícones à esquerda,
 // chip do talhão no topo-direito e dock inferior com KPIs + CTA primário.
 
+import { useRef, useState } from 'react'
 import { theme } from '../../styles/theme'
 import { getCategoriaInfo } from '../../lib/operacoes'
-import { useMediaQuery } from './hooks'
+import { useGpsRequest, useMediaQuery } from './hooks'
 import { SimpleFarmMap } from './maps'
 import { requestOfflineStorage } from './offline'
 import { normalizeFeature, getMonitoramentoMeta, formatCultura, formatShortDate } from './utils'
@@ -85,6 +86,98 @@ const Ico = {
       <line x1="6" y1="6" x2="18" y2="18" />
       <line x1="6" y1="18" x2="18" y2="6" />
     </svg>
+  ),
+  Gps: props => (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <circle cx="12" cy="12" r="3" />
+      <circle cx="12" cy="12" r="8" />
+      <line x1="12" y1="2" x2="12" y2="4" />
+      <line x1="12" y1="20" x2="12" y2="22" />
+      <line x1="2" y1="12" x2="4" y2="12" />
+      <line x1="20" y1="12" x2="22" y2="12" />
+    </svg>
+  )
+}
+
+const GPS_STATUS_TEXT = {
+  requesting: 'Solicitando GPS...',
+  denied: 'GPS bloqueado. Libere nas permissoes do navegador',
+  unavailable: 'GPS indisponivel no dispositivo',
+  timeout: 'GPS demorou demais. Tente novamente',
+  unsupported: 'Geolocalizacao indisponivel',
+  error: 'Falha ao ler GPS'
+}
+
+function GpsBanner({ status, error, accuracy, onRetry, onDismiss }) {
+  if (status === 'idle' || status === 'active') return null
+  const isError = status !== 'requesting'
+  const bg = isError ? '#fff5e5' : 'rgba(255,255,255,0.96)'
+  const fg = isError ? '#8a4a00' : C.textDk
+  return (
+    <div
+      role={isError ? 'alert' : 'status'}
+      style={{
+        position: 'absolute',
+        top: 76,
+        left: '50%',
+        transform: 'translateX(-50%)',
+        background: bg,
+        color: fg,
+        border: `1px solid ${isError ? '#f0c98c' : C.border}`,
+        borderRadius: 12,
+        padding: '10px 14px',
+        fontSize: 12,
+        fontWeight: 700,
+        boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
+        zIndex: 7,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        maxWidth: 'min(92vw, 420px)'
+      }}
+    >
+      <span style={{ flex: 1, lineHeight: 1.3 }}>
+        {GPS_STATUS_TEXT[status] || 'GPS'}
+        {accuracy ? <span style={{ color: C.textMid, fontWeight: 600 }}> · ±{Math.round(accuracy)}m</span> : null}
+        {error && status !== 'requesting' ? (
+          <span style={{ display: 'block', fontWeight: 500, marginTop: 2, fontSize: 11 }}>{error}</span>
+        ) : null}
+      </span>
+      {isError && (
+        <button
+          onClick={onRetry}
+          style={{
+            background: C.greenDp,
+            color: '#f0f5e8',
+            border: 'none',
+            borderRadius: 8,
+            padding: '6px 10px',
+            fontSize: 11,
+            fontWeight: 800,
+            cursor: 'pointer'
+          }}
+        >
+          Tentar
+        </button>
+      )}
+      {isError && (
+        <button
+          onClick={onDismiss}
+          aria-label="Fechar aviso"
+          style={{
+            background: 'transparent',
+            color: fg,
+            border: 'none',
+            cursor: 'pointer',
+            padding: 2,
+            display: 'grid',
+            placeItems: 'center'
+          }}
+        >
+          <Ico.X />
+        </button>
+      )}
+    </div>
   )
 }
 
@@ -357,6 +450,22 @@ export function FazendaMapaPrincipal({
   setMenuOpen
 }) {
   const isDesktop = useMediaQuery('(min-width: 900px)')
+  const gps = useGpsRequest()
+  const centerNonceRef = useRef(0)
+  const [centerNonce, setCenterNonce] = useState(0)
+  const [gpsBannerDismissed, setGpsBannerDismissed] = useState(false)
+
+  function handleGpsClick() {
+    setGpsBannerDismissed(false)
+    // sempre incrementa nonce — usuário clicando = quer recentralizar mesmo se
+    // a posição já está conhecida.
+    centerNonceRef.current += 1
+    setCenterNonce(centerNonceRef.current)
+    gps.request()
+  }
+
+  const gpsActive = gps.status === 'active'
+  const showGpsBanner = !gpsBannerDismissed && gps.status !== 'idle' && gps.status !== 'active'
 
   const features = talhoes
     .map(t => ({ talhao: t, feature: normalizeFeature(t.geometria, t.codigo) }))
@@ -417,6 +526,14 @@ export function FazendaMapaPrincipal({
         setActiveView={setActiveView}
         navigate={navigate}
         setMenuOpen={setMenuOpen}
+        gpsStatus={gps.status}
+        gpsPosition={gps.position}
+        gpsError={gps.error}
+        gpsActive={gpsActive}
+        centerNonce={centerNonce}
+        onGpsClick={handleGpsClick}
+        showGpsBanner={showGpsBanner}
+        onDismissGpsBanner={() => setGpsBannerDismissed(true)}
       />
     )
   }
@@ -431,6 +548,8 @@ export function FazendaMapaPrincipal({
         selectedMode="timeline"
         pluviometros={[]}
         onFeatureClick={handleFeatureClick}
+        devicePosition={gps.position}
+        centerOnDeviceNonce={centerNonce}
       />
 
       {/* Rail vertical de ícones */}
@@ -465,7 +584,29 @@ export function FazendaMapaPrincipal({
         <button onClick={() => setActiveView('solo')} style={railIconStyle(false)} title="Solo" aria-label="Solo">
           <Ico.Soil />
         </button>
+        <hr style={railDividerStyle} />
+        <button
+          type="button"
+          onClick={handleGpsClick}
+          style={railIconStyle(gpsActive)}
+          title={gpsActive ? 'Recentralizar GPS' : 'Ativar GPS'}
+          aria-label={gpsActive ? 'Recentralizar GPS' : 'Ativar GPS'}
+          aria-pressed={gpsActive}
+        >
+          <Ico.Gps />
+          {gps.status === 'requesting' && <span style={railBadgeStyle} />}
+        </button>
       </nav>
+
+      {showGpsBanner && (
+        <GpsBanner
+          status={gps.status}
+          error={gps.error}
+          accuracy={gps.position?.accuracy}
+          onRetry={handleGpsClick}
+          onDismiss={() => setGpsBannerDismissed(true)}
+        />
+      )}
 
       {/* Breadcrumb */}
       <div style={crumbStyle}>
@@ -653,7 +794,15 @@ function MapaMobile({
   alternarTalhao,
   setActiveView,
   navigate,
-  setMenuOpen
+  setMenuOpen,
+  gpsStatus,
+  gpsPosition,
+  gpsError,
+  gpsActive,
+  centerNonce,
+  onGpsClick,
+  showGpsBanner,
+  onDismissGpsBanner
 }) {
   return (
     <section style={pageMobileStyle}>
@@ -665,6 +814,8 @@ function MapaMobile({
         selectedMode="timeline"
         pluviometros={[]}
         onFeatureClick={handleFeatureClick}
+        devicePosition={gpsPosition}
+        centerOnDeviceNonce={centerNonce}
       />
 
       {/* Rail horizontal no topo */}
@@ -707,6 +858,17 @@ function MapaMobile({
         <button onClick={() => setActiveView('solo')} style={railIconStyle(false)} aria-label="Solo">
           <Ico.Soil />
         </button>
+        <span style={{ width: 1, height: 26, background: C.borderSoft, flexShrink: 0 }} />
+        <button
+          type="button"
+          onClick={onGpsClick}
+          style={railIconStyle(gpsActive)}
+          aria-label={gpsActive ? 'Recentralizar GPS' : 'Ativar GPS'}
+          aria-pressed={gpsActive}
+        >
+          <Ico.Gps />
+          {gpsStatus === 'requesting' && <span style={railBadgeStyle} />}
+        </button>
         <div style={{ flex: 1, minWidth: 4 }} />
         <span
           style={{
@@ -722,6 +884,16 @@ function MapaMobile({
           {selected?.codigo || fazenda?.nome || ''}
         </span>
       </nav>
+
+      {showGpsBanner && (
+        <GpsBanner
+          status={gpsStatus}
+          error={gpsError}
+          accuracy={gpsPosition?.accuracy}
+          onRetry={onGpsClick}
+          onDismiss={onDismissGpsBanner}
+        />
+      )}
 
       {selected && (
         <div

@@ -48,7 +48,8 @@ export function SimpleFarmMap({
   placingPluviometro = false,
   onMapPoint,
   onPluviometroClick,
-  devicePosition = null
+  devicePosition = null,
+  centerOnDeviceNonce = 0
 }) {
   const normalized = features
     .map((feature, index) => ({
@@ -84,6 +85,7 @@ export function SimpleFarmMap({
       onMapPoint={onMapPoint}
       onPluviometroClick={onPluviometroClick}
       devicePosition={devicePosition}
+      centerOnDeviceNonce={centerOnDeviceNonce}
     />
   )
 }
@@ -99,7 +101,8 @@ function LeafletFarmMap({
   placingPluviometro = false,
   onMapPoint,
   onPluviometroClick,
-  devicePosition = null
+  devicePosition = null,
+  centerOnDeviceNonce = 0
 }) {
   const mapNodeRef = useRef(null)
   const mapRef = useRef(null)
@@ -316,6 +319,11 @@ function LeafletFarmMap({
     map.on('click', handleMapClick)
     return () => map.off('click', handleMapClick)
   }, [leafletReady, placingPluviometro, onMapPoint])
+
+  useEffect(() => {
+    if (!leafletReady || !mapRef.current || !deviceMarker || centerOnDeviceNonce <= 0) return
+    mapRef.current.setView([deviceMarker.latitude, deviceMarker.longitude], 17, { animate: true })
+  }, [centerOnDeviceNonce, leafletReady, deviceMarker?.latitude, deviceMarker?.longitude])
 
   function rainIntensityForMarker(marker, index) {
     const seed = String(marker.id || marker.nome || index)
