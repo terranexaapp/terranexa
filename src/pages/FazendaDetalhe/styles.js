@@ -1561,59 +1561,6 @@ export const rainInterpolationSpotStyle = {
   filter: 'blur(8px)'
 }
 export const satelliteSvgStyle = { position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'block' }
-export const satelliteControlsStyle = {
-  position: 'absolute',
-  left: 14,
-  bottom: 16,
-  display: 'grid',
-  gap: 8,
-  alignItems: 'center',
-  zIndex: 5
-}
-export const satelliteControlsMobileStyle = {
-  position: 'absolute',
-  right: 12,
-  top: 18,
-  display: 'grid',
-  gap: 8,
-  alignItems: 'center',
-  zIndex: 5
-}
-export const satelliteControlButtonStyle = {
-  width: 34,
-  height: 34,
-  borderRadius: 10,
-  border: '1px solid rgba(255,255,255,0.24)',
-  background: 'rgba(255,255,255,0.92)',
-  color: C.textDk,
-  fontSize: 18,
-  lineHeight: 1,
-  fontWeight: 900,
-  cursor: 'pointer',
-  boxShadow: '0 8px 20px rgba(0,0,0,0.20)'
-}
-export const satelliteGpsButtonStyle = {
-  ...satelliteControlButtonStyle,
-  color: C.greenDp,
-  fontSize: 20,
-  background: 'rgba(255,255,255,0.94)'
-}
-export const satelliteBadgeStyle = {
-  position: 'absolute',
-  left: 14,
-  bottom: 14,
-  zIndex: 2,
-  background: 'rgba(13,28,17,0.72)',
-  color: 'rgba(255,255,255,0.86)',
-  border: '1px solid rgba(255,255,255,0.18)',
-  borderRadius: 999,
-  padding: '6px 10px',
-  fontSize: 10,
-  fontWeight: 900,
-  letterSpacing: 0,
-  textTransform: 'uppercase',
-  pointerEvents: 'none'
-}
 export const mapDrawHintStyle = {
   position: 'absolute',
   left: 12,
