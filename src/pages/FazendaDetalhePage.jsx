@@ -13,7 +13,6 @@ import { RelatoriosView } from './FazendaDetalhe/panels'
 import {
   FarmDesktopSidebar,
   DashboardView,
-  MonitoramentoDashboardView,
   InterpolacaoView
 } from './FazendaDetalhe/views'
 import { MonitoramentoCockpitView } from './FazendaDetalhe/monitoramentoCockpit'
