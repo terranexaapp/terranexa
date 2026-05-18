@@ -149,7 +149,7 @@ export async function listarPontosDoMonitoramento(monitoramentoId) {
     .select(
       'id, tipo, latitude, longitude, precisao_m, observacoes, created_at, ' +
         'praga_doenca_id, estadio_fenologico, severidade, percentual_dano, recomendacao, foto_url, ' +
-        'praga_doenca:pragas_doencas(id, nome_comum, nome_cientifico, tipo, nivel_dano_economico)'
+        'praga_doenca:pragas_doencas(id, nome_comum, nome_cientifico, tipo, nivel_dano_economico, foto_url)'
     )
     .eq('monitoramento_id', monitoramentoId)
     .order('created_at', { ascending: true })

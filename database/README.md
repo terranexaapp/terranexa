@@ -77,3 +77,11 @@ Após o setup inicial, mudanças de schema devem ser adicionadas como
 existentes em produção. Cada arquivo precisa ser idempotente
 (`create table if not exists`, `drop trigger if exists` antes de
 `create trigger`, etc).
+
+Arquivos incrementais atuais:
+
+| Arquivo | O que faz |
+|---|---|
+| `005_fix_missing_schema.sql` | Completa colunas ausentes usadas pelo app em `fazendas` e `monitoramento_pontos`. |
+| `006_pragas_doencas_fotos.sql` | Garante `foto_url` no catalogo de pragas/doencas para os cards de monitoramento. |
+| `007_catalogo_pragas_mae.sql` | Cria o catalogo-mae TerraNexa, culturas N:N e configuracao por fazenda. |

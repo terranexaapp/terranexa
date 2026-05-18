@@ -5,7 +5,7 @@ import {
   criarMonitoramentoPonto,
   salvarCaminhamento
 } from '../../lib/monitoramentos'
-import { listarPragasDoencas } from '../../lib/pragasDoencas'
+import { listarPragasDoencas, getFotoPragaDoenca } from '../../lib/pragasDoencas'
 import { uploadFotoMonitoramento, getPublicUrl } from '../../lib/storage'
 import { requestOfflineStorage, saveMonitoringPointOffline } from './offline'
 import { SimpleFarmMap } from './maps'
@@ -80,6 +80,43 @@ const ESTADIOS = [
 ]
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+const CULTURA_ALIASES = {
+  soja: 'soja',
+  soy: 'soja',
+  milho: 'milho',
+  corn: 'milho',
+  algodao: 'algodao',
+  cotton: 'algodao',
+  feijao: 'feijao',
+  sorgo: 'sorgo',
+  cana: 'cana',
+  cafe: 'cafe'
+}
+
+const DOENCAS_CULTURAS = {
+  FERR_ASIATICA: ['soja'],
+  MOFO_BRANCO: ['soja'],
+  ANTRACNOSE: ['soja', 'algodao'],
+  CERCOSPORA_SOJA: ['soja'],
+  MANCHA_ALVO_SOJA: ['soja'],
+  MILDIO_SOJA: ['soja'],
+  OIDIO_SOJA: ['soja'],
+  FITOFTORA_SOJA: ['soja'],
+  RHIZOCTONIA_SOJA: ['soja'],
+  FERR_MILHO: ['milho'],
+  BIPOLARIS_MILHO: ['milho'],
+  CERCOSPORIOSE_MILHO: ['milho'],
+  MANCHA_BRANCA: ['milho'],
+  ENF_MILHO: ['milho'],
+  RAMULOSE: ['algodao'],
+  MANCHA_ALVO_ALGODAO: ['algodao'],
+  RAMULARIA_ALGODAO: ['algodao'],
+  MURCHA_VERT: ['algodao'],
+  FERR_CAFE: ['cafe'],
+  CERCOSPORIOSE: ['cafe'],
+  FERR_CANA: ['cana']
+}
+
 function detectFormType(praga, categoria) {
   if (praga) {
     const nome = (praga.nome_comum || '').toLowerCase()
@@ -167,6 +204,36 @@ function resumoDraft(d) {
   }
   if (d.form.severidade) return `Severidade ${d.form.severidade}`
   return d.categoria.label
+}
+
+function normalizeCultura(value) {
+  const key = String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+  return CULTURA_ALIASES[key] || key || null
+}
+
+function getCulturaTalhao(talhao) {
+  return normalizeCultura(talhao?.cultura || talhao?.cultura_atual || talhao?.cultura_nome)
+}
+
+function culturasDoenca(praga) {
+  const map = DOENCAS_CULTURAS[praga?.codigo]
+  if (map) return map
+  return String(praga?.cultura_alvo || '')
+    .split(',')
+    .map(normalizeCultura)
+    .filter(Boolean)
+}
+
+function itemDisponivelNoTalhao(praga, categoria, culturaTalhao) {
+  if (categoria?.tipoDB !== 'doenca' || praga?.tipo !== 'doenca') return true
+  if (!culturaTalhao) return true
+  const culturas = culturasDoenca(praga)
+  if (!culturas.length || culturas.includes('multi') || culturas.includes('todas')) return true
+  return culturas.includes(culturaTalhao)
 }
 
 // ─── Ícones SVG (mesmos do design v2) ────────────────────────────────────────
@@ -868,8 +935,10 @@ export function MonitoramentoOcorrenciaView({ fazenda, fazendaId, talhao, onBack
 
   // ── Tela: lista de pragas/doenças/daninhas ──────────────────────────────
   function renderListaPragas() {
+    const culturaTalhao = getCulturaTalhao(talhao)
     const lista = catalogo
       .filter(p => p.tipo === categoriaSel?.tipoDB)
+      .filter(p => itemDisponivelNoTalhao(p, categoriaSel, culturaTalhao))
       .filter(p => {
         if (!buscaPraga.trim()) return true
         const q = buscaPraga.toLowerCase()
@@ -899,23 +968,26 @@ export function MonitoramentoOcorrenciaView({ fazenda, fazendaId, talhao, onBack
           </div>
         ) : (
           <div className="m-pest-grid">
-            {lista.map(praga => (
-              <button
-                key={praga.id}
-                className="m-pest-card"
-                onClick={() => iniciarFormulario(categoriaSel, praga)}
-              >
-                <div
-                  className="bg"
-                  style={praga.foto_url ? { backgroundImage: `url(${praga.foto_url})` } : { background: categoriaSel?.accent || '#5a8a3a' }}
-                />
-                <div className="ov" />
-                <div className="body">
-                  <div className="name">{praga.nome_comum}</div>
-                  {praga.nome_cientifico && <div className="sci">{praga.nome_cientifico}</div>}
-                </div>
-              </button>
-            ))}
+            {lista.map(praga => {
+              const foto = getFotoPragaDoenca(praga, categoriaSel?.foto)
+              return (
+                <button
+                  key={praga.id}
+                  className="m-pest-card"
+                  onClick={() => iniciarFormulario(categoriaSel, praga)}
+                >
+                  <div
+                    className="bg"
+                    style={foto ? { backgroundImage: `url(${foto})` } : { background: categoriaSel?.accent || '#5a8a3a' }}
+                  />
+                  <div className="ov" />
+                  <div className="body">
+                    <div className="name">{praga.nome_comum}</div>
+                    {praga.nome_cientifico && <div className="sci">{praga.nome_cientifico}</div>}
+                  </div>
+                </button>
+              )
+            })}
             <button className="m-pest-card" onClick={() => iniciarFormulario(categoriaSel, null)}>
               <div className="bg" style={{ background: '#5a6657' }} />
               <div className="ov" />
@@ -936,7 +1008,7 @@ export function MonitoramentoOcorrenciaView({ fazenda, fazendaId, talhao, onBack
       return {
         name: pragaSel.nome_comum,
         sci: pragaSel.nome_cientifico,
-        bg: pragaSel.foto_url
+        bg: getFotoPragaDoenca(pragaSel, categoriaSel?.foto)
       }
     }
     return {

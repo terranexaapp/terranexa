@@ -6,6 +6,7 @@ import {
   atualizarPragaDoenca,
   desativarPragaDoenca,
   reativarPragaDoenca,
+  itemPertenceCultura,
   getTipoPragaInfo,
   TIPOS_PRAGA_DOENCA,
   CULTURAS_PRAGA
@@ -35,7 +36,8 @@ function emptyDraft() {
     sintomas: '',
     nivel_dano_economico: '',
     manejo_recomendado: '',
-    insumo_sugerido_id: ''
+    insumo_sugerido_id: '',
+    foto_url: ''
   }
 }
 
@@ -63,6 +65,7 @@ export function PragasDoencasSection({ fazendaId }) {
   const ndeId = useId()
   const manejoId = useId()
   const insumoId = useId()
+  const fotoId = useId()
 
   async function carregar() {
     setLoading(true)
@@ -93,7 +96,7 @@ export function PragasDoencasSection({ fazendaId }) {
     const q = busca.trim().toLowerCase()
     return itens.filter(i => {
       if (filterTipo !== 'todos' && i.tipo !== filterTipo) return false
-      if (filterCultura !== 'todas' && i.cultura_alvo !== filterCultura && i.cultura_alvo !== 'multi') return false
+      if (filterCultura !== 'todas' && !itemPertenceCultura(i, filterCultura)) return false
       if (!q) return true
       return (
         i.codigo.toLowerCase().includes(q) ||
@@ -122,7 +125,8 @@ export function PragasDoencasSection({ fazendaId }) {
       sintomas: item.sintomas || '',
       nivel_dano_economico: item.nivel_dano_economico || '',
       manejo_recomendado: item.manejo_recomendado || '',
-      insumo_sugerido_id: item.insumo_sugerido_id || ''
+      insumo_sugerido_id: item.insumo_sugerido_id || '',
+      foto_url: item.foto_url || ''
     })
     setFormError('')
   }
@@ -263,6 +267,16 @@ export function PragasDoencasSection({ fazendaId }) {
                   onClick={() => startEdit(item)}
                   style={{ ...cardStyle, borderColor: isSelected ? C.greenDp : C.border }}
                 >
+                  <div
+                    style={
+                      item.foto_url
+                        ? { ...photoThumbStyle, backgroundImage: `url(${item.foto_url})` }
+                        : photoThumbEmptyStyle
+                    }
+                    aria-hidden="true"
+                  >
+                    {!item.foto_url && <span>sem foto</span>}
+                  </div>
                   <div style={cardHeaderStyle}>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'baseline', minWidth: 0 }}>
                       <code style={codigoStyle}>{item.codigo}</code>
@@ -337,6 +351,34 @@ export function PragasDoencasSection({ fazendaId }) {
                   placeholder="Anticarsia gemmatalis"
                   style={{ ...inputStyle, fontStyle: 'italic' }}
                 />
+              </div>
+              <div style={photoFieldStyle}>
+                <div
+                  style={
+                    draft.foto_url
+                      ? { ...photoPreviewStyle, backgroundImage: `url(${draft.foto_url})` }
+                      : photoPreviewEmptyStyle
+                  }
+                  aria-hidden="true"
+                >
+                  {!draft.foto_url && <span>sem foto</span>}
+                </div>
+                <div>
+                  <label htmlFor={fotoId} style={formLabelStyle}>
+                    URL DA FOTO
+                  </label>
+                  <input
+                    id={fotoId}
+                    type="url"
+                    value={draft.foto_url}
+                    onChange={e => setDraft(d => ({ ...d, foto_url: e.target.value }))}
+                    placeholder="https://..."
+                    style={inputStyle}
+                  />
+                  <p style={fieldHintStyle}>
+                    Use uma URL publica. A tela de ocorrencia usa esta foto; se ficar vazio, mostra a imagem padrao da categoria.
+                  </p>
+                </div>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
                 <div>
@@ -493,6 +535,25 @@ const cardStyle = {
   textAlign: 'left',
   cursor: 'pointer'
 }
+const photoThumbStyle = {
+  width: '100%',
+  height: 96,
+  borderRadius: 8,
+  backgroundSize: 'cover',
+  backgroundPosition: 'center',
+  border: `1px solid ${C.border}`,
+  overflow: 'hidden'
+}
+const photoThumbEmptyStyle = {
+  ...photoThumbStyle,
+  display: 'grid',
+  placeItems: 'center',
+  color: C.textDim,
+  background: C.bgSoft,
+  fontSize: 10,
+  fontWeight: 800,
+  textTransform: 'uppercase'
+}
 const cardHeaderStyle = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }
 const cardMetaStyle = { display: 'flex', gap: 6, alignItems: 'center', color: C.textMid, fontSize: 11, flexWrap: 'wrap' }
 const codigoStyle = {
@@ -522,6 +583,31 @@ const editorStyle = {
   minHeight: 320,
   alignSelf: 'start'
 }
+const photoFieldStyle = {
+  display: 'grid',
+  gridTemplateColumns: '112px 1fr',
+  gap: 10,
+  alignItems: 'stretch'
+}
+const photoPreviewStyle = {
+  minHeight: 88,
+  borderRadius: 10,
+  border: `1px solid ${C.border}`,
+  backgroundSize: 'cover',
+  backgroundPosition: 'center',
+  overflow: 'hidden'
+}
+const photoPreviewEmptyStyle = {
+  ...photoPreviewStyle,
+  display: 'grid',
+  placeItems: 'center',
+  color: C.textDim,
+  background: C.bg,
+  fontSize: 10,
+  fontWeight: 800,
+  textTransform: 'uppercase'
+}
+const fieldHintStyle = { margin: '5px 0 0', color: C.textDim, fontSize: 11, lineHeight: 1.35 }
 const emptyEditorStyle = { textAlign: 'center', display: 'grid', placeContent: 'center', minHeight: 240, gap: 4 }
 const emptyStateStyle = {
   background: C.bg,

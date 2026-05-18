@@ -19,8 +19,21 @@ export const CULTURAS_PRAGA = [
   { id: 'multi', label: 'Multi-cultura' }
 ]
 
+export const FOTOS_PRAGA_TIPO = {
+  praga: 'https://images.unsplash.com/photo-1593069567131-53a0614dde1d?w=600&q=70',
+  doenca: 'https://images.unsplash.com/photo-1530836369250-ef72a3f5cda8?w=600&q=70',
+  daninha: 'https://images.unsplash.com/photo-1466692476868-aef1dfb1e735?w=600&q=70',
+  deficiencia: 'https://images.unsplash.com/photo-1416664806563-bb6be3be8a0c?w=600&q=70',
+  outro: 'https://images.unsplash.com/photo-1500076656116-558758c991c1?w=600&q=70'
+}
+
 export function getTipoPragaInfo(tipo) {
   return TIPOS_PRAGA_DOENCA.find(t => t.id === tipo) || TIPOS_PRAGA_DOENCA[TIPOS_PRAGA_DOENCA.length - 1]
+}
+
+export function getFotoPragaDoenca(item, fallbackUrl = null) {
+  const foto = item?.foto_url?.trim?.() || item?.foto_url || ''
+  return foto || fallbackUrl || FOTOS_PRAGA_TIPO[item?.tipo] || FOTOS_PRAGA_TIPO.outro
 }
 
 export async function listarPragasDoencas(fazendaId, { incluirInativas = false, cultura, tipo } = {}) {
@@ -31,11 +44,23 @@ export async function listarPragasDoencas(fazendaId, { incluirInativas = false, 
     .order('tipo', { ascending: true })
     .order('nome_comum', { ascending: true })
   if (!incluirInativas) q = q.eq('ativo', true)
-  if (cultura && cultura !== 'todas') q = q.in('cultura_alvo', [cultura, 'multi'])
   if (tipo && tipo !== 'todos') q = q.eq('tipo', tipo)
   const { data, error } = await q
   if (error) throw error
-  return data || []
+  const items = data || []
+  if (cultura && cultura !== 'todas') return items.filter(item => itemPertenceCultura(item, cultura))
+  return items
+}
+
+export function itemPertenceCultura(item, cultura) {
+  const culturaKey = normalizeCulturaAlvo(cultura)
+  if (!culturaKey || culturaKey === 'todas') return true
+  const culturas = String(item?.cultura_alvo || '')
+    .split(',')
+    .map(normalizeCulturaAlvo)
+    .filter(Boolean)
+  if (!culturas.length) return true
+  return culturas.includes(culturaKey) || culturas.includes('multi') || culturas.includes('todas')
 }
 
 export async function criarPragaDoenca(payload) {
@@ -81,7 +106,8 @@ function normalize({
   sintomas,
   nivel_dano_economico,
   manejo_recomendado,
-  insumo_sugerido_id
+  insumo_sugerido_id,
+  foto_url
 }) {
   return {
     ...(fazenda_id !== undefined && { fazenda_id }),
@@ -93,7 +119,8 @@ function normalize({
     sintomas: sintomas?.trim() || null,
     nivel_dano_economico: nivel_dano_economico?.trim() || null,
     manejo_recomendado: manejo_recomendado?.trim() || null,
-    insumo_sugerido_id: insumo_sugerido_id || null
+    insumo_sugerido_id: insumo_sugerido_id || null,
+    foto_url: foto_url?.trim() || null
   }
 }
 
@@ -103,4 +130,12 @@ function normalizeCodigo(codigo) {
     .toUpperCase()
     .replace(/[^A-Z0-9_]/g, '_')
     .slice(0, 24)
+}
+
+function normalizeCulturaAlvo(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
 }
