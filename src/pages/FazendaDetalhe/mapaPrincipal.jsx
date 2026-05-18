@@ -101,18 +101,35 @@ const Ico = {
 
 const GPS_STATUS_TEXT = {
   requesting: 'Solicitando GPS...',
-  denied: 'GPS bloqueado. Libere nas permissoes do navegador',
+  denied: 'GPS bloqueado',
   unavailable: 'GPS indisponivel no dispositivo',
   timeout: 'GPS demorou demais. Tente novamente',
   unsupported: 'Geolocalizacao indisponivel',
   error: 'Falha ao ler GPS'
 }
 
-function GpsBanner({ status, error, accuracy, onRetry, onDismiss }) {
+function gpsHelpText(status, blockedReason) {
+  if (status === 'denied') {
+    if (blockedReason === 'blocked') {
+      return 'Toque no cadeado/ajustes do site e mude Localizacao para Permitir. Verifique tambem se a Localizacao do celular esta ligada.'
+    }
+    if (blockedReason === 'prompt-dismissed') {
+      return 'O aviso de permissao foi fechado. Toque em Tentar e responda Permitir.'
+    }
+    return 'Permita a Localizacao no navegador (cadeado/ajustes do site) e confira se a Localizacao do celular esta ligada.'
+  }
+  if (status === 'unavailable') return 'Verifique se a Localizacao do celular esta ligada e tente em area aberta.'
+  if (status === 'timeout') return 'Sinal fraco — saia de areas cobertas e tente novamente.'
+  if (status === 'unsupported') return 'Este navegador nao oferece GPS ou o site nao esta em HTTPS.'
+  return null
+}
+
+function GpsBanner({ status, blockedReason, accuracy, onRetry, onDismiss }) {
   if (status === 'idle' || status === 'active') return null
   const isError = status !== 'requesting'
   const bg = isError ? '#fff5e5' : 'rgba(255,255,255,0.96)'
   const fg = isError ? '#8a4a00' : C.textDk
+  const helpText = gpsHelpText(status, blockedReason)
   return (
     <div
       role={isError ? 'alert' : 'status'}
@@ -139,8 +156,10 @@ function GpsBanner({ status, error, accuracy, onRetry, onDismiss }) {
       <span style={{ flex: 1, lineHeight: 1.3 }}>
         {GPS_STATUS_TEXT[status] || 'GPS'}
         {accuracy ? <span style={{ color: C.textMid, fontWeight: 600 }}> · ±{Math.round(accuracy)}m</span> : null}
-        {error && status !== 'requesting' ? (
-          <span style={{ display: 'block', fontWeight: 500, marginTop: 2, fontSize: 11 }}>{error}</span>
+        {helpText ? (
+          <span style={{ display: 'block', fontWeight: 500, marginTop: 4, fontSize: 11, lineHeight: 1.35 }}>
+            {helpText}
+          </span>
         ) : null}
       </span>
       {isError && (
@@ -528,7 +547,7 @@ export function FazendaMapaPrincipal({
         setMenuOpen={setMenuOpen}
         gpsStatus={gps.status}
         gpsPosition={gps.position}
-        gpsError={gps.error}
+        gpsBlockedReason={gps.blockedReason}
         gpsActive={gpsActive}
         centerNonce={centerNonce}
         onGpsClick={handleGpsClick}
@@ -601,7 +620,7 @@ export function FazendaMapaPrincipal({
       {showGpsBanner && (
         <GpsBanner
           status={gps.status}
-          error={gps.error}
+          blockedReason={gps.blockedReason}
           accuracy={gps.position?.accuracy}
           onRetry={handleGpsClick}
           onDismiss={() => setGpsBannerDismissed(true)}
@@ -797,7 +816,7 @@ function MapaMobile({
   setMenuOpen,
   gpsStatus,
   gpsPosition,
-  gpsError,
+  gpsBlockedReason,
   gpsActive,
   centerNonce,
   onGpsClick,
@@ -888,7 +907,7 @@ function MapaMobile({
       {showGpsBanner && (
         <GpsBanner
           status={gpsStatus}
-          error={gpsError}
+          blockedReason={gpsBlockedReason}
           accuracy={gpsPosition?.accuracy}
           onRetry={onGpsClick}
           onDismiss={onDismissGpsBanner}
