@@ -108,9 +108,19 @@ const GPS_STATUS_TEXT = {
   error: 'Falha ao ler GPS'
 }
 
+function isIosSafariLike() {
+  if (typeof navigator === 'undefined') return false
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+}
+
 function gpsHelpText(status, blockedReason) {
+  const ios = isIosSafariLike()
   if (status === 'denied') {
     if (blockedReason === 'blocked') {
+      if (ios) {
+        return 'No iPhone: toque no menu do endereco do Safari, abra Ajustes do Site e libere Localizacao. Se continuar, confira Ajustes > Privacidade > Servicos de Localizacao > Safari.'
+      }
       return 'Toque no cadeado/ajustes do site e mude Localizacao para Permitir. Verifique tambem se a Localizacao do celular esta ligada.'
     }
     if (blockedReason === 'prompt-dismissed') {
@@ -147,13 +157,14 @@ function GpsBanner({ status, blockedReason, accuracy, onRetry, onDismiss }) {
         fontWeight: 700,
         boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
         zIndex: 7,
-        display: 'flex',
-        alignItems: 'center',
+        display: 'grid',
+        gridTemplateColumns: '1fr',
         gap: 10,
-        maxWidth: 'min(92vw, 420px)'
+        width: 'min(92vw, 460px)',
+        maxWidth: 'min(92vw, 460px)'
       }}
     >
-      <span style={{ flex: 1, lineHeight: 1.3 }}>
+      <span style={{ lineHeight: 1.3 }}>
         {GPS_STATUS_TEXT[status] || 'GPS'}
         {accuracy ? <span style={{ color: C.textMid, fontWeight: 600 }}> · ±{Math.round(accuracy)}m</span> : null}
         {helpText ? (
@@ -163,38 +174,38 @@ function GpsBanner({ status, blockedReason, accuracy, onRetry, onDismiss }) {
         ) : null}
       </span>
       {isError && (
-        <button
-          onClick={onRetry}
-          style={{
-            background: C.greenDp,
-            color: '#f0f5e8',
-            border: 'none',
-            borderRadius: 8,
-            padding: '6px 10px',
-            fontSize: 11,
-            fontWeight: 800,
-            cursor: 'pointer'
-          }}
-        >
-          Tentar
-        </button>
-      )}
-      {isError && (
-        <button
-          onClick={onDismiss}
-          aria-label="Fechar aviso"
-          style={{
-            background: 'transparent',
-            color: fg,
-            border: 'none',
-            cursor: 'pointer',
-            padding: 2,
-            display: 'grid',
-            placeItems: 'center'
-          }}
-        >
-          <Ico.X />
-        </button>
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', alignItems: 'center' }}>
+          <button
+            onClick={onRetry}
+            style={{
+              background: C.greenDp,
+              color: '#f0f5e8',
+              border: 'none',
+              borderRadius: 8,
+              padding: '8px 12px',
+              fontSize: 11,
+              fontWeight: 800,
+              cursor: 'pointer'
+            }}
+          >
+            Tentar novamente
+          </button>
+          <button
+            onClick={onDismiss}
+            aria-label="Fechar aviso"
+            style={{
+              background: 'transparent',
+              color: fg,
+              border: 'none',
+              cursor: 'pointer',
+              padding: 6,
+              display: 'grid',
+              placeItems: 'center'
+            }}
+          >
+            <Ico.X />
+          </button>
+        </div>
       )}
     </div>
   )
@@ -480,6 +491,8 @@ export function FazendaMapaPrincipal({
     // a posição já está conhecida.
     centerNonceRef.current += 1
     setCenterNonce(centerNonceRef.current)
+    if (gps.status === 'active') return
+    gps.clear()
     gps.request()
   }
 
