@@ -21,6 +21,21 @@ export const FAZENDA_PERMISSAO_LABELS = {
   os_fechar: 'Fechar OS'
 }
 
+export const FAZENDA_PERMISSAO_GROUPS = [
+  {
+    title: 'Telas principais',
+    keys: ['mapa', 'dashboard', 'chuvas', 'solo', 'monitoramento', 'monitoramento_registro']
+  },
+  {
+    title: 'Gerencial',
+    keys: ['gerencial', 'talhoes', 'pluviometros', 'safras', 'estoque', 'equipe', 'insumos', 'maquinas', 'produtividade', 'membros']
+  },
+  {
+    title: 'Operacao e OS',
+    keys: ['operacoes_resumo', 'os_apontamento', 'os_fechar', 'relatorios']
+  }
+]
+
 export const FAZENDA_PAPEIS = [
   {
     papel: 'gerente',

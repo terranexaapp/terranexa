@@ -36,6 +36,24 @@ function acessoFromMeta(papelMeta, vinculo = null) {
   }
 }
 
+async function buscarPapelMetaBanco(papel) {
+  const { data, error } = await supabase
+    .from('fazenda_papeis')
+    .select('papel, label, nivel_hierarquia, descricao, permissoes, ativo')
+    .eq('papel', papel)
+    .eq('ativo', true)
+    .maybeSingle()
+
+  if (error || !data) return getFazendaPapelMeta(papel)
+  return {
+    papel: data.papel,
+    label: data.label,
+    nivel_hierarquia: data.nivel_hierarquia,
+    resumo: data.descricao,
+    permissoes: data.permissoes || {}
+  }
+}
+
 export async function buscarMeuAcessoFazenda(fazendaId, fazenda) {
   const {
     data: { user }
@@ -57,8 +75,8 @@ export async function buscarMeuAcessoFazenda(fazendaId, fazenda) {
     .maybeSingle()
 
   if (error) throw error
-  if (!data) return acessoFromMeta(getFazendaPapelMeta('operador'))
-  return acessoFromMeta(getFazendaPapelMeta(data.papel), data)
+  if (!data) return acessoFromMeta(await buscarPapelMetaBanco('operador'))
+  return acessoFromMeta(await buscarPapelMetaBanco(data.papel), data)
 }
 
 export function temPermissao(acesso, permissao) {

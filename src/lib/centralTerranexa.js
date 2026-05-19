@@ -231,6 +231,70 @@ export async function atualizarPapelUsuarioFazenda(vinculoId, papel) {
   return data
 }
 
+export async function atualizarPermissoesPapelFazenda(papel, permissoes) {
+  const { data, error } = await supabase
+    .from('fazenda_papeis')
+    .update({
+      permissoes: permissoes || {},
+      updated_at: new Date().toISOString()
+    })
+    .eq('papel', papel)
+    .select('papel, label, nivel_hierarquia, descricao, permissoes, ativo')
+    .single()
+  if (error) throw error
+  return {
+    papel: data.papel,
+    label: data.label,
+    nivel_hierarquia: data.nivel_hierarquia,
+    resumo: data.descricao,
+    permissoes: data.permissoes || {}
+  }
+}
+
+export async function listarCatalogoPragasCulturas() {
+  const [culturasResult, pragasResult, vinculosResult] = await Promise.all([
+    supabase
+      .from('catalogo_culturas')
+      .select('id, nome, ordem, ativo')
+      .eq('ativo', true)
+      .order('ordem', { ascending: true }),
+    supabase
+      .from('catalogo_pragas')
+      .select('id, codigo, nome_comum, nome_cientifico, tipo, ativo, foto_url, nivel_dano_economico')
+      .order('tipo', { ascending: true })
+      .order('nome_comum', { ascending: true }),
+    supabase
+      .from('catalogo_praga_culturas')
+      .select('catalogo_praga_id, cultura_id')
+  ])
+
+  if (culturasResult.error) throw culturasResult.error
+  if (pragasResult.error) throw pragasResult.error
+  if (vinculosResult.error) throw vinculosResult.error
+
+  const culturasPorPraga = (vinculosResult.data || []).reduce((acc, vinculo) => {
+    acc[vinculo.catalogo_praga_id] = [...(acc[vinculo.catalogo_praga_id] || []), vinculo.cultura_id]
+    return acc
+  }, {})
+
+  return {
+    culturas: culturasResult.data || [],
+    pragas: (pragasResult.data || []).map(praga => ({
+      ...praga,
+      culturaIds: culturasPorPraga[praga.id] || []
+    }))
+  }
+}
+
+export async function salvarCulturasPraga({ catalogoPragaId, culturaIds }) {
+  const { data, error } = await supabase.rpc('definir_culturas_catalogo_praga', {
+    p_catalogo_praga_id: catalogoPragaId,
+    p_culturas: culturaIds || []
+  })
+  if (error) throw error
+  return data
+}
+
 export async function listarSolicitacoesLiberacao({ status = 'fila' } = {}) {
   let query = supabase.from('solicitacoes_liberacao').select('*').order('created_at', { ascending: true })
 

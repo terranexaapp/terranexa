@@ -4,18 +4,28 @@ import { useAuth } from '../hooks/useAuth'
 import {
   aprovarSolicitacao,
   atualizarPapelUsuarioFazenda,
+  atualizarPermissoesPapelFazenda,
   atualizarContratoConta,
   buscarDossieSolicitacao,
   iniciarAnalise,
+  listarCatalogoPragasCulturas,
   listarHierarquiaUsuariosFazendas,
   listarResumoContas,
   listarSolicitacoesLiberacao,
   listarUsuariosCadastrados,
   pedirDocumentos,
   rejeitarSolicitacao,
+  salvarCulturasPraga,
   vincularUsuarioFazenda
 } from '../lib/centralTerranexa'
-import { FAZENDA_PAPEIS, PROPRIETARIO_PAPEL, getFazendaPapelMeta, resumirPermissoes } from '../lib/fazendaPapeis'
+import {
+  FAZENDA_PAPEIS,
+  FAZENDA_PERMISSAO_GROUPS,
+  FAZENDA_PERMISSAO_LABELS,
+  PROPRIETARIO_PAPEL,
+  getFazendaPapelMeta,
+  resumirPermissoes
+} from '../lib/fazendaPapeis'
 import { theme } from '../styles/theme'
 import { Logo } from '../components/Logo'
 import { ErrorPanel } from '../components/ErrorPanel'
@@ -36,6 +46,7 @@ const STATUS_LABEL = {
 
 const RISCO_LABEL = { baixo: 'Baixo', medio: 'Medio', alto: 'Alto' }
 const HIERARQUIA_INICIAL = { proprietarios: [], fazendas: [], papeis: FAZENDA_PAPEIS, avisos: [] }
+const AGRO_CATALOGO_INICIAL = { culturas: [], pragas: [], avisos: [] }
 const FILTERS = [
   ['fila', 'Fila'],
   ['pendente_validacao', 'Pendentes'],
@@ -76,6 +87,13 @@ function emptyContractDraft(conta) {
   }
 }
 
+function buildPermissionsDraft(papeis) {
+  return (papeis || []).reduce((acc, papel) => {
+    acc[papel.papel] = { ...(papel.permissoes || {}) }
+    return acc
+  }, {})
+}
+
 export function CentralTerranexaPage() {
   const navigate = useNavigate()
   const { profile, signOut } = useAuth()
@@ -90,6 +108,17 @@ export function CentralTerranexaPage() {
   const [linkSaving, setLinkSaving] = useState(false)
   const [linkMessage, setLinkMessage] = useState('')
   const [linkError, setLinkError] = useState('')
+  const [permissionsDraft, setPermissionsDraft] = useState(buildPermissionsDraft(FAZENDA_PAPEIS))
+  const [permissionSaving, setPermissionSaving] = useState('')
+  const [permissionMessage, setPermissionMessage] = useState('')
+  const [permissionError, setPermissionError] = useState('')
+  const [agroCatalogo, setAgroCatalogo] = useState(AGRO_CATALOGO_INICIAL)
+  const [agroSearch, setAgroSearch] = useState('')
+  const [agroType, setAgroType] = useState('todos')
+  const [agroCulture, setAgroCulture] = useState('todas')
+  const [agroSavingId, setAgroSavingId] = useState('')
+  const [agroMessage, setAgroMessage] = useState('')
+  const [agroError, setAgroError] = useState('')
   const [selectedId, setSelectedId] = useState(null)
   const [dossie, setDossie] = useState({ evidencias: [], revisoes: [], eventos: [] })
   const [loading, setLoading] = useState(true)
@@ -177,20 +206,40 @@ export function CentralTerranexaPage() {
 
   const papeisDisponiveis = hierarquia.papeis?.length ? hierarquia.papeis : FAZENDA_PAPEIS
 
+  const agroPragasFiltradas = useMemo(() => {
+    const term = agroSearch.trim().toLowerCase()
+    return (agroCatalogo.pragas || []).filter(praga => {
+      const matchesType = agroType === 'todos' || praga.tipo === agroType
+      const matchesCulture = agroCulture === 'todas' || praga.culturaIds?.includes(agroCulture)
+      const matchesSearch =
+        !term ||
+        [praga.nome_comum, praga.nome_cientifico, praga.codigo, praga.tipo]
+          .filter(Boolean)
+          .some(value => String(value).toLowerCase().includes(term))
+      return matchesType && matchesCulture && matchesSearch
+    })
+  }, [agroCatalogo.pragas, agroCulture, agroSearch, agroType])
+
   async function carregar({ keepSelection = true } = {}) {
     try {
       setLoading(true)
       setError(null)
-      const [solicitacoesData, contasData, usuariosData, hierarquiaData] = await Promise.all([
+      const [solicitacoesData, contasData, usuariosData, hierarquiaData, agroData] = await Promise.all([
         listarSolicitacoesLiberacao({ status: filter }),
         listarResumoContas(),
         listarUsuariosCadastrados(),
-        listarHierarquiaUsuariosFazendas()
+        listarHierarquiaUsuariosFazendas(),
+        listarCatalogoPragasCulturas().catch(err => ({
+          ...AGRO_CATALOGO_INICIAL,
+          avisos: [err.message || 'Nao foi possivel carregar o catalogo agronomico.']
+        }))
       ])
       setSolicitacoes(solicitacoesData)
       setContas(contasData)
       setUsuarios(usuariosData)
       setHierarquia(hierarquiaData)
+      setPermissionsDraft(buildPermissionsDraft(hierarquiaData.papeis))
+      setAgroCatalogo(agroData)
       setLinkDraft(draft => ({
         ...draft,
         fazendaId: hierarquiaData.fazendas.some(fazenda => fazenda.id === draft.fazendaId)
@@ -321,6 +370,75 @@ export function CentralTerranexaPage() {
       await carregar()
     } catch (err) {
       setLinkError(err.message || 'Nao foi possivel alterar o papel.')
+    }
+  }
+
+  function handleTogglePermissao(papel, permissao) {
+    setPermissionsDraft(draft => ({
+      ...draft,
+      [papel]: {
+        ...(draft[papel] || {}),
+        [permissao]: !Boolean(draft[papel]?.[permissao])
+      }
+    }))
+  }
+
+  function handleSetPermissoesGrupo(papel, keys, value) {
+    setPermissionsDraft(draft => ({
+      ...draft,
+      [papel]: {
+        ...(draft[papel] || {}),
+        ...keys.reduce((acc, key) => {
+          acc[key] = value
+          return acc
+        }, {})
+      }
+    }))
+  }
+
+  async function handleSalvarPermissoes(papel) {
+    setPermissionSaving(papel.papel)
+    setPermissionError('')
+    setPermissionMessage('')
+    try {
+      await atualizarPermissoesPapelFazenda(papel.papel, permissionsDraft[papel.papel] || {})
+      setPermissionMessage(`Permissoes de ${papel.label} salvas.`)
+      await carregar()
+    } catch (err) {
+      setPermissionError(err.message || 'Nao foi possivel salvar as permissoes.')
+    } finally {
+      setPermissionSaving('')
+    }
+  }
+
+  function handleToggleCulturaPraga(pragaId, culturaId) {
+    setAgroCatalogo(catalogo => ({
+      ...catalogo,
+      pragas: catalogo.pragas.map(praga => {
+        if (praga.id !== pragaId) return praga
+        const current = new Set(praga.culturaIds || [])
+        if (current.has(culturaId)) current.delete(culturaId)
+        else current.add(culturaId)
+        return { ...praga, culturaIds: [...current] }
+      })
+    }))
+  }
+
+  async function handleSalvarCulturasPraga(praga) {
+    setAgroSavingId(praga.id)
+    setAgroError('')
+    setAgroMessage('')
+    try {
+      const totalFazendas = await salvarCulturasPraga({
+        catalogoPragaId: praga.id,
+        culturaIds: praga.culturaIds || []
+      })
+      setAgroMessage(`${praga.nome_comum} atualizado. ${Number(totalFazendas || 0)} fazendas sincronizadas.`)
+      setAgroCatalogo(await listarCatalogoPragasCulturas())
+    } catch (err) {
+      setAgroError(err.message || 'Nao foi possivel salvar as culturas desta praga/doenca.')
+    } finally {
+      setAgroSavingId('')
     }
   }
 
@@ -558,6 +676,33 @@ export function CentralTerranexaPage() {
             </table>
           </div>
         </section>
+
+        <PermissionsMatrixSection
+          papeis={papeisDisponiveis}
+          draft={permissionsDraft}
+          saving={permissionSaving}
+          message={permissionMessage}
+          error={permissionError}
+          onToggle={handleTogglePermissao}
+          onSetGroup={handleSetPermissoesGrupo}
+          onSave={handleSalvarPermissoes}
+        />
+
+        <AgroCatalogSection
+          catalogo={agroCatalogo}
+          pragas={agroPragasFiltradas}
+          search={agroSearch}
+          type={agroType}
+          culture={agroCulture}
+          savingId={agroSavingId}
+          message={agroMessage}
+          error={agroError}
+          onSearch={setAgroSearch}
+          onType={setAgroType}
+          onCulture={setAgroCulture}
+          onToggleCulture={handleToggleCulturaPraga}
+          onSave={handleSalvarCulturasPraga}
+        />
 
         <section style={s.hierarchySection}>
           <div style={s.accountsHeader}>
@@ -870,6 +1015,182 @@ function Td({ children }) {
   return <td style={s.td}>{children}</td>
 }
 
+function PermissionsMatrixSection({ papeis, draft, saving, message, error, onToggle, onSetGroup, onSave }) {
+  return (
+    <section style={s.permissionsSection}>
+      <div style={s.accountsHeader}>
+        <div>
+          <p style={s.eyebrow}>PERMISSOES</p>
+          <h2 style={s.usersTitle}>Telas liberadas por tipo de usuario</h2>
+        </div>
+        <span style={s.smallMeta}>{papeis.length} hierarquias</span>
+      </div>
+
+      {(error || message) && <div style={error ? s.errorBox : s.successBox}>{error || message}</div>}
+
+      <div className="tn-central-permissions-grid" style={s.permissionsGrid}>
+        {papeis.map(papel => (
+          <article key={papel.papel} style={s.permissionCard}>
+            <div style={s.permissionCardHeader}>
+              <div>
+                <strong style={s.permissionRoleTitle}>{papel.label}</strong>
+                <p style={s.permissionRoleMeta}>Nivel {papel.nivel_hierarquia} / {papel.resumo}</p>
+              </div>
+              <span style={{ ...s.roleBadge, ...farmRoleTone(papel.papel) }}>{papel.papel}</span>
+            </div>
+
+            {FAZENDA_PERMISSAO_GROUPS.map(group => (
+              <div key={`${papel.papel}-${group.title}`} style={s.permissionGroup}>
+                <div style={s.permissionGroupHeader}>
+                  <span>{group.title}</span>
+                  <div style={s.permissionMiniActions}>
+                    <button type="button" onClick={() => onSetGroup(papel.papel, group.keys, true)} style={s.miniBtn}>
+                      Tudo
+                    </button>
+                    <button type="button" onClick={() => onSetGroup(papel.papel, group.keys, false)} style={s.miniBtn}>
+                      Nada
+                    </button>
+                  </div>
+                </div>
+                <div className="tn-central-permission-checks" style={s.permissionChecks}>
+                  {group.keys.map(key => (
+                    <label key={key} style={s.permissionCheck}>
+                      <input
+                        type="checkbox"
+                        checked={Boolean(draft[papel.papel]?.[key])}
+                        onChange={() => onToggle(papel.papel, key)}
+                      />
+                      <span>{FAZENDA_PERMISSAO_LABELS[key] || key}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            ))}
+
+            <button
+              type="button"
+              disabled={saving === papel.papel}
+              onClick={() => onSave(papel)}
+              style={s.secondaryBtn}
+            >
+              {saving === papel.papel ? 'Salvando...' : 'Salvar permissoes'}
+            </button>
+          </article>
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function AgroCatalogSection({
+  catalogo,
+  pragas,
+  search,
+  type,
+  culture,
+  savingId,
+  message,
+  error,
+  onSearch,
+  onType,
+  onCulture,
+  onToggleCulture,
+  onSave
+}) {
+  const tipos = ['todos', ...new Set((catalogo.pragas || []).map(praga => praga.tipo).filter(Boolean))]
+  return (
+    <section style={s.agroSection}>
+      <div style={s.accountsHeader}>
+        <div>
+          <p style={s.eyebrow}>CATALOGO AGRONOMICO</p>
+          <h2 style={s.usersTitle}>Pragas e doencas por cultura</h2>
+        </div>
+        <span style={s.smallMeta}>
+          {pragas.length} de {catalogo.pragas.length} itens
+        </span>
+      </div>
+
+      {catalogo.avisos?.length > 0 && (
+        <div style={s.warningBox}>
+          {catalogo.avisos.map(aviso => (
+            <p key={aviso} style={{ margin: 0 }}>
+              {aviso}
+            </p>
+          ))}
+        </div>
+      )}
+
+      {(error || message) && <div style={error ? s.errorBox : s.successBox}>{error || message}</div>}
+
+      <div className="tn-central-agro-tools" style={s.agroTools}>
+        <input
+          value={search}
+          onChange={e => onSearch(e.target.value)}
+          placeholder="Buscar por nome, codigo ou nome cientifico"
+          style={s.searchInput}
+        />
+        <select value={type} onChange={e => onType(e.target.value)} style={s.input}>
+          {tipos.map(tipo => (
+            <option key={tipo} value={tipo}>
+              {tipo === 'todos' ? 'Todos os tipos' : agroTypeLabel(tipo)}
+            </option>
+          ))}
+        </select>
+        <select value={culture} onChange={e => onCulture(e.target.value)} style={s.input}>
+          <option value="todas">Todas culturas</option>
+          {catalogo.culturas.map(cultura => (
+            <option key={cultura.id} value={cultura.id}>
+              {cultura.nome}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div style={s.agroList}>
+        {pragas.map(praga => (
+          <article key={praga.id} style={s.agroRow}>
+            <div style={s.agroRowHeader}>
+              <div>
+                <strong style={s.agroTitle}>{praga.nome_comum}</strong>
+                <p style={s.agroMeta}>
+                  {praga.nome_cientifico || 'Sem nome cientifico'} / {praga.codigo}
+                </p>
+              </div>
+              <span style={{ ...s.badge, ...agroTypeTone(praga.tipo) }}>{agroTypeLabel(praga.tipo)}</span>
+            </div>
+            <div className="tn-central-culture-checks" style={s.cultureChecks}>
+              {catalogo.culturas.map(cultura => (
+                <label key={`${praga.id}-${cultura.id}`} style={s.cultureCheck}>
+                  <input
+                    type="checkbox"
+                    checked={Boolean(praga.culturaIds?.includes(cultura.id))}
+                    onChange={() => onToggleCulture(praga.id, cultura.id)}
+                  />
+                  <span>{cultura.nome}</span>
+                </label>
+              ))}
+            </div>
+            <div style={s.agroFooter}>
+              <span style={s.smallMeta}>
+                {praga.culturaIds?.length || 0} culturas direcionadas
+              </span>
+              <button
+                type="button"
+                disabled={savingId === praga.id}
+                onClick={() => onSave(praga)}
+                style={s.secondaryBtn}
+              >
+                {savingId === praga.id ? 'Salvando...' : 'Salvar culturas'}
+              </button>
+            </div>
+          </article>
+        ))}
+        {pragas.length === 0 && <p style={s.emptyText}>Nenhum item encontrado neste filtro.</p>}
+      </div>
+    </section>
+  )
+}
+
 function OwnerHierarchyCard({ grupo, papeis, onAlterarPapel }) {
   const owner = grupo.proprietario || {}
   return (
@@ -1030,6 +1351,25 @@ function farmRoleTone(papel) {
   if (papel === 'tecnico') return { color: C.amberDk, background: C.amberLight }
   if (papel === 'coordenador_equipe') return { color: C.textDk, background: C.bgLight }
   return { color: C.textMid, background: C.bgSoft }
+}
+
+function agroTypeLabel(tipo) {
+  const labels = {
+    praga: 'Praga',
+    doenca: 'Doenca',
+    daninha: 'Daninha',
+    deficiencia: 'Deficiencia',
+    outro: 'Outro'
+  }
+  return labels[tipo] || tipo || 'Outro'
+}
+
+function agroTypeTone(tipo) {
+  if (tipo === 'praga') return { color: C.redDk, background: C.redLight }
+  if (tipo === 'doenca') return { color: C.amberDk, background: C.amberLight }
+  if (tipo === 'daninha') return { color: C.greenDp, background: C.greenLight }
+  if (tipo === 'deficiencia') return { color: C.blue, background: C.blueLight }
+  return { color: C.textMid, background: C.bgLight }
 }
 
 const s = {
@@ -1221,6 +1561,8 @@ const s = {
   timelineRow: { display: 'grid', gap: 3, borderTop: `1px solid ${C.borderSoft}`, padding: '8px 0', fontSize: 12 },
   emptyText: { margin: 0, color: C.textDim, fontSize: 12, padding: 12 },
   accountsSection: { marginTop: 16, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: 12 },
+  permissionsSection: { marginTop: 16, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: 12 },
+  agroSection: { marginTop: 16, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: 12 },
   hierarchySection: { marginTop: 16, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: 12 },
   usersSection: { marginTop: 16, background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: 12 },
   accountsHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
@@ -1263,6 +1605,104 @@ const s = {
     color: C.textDk,
     fontFamily: 'inherit',
     boxSizing: 'border-box'
+  },
+  permissionsGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 10 },
+  permissionCard: {
+    display: 'grid',
+    gap: 10,
+    alignContent: 'start',
+    border: `1px solid ${C.borderSoft}`,
+    borderRadius: 8,
+    padding: 12,
+    background: '#FBFCF8',
+    minWidth: 0
+  },
+  permissionCardHeader: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 10,
+    paddingBottom: 9,
+    borderBottom: `1px solid ${C.borderSoft}`
+  },
+  permissionRoleTitle: { display: 'block', color: C.textDk, fontSize: 14, lineHeight: 1.2 },
+  permissionRoleMeta: { margin: '3px 0 0', color: C.textMid, fontSize: 11, lineHeight: 1.35 },
+  permissionGroup: { display: 'grid', gap: 7 },
+  permissionGroupHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    color: C.textDk,
+    fontSize: 11,
+    fontWeight: 900
+  },
+  permissionMiniActions: { display: 'flex', gap: 5, flexShrink: 0 },
+  miniBtn: {
+    border: `1px solid ${C.border}`,
+    borderRadius: 7,
+    padding: '4px 7px',
+    background: C.bg,
+    color: C.textMid,
+    fontSize: 10,
+    fontWeight: 900,
+    cursor: 'pointer'
+  },
+  permissionChecks: { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 6 },
+  permissionCheck: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+    minHeight: 30,
+    border: `1px solid ${C.borderSoft}`,
+    borderRadius: 8,
+    padding: '6px 7px',
+    background: C.bg,
+    color: C.textMid,
+    fontSize: 11,
+    fontWeight: 800,
+    lineHeight: 1.25
+  },
+  agroTools: { display: 'grid', gridTemplateColumns: 'minmax(220px, 1.5fr) minmax(160px, 0.7fr) minmax(160px, 0.8fr)', gap: 8, marginBottom: 10 },
+  agroList: { display: 'grid', gap: 9 },
+  agroRow: {
+    border: `1px solid ${C.borderSoft}`,
+    borderRadius: 8,
+    padding: 12,
+    background: '#FBFCF8',
+    minWidth: 0
+  },
+  agroRowHeader: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 10,
+    marginBottom: 9
+  },
+  agroTitle: { display: 'block', color: C.textDk, fontSize: 14, lineHeight: 1.2 },
+  agroMeta: { margin: '3px 0 0', color: C.textMid, fontSize: 11, lineHeight: 1.35 },
+  cultureChecks: { display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 6 },
+  cultureCheck: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+    minHeight: 30,
+    border: `1px solid ${C.borderSoft}`,
+    borderRadius: 8,
+    padding: '6px 7px',
+    background: C.bg,
+    color: C.textMid,
+    fontSize: 11,
+    fontWeight: 800
+  },
+  agroFooter: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    marginTop: 10,
+    paddingTop: 9,
+    borderTop: `1px solid ${C.borderSoft}`
   },
   smallMeta: { color: C.textDim, fontSize: 12 },
   tableWrap: { overflowX: 'auto' },
@@ -1348,13 +1788,17 @@ if (typeof document !== 'undefined' && !document.getElementById('tn-central-styl
   el.textContent = `
     @media (max-width: 980px) {
       .tn-central-workspace,
-      .tn-central-link-form { grid-template-columns: 1fr !important; }
+      .tn-central-link-form,
+      .tn-central-permissions-grid,
+      .tn-central-agro-tools { grid-template-columns: 1fr !important; }
     }
     @media (max-width: 760px) {
       .tn-central-stats { grid-template-columns: 1fr 1fr !important; }
       .tn-central-detail-grid,
       .tn-central-contract-grid,
       .tn-central-dossie-grid { grid-template-columns: 1fr !important; }
+      .tn-central-permission-checks,
+      .tn-central-culture-checks { grid-template-columns: 1fr !important; }
     }
   `
   document.head.appendChild(el)

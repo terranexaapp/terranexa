@@ -87,3 +87,4 @@ Arquivos incrementais atuais:
 | `007_catalogo_pragas_mae.sql` | Cria o catalogo-mae TerraNexa, culturas N:N e configuracao por fazenda. |
 | `008_comercial_aprovacoes_auditoria.sql` | Cria contas comerciais, assinaturas por hectare, fila de liberacao e auditoria. |
 | `009_hierarquia_fazenda_papeis.sql` | Amplia papeis por fazenda, matriz de permissoes e vinculacao pela Central TerraNexa. |
+| `010_central_permissoes_catalogo_agronomico.sql` | Libera a Central para editar permissoes por papel e pragas/doencas por cultura. |
