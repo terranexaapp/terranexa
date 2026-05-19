@@ -4,6 +4,15 @@ import { supabase } from '../lib/supabase'
 import { listarOperacoes, resumoCustosPorCategoria } from '../lib/operacoes'
 import { listarPluviometros, criarPluviometro, atualizarPluviometro, desativarPluviometro } from '../lib/pluviometros'
 import { listarUltimosMonitoramentos } from '../lib/monitoramentos'
+import {
+  buscarMeuAcessoFazenda,
+  filtrarDesktopNavGroups,
+  filtrarNavItems,
+  listarManagersPermitidos,
+  managerPermitido,
+  primeiroDestinoPermitido,
+  viewPermitida
+} from '../lib/fazendaAcesso'
 import { NovaOperacaoModal } from '../components/NovaOperacaoModal'
 import { Logo } from '../components/Logo'
 import { theme } from '../styles/theme'
@@ -21,7 +30,7 @@ import { MonitoramentoOcorrenciaView } from './FazendaDetalhe/monitoramentoOcorr
 import { FazendaMapaPrincipal } from './FazendaDetalhe/mapaPrincipal'
 import { GerencialView } from './FazendaDetalhe/gerencial'
 import { TalhaoGeoModal } from './FazendaDetalhe/talhaoGeoModal'
-import { NAV_ITEMS } from './FazendaDetalhe/constants'
+import { DESKTOP_NAV_GROUPS, NAV_ITEMS } from './FazendaDetalhe/constants'
 import { useMediaQuery } from './FazendaDetalhe/hooks'
 import { getMonitoramentoMeta, indexMonitoramentosByTalhao } from './FazendaDetalhe/utils'
 import {
@@ -60,6 +69,7 @@ export function FazendaDetalhePage() {
   const [activeManager, setActiveManager] = useState('talhoes')
   const [menuOpen, setMenuOpen] = useState(false)
   const [fazenda, setFazenda] = useState(null)
+  const [acesso, setAcesso] = useState(null)
   const [talhoes, setTalhoes] = useState([])
   const [loading, setLoading] = useState(true)
   const [showNovo, setShowNovo] = useState(false)
@@ -93,6 +103,11 @@ export function FazendaDetalhePage() {
       })
     ])
     setFazenda(f)
+    try {
+      setAcesso(await buscarMeuAcessoFazenda(id, f))
+    } catch {
+      setAcesso({ papel: 'operador', label: 'Operador', permissoes: { mapa: true } })
+    }
     setTalhoes(ts || [])
     setPluviometros(pluviometrosData || [])
     try {
@@ -177,12 +192,31 @@ export function FazendaDetalhePage() {
     const status = getMonitoramentoMeta(monitoramentosResumo[talhao.id]).status
     return status === 'late' || status === 'never'
   }).length
+  const navItemsPermitidos = useMemo(() => filtrarNavItems(NAV_ITEMS, acesso), [acesso])
+  const desktopNavGroupsPermitidos = useMemo(() => filtrarDesktopNavGroups(DESKTOP_NAV_GROUPS, acesso), [acesso])
+  const managersPermitidos = useMemo(() => listarManagersPermitidos(acesso), [acesso])
   const isMapView = activeView === 'mapa'
   // Telas em fullscreen (sem header de pagina, sem padding) — mapa principal e
   // a tela de ocorrencia, que renderiza seu proprio topbar + mapa de fundo.
   const isFullscreenView = isMapView || activeView === 'monitoramento-registro'
   const isDesktopShell = useMediaQuery('(min-width: 980px)')
   const showDesktopShell = isDesktopShell && !isFullscreenView
+
+  useEffect(() => {
+    if (!acesso) return
+    if (activeView === 'gerencial' && !managerPermitido(activeManager, acesso)) {
+      const nextManager = managersPermitidos[0]
+      if (nextManager) {
+        setActiveManager(nextManager)
+        return
+      }
+    }
+    if (!viewPermitida(activeView, acesso)) {
+      const destino = primeiroDestinoPermitido(acesso)
+      setActiveView(destino.view)
+      if (destino.manager) setActiveManager(destino.manager)
+    }
+  }, [acesso, activeManager, activeView, managersPermitidos])
 
   if (loading) {
     return (
@@ -255,7 +289,7 @@ export function FazendaDetalhePage() {
             )}
           </div>
           <nav style={{ display: 'none', gap: 8, overflowX: 'auto', paddingBottom: 2 }}>
-            {NAV_ITEMS.map(item => (
+            {navItemsPermitidos.map(item => (
               <button
                 key={item.id}
                 onClick={() => setActiveView(item.id)}
@@ -287,7 +321,7 @@ export function FazendaDetalhePage() {
                 ×
               </button>
             </div>
-            {NAV_ITEMS.map(item => (
+            {navItemsPermitidos.map(item => (
               <button
                 key={item.id}
                 onClick={() => {
@@ -367,6 +401,7 @@ export function FazendaDetalhePage() {
               total={total}
               talhoes={talhoes}
               navigate={navigate}
+              navGroups={desktopNavGroupsPermitidos}
             />
           )}
           <section
@@ -459,6 +494,7 @@ export function FazendaDetalhePage() {
                 onCreatePluviometro={salvarPluviometro}
                 onUpdatePluviometro={editarPluviometro}
                 onDeletePluviometro={excluirPluviometro}
+                allowedManagers={managersPermitidos}
                 navigate={navigate}
               />
             )}

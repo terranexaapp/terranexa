@@ -1,6 +1,7 @@
 import { useEffect, useId, useState } from 'react'
 import { theme } from '../../styles/theme'
 import { convidarMembro, listarMembros, revogarConvite, atualizarPapelMembro, gerarLinkConvite } from '../../lib/convites'
+import { FAZENDA_PAPEIS, getFazendaPapelMeta } from '../../lib/fazendaPapeis'
 import {
   eyebrowStyle,
   panelStyle,
@@ -16,15 +17,15 @@ import {
 
 const C = theme.normal
 
-const PAPEL_LABEL = { gerente: 'Gerente', operador: 'Operador' }
-const PAPEL_DESC = {
-  gerente: 'Acesso completo: pode gerenciar talhões, equipes, OS e insumos.',
-  operador: 'Acesso de campo: pode visualizar tudo e registrar monitoramentos.'
-}
+const PAPEL_OPTIONS = FAZENDA_PAPEIS
+const PAPEL_LABEL = PAPEL_OPTIONS.reduce((acc, item) => {
+  acc[item.papel] = item.label
+  return acc
+}, {})
 const STATUS_LABEL = { pendente: 'Pendente', aceito: 'Ativo' }
 
 function emptyDraft() {
-  return { email: '', papel: 'operador' }
+  return { email: '', papel: 'tecnico' }
 }
 
 export function MembrosManager({ fazendaId }) {
@@ -141,7 +142,7 @@ export function MembrosManager({ fazendaId }) {
           <p style={eyebrowStyle}>MEMBROS</p>
           <h3 style={panelTitleStyle}>Acesso à fazenda</h3>
           <p style={{ margin: '4px 0 0', color: C.textMid, fontSize: 12 }}>
-            Convide colaboradores por e-mail. Gerentes têm acesso completo; Operadores podem registrar monitoramentos.
+            Convide colaboradores por e-mail com hierarquia por fazenda.
           </p>
         </div>
         <div style={headerActionsStyle}>
@@ -180,21 +181,21 @@ export function MembrosManager({ fazendaId }) {
               PAPEL *
             </label>
             <div style={papelGridStyle}>
-              {(['gerente', 'operador']).map(p => (
+              {PAPEL_OPTIONS.map(option => (
                 <button
-                  key={p}
+                  key={option.papel}
                   type="button"
-                  onClick={() => setDraft(d => ({ ...d, papel: p }))}
+                  onClick={() => setDraft(d => ({ ...d, papel: option.papel }))}
                   style={{
                     ...papelCardStyle,
-                    borderColor: draft.papel === p ? C.greenDp : C.border,
-                    background: draft.papel === p ? C.greenLight : C.bg
+                    borderColor: draft.papel === option.papel ? C.greenDp : C.border,
+                    background: draft.papel === option.papel ? C.greenLight : C.bg
                   }}
                 >
-                  <strong style={{ color: draft.papel === p ? C.greenDp : C.textDk, fontSize: 13 }}>
-                    {PAPEL_LABEL[p]}
+                  <strong style={{ color: draft.papel === option.papel ? C.greenDp : C.textDk, fontSize: 13 }}>
+                    {option.label}
                   </strong>
-                  <span style={{ color: C.textMid, fontSize: 11 }}>{PAPEL_DESC[p]}</span>
+                  <span style={{ color: C.textMid, fontSize: 11 }}>{option.resumo}</span>
                 </button>
               ))}
             </div>
@@ -273,6 +274,7 @@ export function MembrosManager({ fazendaId }) {
 function MemberRow({ membro, copied, onCopiar, onEmail, onRevogar, onChangePapel }) {
   const isPendente = membro.status === 'pendente'
   const nome = membro.profiles?.nome
+  const papelMeta = getFazendaPapelMeta(membro.papel)
 
   return (
     <div style={cardStyle}>
@@ -304,8 +306,11 @@ function MemberRow({ membro, copied, onCopiar, onEmail, onRevogar, onChangePapel
               style={papelSelectStyle}
               aria-label="Alterar papel"
             >
-              <option value="gerente">Gerente</option>
-              <option value="operador">Operador</option>
+              {PAPEL_OPTIONS.map(option => (
+                <option key={option.papel} value={option.papel}>
+                  {option.label}
+                </option>
+              ))}
             </select>
           )}
           {membro.status === 'pendente' && (
@@ -317,7 +322,7 @@ function MemberRow({ membro, copied, onCopiar, onEmail, onRevogar, onChangePapel
                 border: `1px solid ${C.border}`
               }}
             >
-              {PAPEL_LABEL[membro.papel]}
+              {papelMeta.label}
             </span>
           )}
         </div>

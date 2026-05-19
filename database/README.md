@@ -85,3 +85,5 @@ Arquivos incrementais atuais:
 | `005_fix_missing_schema.sql` | Completa colunas ausentes usadas pelo app em `fazendas` e `monitoramento_pontos`. |
 | `006_pragas_doencas_fotos.sql` | Garante `foto_url` no catalogo de pragas/doencas para os cards de monitoramento. |
 | `007_catalogo_pragas_mae.sql` | Cria o catalogo-mae TerraNexa, culturas N:N e configuracao por fazenda. |
+| `008_comercial_aprovacoes_auditoria.sql` | Cria contas comerciais, assinaturas por hectare, fila de liberacao e auditoria. |
+| `009_hierarquia_fazenda_papeis.sql` | Amplia papeis por fazenda, matriz de permissoes e vinculacao pela Central TerraNexa. |

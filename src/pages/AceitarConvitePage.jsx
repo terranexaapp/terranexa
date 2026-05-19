@@ -2,16 +2,11 @@ import { useEffect, useState } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { buscarConviteInfo, aceitarConvite } from '../lib/convites'
+import { getFazendaPapelMeta } from '../lib/fazendaPapeis'
 import { theme } from '../styles/theme'
 import { Logo } from '../components/Logo'
 
 const C = theme.normal
-
-const PAPEL_LABEL = { gerente: 'Gerente', operador: 'Operador' }
-const PAPEL_DESC = {
-  gerente: 'Acesso completo: gerenciar talhões, equipes, OS e insumos.',
-  operador: 'Acesso de campo: visualizar tudo e registrar monitoramentos.'
-}
 
 export function AceitarConvitePage() {
   const [searchParams] = useSearchParams()
@@ -65,6 +60,8 @@ export function AceitarConvitePage() {
     const redirect = `/aceitar-convite?token=${token}`
     navigate(`/login?redirect=${encodeURIComponent(redirect)}`)
   }
+
+  const papelMeta = info ? getFazendaPapelMeta(info.papel) : null
 
   if (authLoading) {
     return (
@@ -122,8 +119,8 @@ export function AceitarConvitePage() {
             <h2 style={titleStyle}>{info.fazenda_nome}</h2>
 
             <div style={papelBoxStyle}>
-              <strong style={{ color: C.greenDp, fontSize: 15 }}>{PAPEL_LABEL[info.papel]}</strong>
-              <p style={{ margin: '4px 0 0', color: C.textMid, fontSize: 13 }}>{PAPEL_DESC[info.papel]}</p>
+              <strong style={{ color: C.greenDp, fontSize: 15 }}>{papelMeta?.label}</strong>
+              <p style={{ margin: '4px 0 0', color: C.textMid, fontSize: 13 }}>{papelMeta?.resumo}</p>
             </div>
 
             {acceptError && <div style={errorBoxStyle}>{acceptError}</div>}

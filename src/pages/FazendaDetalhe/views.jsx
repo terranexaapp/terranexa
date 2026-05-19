@@ -67,7 +67,14 @@ import {
 
 const C = theme.normal
 
-export function FarmDesktopSidebar({ activeView, setActiveView, activeManager, setActiveManager, navigate }) {
+export function FarmDesktopSidebar({
+  activeView,
+  setActiveView,
+  activeManager,
+  setActiveManager,
+  navigate,
+  navGroups = DESKTOP_NAV_GROUPS
+}) {
   function openItem(item) {
     if (item.manager) setActiveManager(item.manager)
     setActiveView(item.view)
@@ -76,7 +83,7 @@ export function FarmDesktopSidebar({ activeView, setActiveView, activeManager, s
   return (
     <aside style={farmDesktopSidebarStyle}>
       <div style={desktopSidebarGroupsStyle}>
-        {DESKTOP_NAV_GROUPS.map(group => (
+        {navGroups.map(group => (
           <div key={group.title} style={desktopNavGroupStyle}>
             <p style={desktopNavGroupTitleStyle}>{group.title.toUpperCase()}</p>
             {group.items.map(item => {

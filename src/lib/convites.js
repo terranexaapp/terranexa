@@ -1,14 +1,30 @@
 import { supabase } from './supabase'
 
+function newInviteToken() {
+  return typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : undefined
+}
+
 export async function convidarMembro({ fazenda_id, email, papel }) {
   const {
     data: { user }
   } = await supabase.auth.getUser()
   if (!user) throw new Error('Não autenticado')
 
+  const payload = {
+    fazenda_id,
+    email: email.trim().toLowerCase(),
+    papel,
+    convidado_por: user.id,
+    status: 'pendente',
+    user_id: null,
+    aceito_em: null
+  }
+  const token = newInviteToken()
+  if (token) payload.token = token
+
   const { data, error } = await supabase
     .from('fazenda_membros')
-    .insert({ fazenda_id, email: email.trim().toLowerCase(), papel, convidado_por: user.id })
+    .upsert(payload, { onConflict: 'fazenda_id,email' })
     .select()
     .single()
   if (error) throw error

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { supabase } from '../lib/supabase'
+import { isInternalUser } from '../lib/internalRoles'
 import { theme } from '../styles/theme'
 import { Logo } from '../components/Logo'
 import { ErrorPanel } from '../components/ErrorPanel'
@@ -110,23 +111,44 @@ export function FazendasPage() {
               </p>
             </div>
           </div>
-          <button
-            onClick={signOut}
-            style={{
-              background: C.bgLight,
-              border: `1px solid ${C.border}`,
-              borderRadius: 8,
-              padding: '7px 12px',
-              color: C.textDk,
-              fontSize: 10,
-              fontFamily: 'monospace',
-              fontWeight: 700,
-              letterSpacing: '1px',
-              cursor: 'pointer'
-            }}
-          >
-            SAIR
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+            {isInternalUser(profile) && (
+              <button
+                onClick={() => navigate('/central-terranexa')}
+                style={{
+                  background: C.greenDp,
+                  border: 'none',
+                  borderRadius: 8,
+                  padding: '7px 12px',
+                  color: C.bg,
+                  fontSize: 10,
+                  fontFamily: 'monospace',
+                  fontWeight: 700,
+                  letterSpacing: '1px',
+                  cursor: 'pointer'
+                }}
+              >
+                CENTRAL TERRANEXA
+              </button>
+            )}
+            <button
+              onClick={signOut}
+              style={{
+                background: C.bgLight,
+                border: `1px solid ${C.border}`,
+                borderRadius: 8,
+                padding: '7px 12px',
+                color: C.textDk,
+                fontSize: 10,
+                fontFamily: 'monospace',
+                fontWeight: 700,
+                letterSpacing: '1px',
+                cursor: 'pointer'
+              }}
+            >
+              SAIR
+            </button>
+          </div>
         </div>
       </header>
       <main style={{ maxWidth: 800, margin: '0 auto', padding: '24px 16px 96px' }}>

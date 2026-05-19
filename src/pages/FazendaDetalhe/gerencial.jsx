@@ -382,6 +382,7 @@ export function GerencialView({
   onDeletePluviometro,
   activeManager,
   setActiveManager,
+  allowedManagers,
   navigate
 }) {
   const isManagerDesktop = useMediaQuery('(min-width: 900px)')
@@ -418,15 +419,22 @@ export function GerencialView({
       text: 'Nome, municipio, usuarios e preferencias'
     }
   ]
+  const allowedManagerSet = new Set(allowedManagers || managementMenu.map(item => item.id))
+  const visibleManagementMenu = managementMenu.filter(item => allowedManagerSet.has(item.id))
   const managementGroups = [
     { title: 'Campo', ids: ['talhoes', 'pluviometros', 'safras'] },
     { title: 'Operacao', ids: ['estoque', 'equipe', 'insumos', 'maquinas'] },
     { title: 'Gestao', ids: ['produtividade', 'membros', 'configuracao'] }
   ].map(group => ({
     ...group,
-    items: group.ids.map(itemId => managementMenu.find(item => item.id === itemId)).filter(Boolean)
-  }))
-  const activeItem = managementMenu.find(item => item.id === activeManager) || managementMenu[0]
+    items: group.ids.map(itemId => visibleManagementMenu.find(item => item.id === itemId)).filter(Boolean)
+  })).filter(group => group.items.length > 0)
+  const activeItem = visibleManagementMenu.find(item => item.id === activeManager) || visibleManagementMenu[0]
+  const canRenderManager = Boolean(activeItem && allowedManagerSet.has(activeManager))
+
+  useEffect(() => {
+    if (activeItem && activeItem.id !== activeManager) setActiveManager(activeItem.id)
+  }, [activeItem, activeManager, setActiveManager])
 
   return (
     <section style={managementPageStyle}>
@@ -484,7 +492,11 @@ export function GerencialView({
         )}
 
         <div style={managementModuleContentStyle}>
-          {activeManager === 'talhoes' && (
+          {!activeItem && (
+            <ManagementModulePanel item={{ title: 'Acesso restrito', text: 'Seu perfil nao possui modulos gerenciais liberados.' }} />
+          )}
+
+          {canRenderManager && activeManager === 'talhoes' && (
             <MapaCadastroTalhoes
               talhoes={talhoes}
               total={total}
@@ -493,7 +505,7 @@ export function GerencialView({
             />
           )}
 
-          {activeManager === 'pluviometros' && (
+          {canRenderManager && activeManager === 'pluviometros' && (
             <PluviometroManager
               fazendaId={fazendaId}
               talhoes={talhoes}
@@ -505,27 +517,28 @@ export function GerencialView({
             />
           )}
 
-          {activeManager === 'configuracao' && (
+          {canRenderManager && activeManager === 'configuracao' && (
             <ConfiguracaoFazendaPanel fazenda={fazenda} talhoes={talhoes} total={total} />
           )}
 
-          {activeManager === 'safras' && <SafrasManager fazendaId={fazendaId} />}
+          {canRenderManager && activeManager === 'safras' && <SafrasManager fazendaId={fazendaId} />}
 
-          {activeManager === 'equipe' && <EquipeManager fazendaId={fazendaId} />}
+          {canRenderManager && activeManager === 'equipe' && <EquipeManager fazendaId={fazendaId} />}
 
-          {activeManager === 'estoque' && <EstoqueManager fazendaId={fazendaId} navigate={navigate} />}
+          {canRenderManager && activeManager === 'estoque' && <EstoqueManager fazendaId={fazendaId} navigate={navigate} />}
 
-          {activeManager === 'insumos' && <InsumosShortcut navigate={navigate} />}
+          {canRenderManager && activeManager === 'insumos' && <InsumosShortcut navigate={navigate} />}
 
-          {activeManager === 'maquinas' && <MaquinaManager fazendaId={fazendaId} />}
+          {canRenderManager && activeManager === 'maquinas' && <MaquinaManager fazendaId={fazendaId} />}
 
-          {activeManager === 'produtividade' && <ProdutividadeManager fazendaId={fazendaId} talhoes={talhoes} />}
+          {canRenderManager && activeManager === 'produtividade' && <ProdutividadeManager fazendaId={fazendaId} talhoes={talhoes} />}
 
-          {activeManager === 'membros' && <MembrosManager fazendaId={fazendaId} />}
+          {canRenderManager && activeManager === 'membros' && <MembrosManager fazendaId={fazendaId} />}
 
-          {!['talhoes', 'pluviometros', 'configuracao', 'safras', 'equipe', 'estoque', 'insumos', 'maquinas', 'produtividade', 'membros'].includes(
-            activeManager
-          ) && <ManagementModulePanel item={activeItem} />}
+          {canRenderManager &&
+            !['talhoes', 'pluviometros', 'configuracao', 'safras', 'equipe', 'estoque', 'insumos', 'maquinas', 'produtividade', 'membros'].includes(
+              activeManager
+            ) && <ManagementModulePanel item={activeItem} />}
         </div>
       </div>
     </section>
