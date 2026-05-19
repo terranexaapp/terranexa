@@ -1,13 +1,11 @@
 // Monitoring occurrence view — design v2 (Variant A · bottom sheet sobre mapa)
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import {
-  criarMonitoramento,
-  criarMonitoramentoPonto,
-  salvarCaminhamento
-} from '../../lib/monitoramentos'
 import { listarPragasDoencas, getFotoPragaDoenca } from '../../lib/pragasDoencas'
-import { uploadFotoMonitoramento, getPublicUrl } from '../../lib/storage'
-import { requestOfflineStorage, saveMonitoringPointOffline } from './offline'
+import {
+  requestOfflineStorage,
+  saveMonitoringBatchOffline,
+  saveMonitoringTrackOffline
+} from './offline'
 import { SimpleFarmMap } from './maps'
 import { normalizeFeature } from './utils'
 import '../../styles/monitoramento.css'
@@ -178,6 +176,21 @@ function distanciaTotal(trilha) {
     total += Math.sqrt(dLat * dLat + dLng * dLng)
   }
   return total
+}
+
+const SEVERIDADE_RANK = {
+  nde: 4,
+  severa: 3,
+  moderada: 2,
+  leve: 1,
+  baixa: 1
+}
+
+function severidadeMaisAlta(drafts) {
+  return (drafts || []).reduce((best, draft) => {
+    const next = draft.form?.severidade || draft.form?.dano || null
+    return (SEVERIDADE_RANK[next] || 0) > (SEVERIDADE_RANK[best] || 0) ? next : best
+  }, null)
 }
 
 function resumoDraft(d) {
@@ -355,12 +368,13 @@ export function MonitoramentoOcorrenciaView({ fazenda, fazendaId, talhao, onBack
   const [metricaTrilhaM, setMetricaTrilhaM] = useState(0)
   const [tempoMs, setTempoMs] = useState(0)
 
-  // Monitoramento Supabase (lazy)
-  const monitoramentoIdRef = useRef(null)
-  const monitoramentoCreateRef = useRef(null)
+  // Sessao local: tudo fica no aparelho ate o tecnico sincronizar na tela de Monitoramento.
+  const sessionLocalIdRef = useRef(null)
 
   // Drafts atuais
   const [drafts, setDrafts] = useState([])
+  const [pontosMapa, setPontosMapa] = useState([])
+  const [trilhaAtual, setTrilhaAtual] = useState([])
 
   // Formulário ativo
   const [form, setForm] = useState({})
@@ -370,6 +384,7 @@ export function MonitoramentoOcorrenciaView({ fazenda, fazendaId, talhao, onBack
 
   const [registrando, setRegistrando] = useState(false)
   const [erro, setErro] = useState(null)
+  const [statusMsg, setStatusMsg] = useState('')
 
   const cameraRef = useRef(null)
 
@@ -429,12 +444,14 @@ export function MonitoramentoOcorrenciaView({ fazenda, fazendaId, talhao, onBack
     const lng = pos.coords.longitude
     const precisao = pos.coords.accuracy
     const novo = { lat, lng, precisao }
+    const trilha = [...trilhaRef.current, { lat, lng, ts: new Date().toISOString() }]
     ultimaPosRef.current = novo
-    trilhaRef.current.push({ lat, lng, ts: new Date().toISOString() })
+    trilhaRef.current = trilha
+    setTrilhaAtual(trilha)
     setGpsPos(novo)
     setGpsState('active')
     setGpsBlockedReason(null)
-    setMetricaTrilhaM(Math.round(distanciaTotal(trilhaRef.current)))
+    setMetricaTrilhaM(Math.round(distanciaTotal(trilha)))
   }, [])
 
   const onGpsError = useCallback(err => {
@@ -559,25 +576,41 @@ export function MonitoramentoOcorrenciaView({ fazenda, fazendaId, talhao, onBack
   // ── Sair: salva caminhamento ────────────────────────────────────────────
   const finalizarESair = useCallback(async () => {
     try {
-      if (monitoramentoIdRef.current && trilhaRef.current.length > 0) {
-        await salvarCaminhamento(monitoramentoIdRef.current, trilhaRef.current, iniciadoEmRef.current)
+      if (trilhaRef.current.length > 0) {
+        await saveMonitoringTrackOffline({
+          sessionId: getSessionLocalId(),
+          context: offlineContext(),
+          monitoramento: offlineMonitoramento(),
+          trilha: trilhaRef.current,
+          iniciadoEm: iniciadoEmRef.current,
+          finalizadoEm: new Date().toISOString()
+        })
       }
     } catch { /* ignora erro de rede */ }
     onBack()
-  }, [onBack])
+  }, [onBack, talhao?.id])
 
-  async function ensureMonitoramento() {
-    if (monitoramentoIdRef.current) return monitoramentoIdRef.current
-    if (!monitoramentoCreateRef.current) {
-      monitoramentoCreateRef.current = criarMonitoramento({
-        talhao_id: talhao?.id,
-        observacoes: 'Monitoramento por app TerraNexa',
-        status: 'realizado'
-      })
-        .then(r => { monitoramentoIdRef.current = r.id; return r.id })
-        .finally(() => { monitoramentoCreateRef.current = null })
+  function getSessionLocalId() {
+    if (!sessionLocalIdRef.current) sessionLocalIdRef.current = uuid()
+    return sessionLocalIdRef.current
+  }
+
+  function offlineContext() {
+    return {
+      fazendaId,
+      fazendaNome: fazenda?.nome || '',
+      talhaoId: talhao?.id || null,
+      talhaoCodigo: talhao?.codigo || ''
     }
-    return monitoramentoCreateRef.current
+  }
+
+  function offlineMonitoramento() {
+    return {
+      talhao_id: talhao?.id,
+      observacoes: 'Monitoramento por app TerraNexa',
+      status: 'realizado',
+      visitado_em: iniciadoEmRef.current
+    }
   }
 
   function iniciarFormulario(categoria, praga = null) {
@@ -593,6 +626,7 @@ export function MonitoramentoOcorrenciaView({ fazenda, fazendaId, talhao, onBack
     setFotoFile(null)
     setDistanciaInput('')
     setErro(null)
+    setStatusMsg('')
     setTela('formulario')
   }
 
@@ -620,6 +654,7 @@ export function MonitoramentoOcorrenciaView({ fazenda, fazendaId, talhao, onBack
       fotoPreview
     }
     setDrafts(d => [...d, draft])
+    setStatusMsg('')
     setTela('categorias')
   }
 
@@ -647,23 +682,11 @@ export function MonitoramentoOcorrenciaView({ fazenda, fazendaId, talhao, onBack
         return
       }
 
-      const monitoramentoId = await ensureMonitoramento()
       const grupoId = uuid()
-
-      for (const d of drafts) {
-        let foto_url = null
-        if (d.fotoFile && fazendaId) {
-          try {
-            const uploaded = await uploadFotoMonitoramento({ fazendaId, file: d.fotoFile })
-            foto_url = getPublicUrl(uploaded)
-          } catch { /* segue sem foto */ }
-        }
-
+      const points = drafts.map(d => {
         const dados_especificos = { ...d.form }
-        if (foto_url) dados_especificos.foto_url = foto_url
-
-        await criarMonitoramentoPonto({
-          monitoramento_id: monitoramentoId,
+        return {
+          localId: uuid(),
           tipo: 'ocorrencia',
           tipo_registro: d.categoria.id,
           latitude: gps.lat,
@@ -673,21 +696,41 @@ export function MonitoramentoOcorrenciaView({ fazenda, fazendaId, talhao, onBack
           severidade: d.form.severidade || d.form.dano || null,
           recomendacao: d.form.acao_sugerida || d.form.recomendacao || null,
           observacoes: d.form.observacoes || null,
-          foto_url,
           dados_especificos,
-          ponto_grupo_id: grupoId
-        })
-      }
+          ponto_grupo_id: grupoId,
+          fotoFile: d.fotoFile || null
+        }
+      })
 
-      saveMonitoringPointOffline(
-        { tipo: 'ponto', lat: gps.lat, lng: gps.lng, hora: new Date().toLocaleString('pt-BR'), ocorrencias: drafts.length },
-        { fazendaId, fazendaNome: fazenda?.nome || '', talhaoId: talhao?.id || null, talhaoCodigo: talhao?.codigo || '' }
-      )
+      await saveMonitoringBatchOffline({
+        sessionId: getSessionLocalId(),
+        context: offlineContext(),
+        monitoramento: offlineMonitoramento(),
+        points
+      })
 
+      setPontosMapa(current => [
+        ...current,
+        {
+          id: grupoId,
+          ponto_grupo_id: grupoId,
+          monitoramento_id: getSessionLocalId(),
+          tipo: 'ocorrencia',
+          tipo_registro: drafts[0]?.categoria?.label || 'ocorrencia',
+          latitude: gps.lat,
+          longitude: gps.lng,
+          precisao_m: gps.precisao,
+          severidade: severidadeMaisAlta(drafts),
+          ocorrencias: drafts.length,
+          praga_doenca: drafts[0]?.praga || null,
+          created_at: new Date().toISOString()
+        }
+      ])
       setDrafts([])
       setMetricaPontos(n => n + 1)
+      setStatusMsg('Ponto salvo no aparelho. Sincronize na tela de Monitoramento quando tiver internet.')
     } catch (err) {
-      setErro(err.message || 'Erro ao registrar ponto')
+      setErro(err.message || 'Erro ao salvar ponto offline')
     } finally {
       setRegistrando(false)
     }
@@ -804,6 +847,8 @@ export function MonitoramentoOcorrenciaView({ fazenda, fazendaId, talhao, onBack
               pluviometros={[]}
               devicePosition={devicePosition}
               centerOnDeviceNonce={centerNonce}
+              monitoramentoPontos={pontosMapa}
+              caminhamentos={trilhaAtual.length > 1 ? [{ id: 'trilha-atual', trilha: trilhaAtual }] : []}
             />
           ) : null}
         </div>
@@ -940,6 +985,20 @@ export function MonitoramentoOcorrenciaView({ fazenda, fazendaId, talhao, onBack
 
           <div className="m-sheet-footer">
             {erro && <div className="m-err" style={{ flex: 1, margin: 0 }}>{erro}</div>}
+            {!erro && statusMsg && (
+              <div
+                style={{
+                  flex: 1,
+                  margin: 0,
+                  color: '#c7f7b7',
+                  fontSize: 11,
+                  lineHeight: 1.25,
+                  fontWeight: 800
+                }}
+              >
+                {statusMsg}
+              </div>
+            )}
             <div className="m-footer-meta">
               <Icon.Pin style={{ verticalAlign: '-2px', marginRight: 4 }} />
               <b>{pontoAtual}</b> · {coordText}

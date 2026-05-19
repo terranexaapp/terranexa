@@ -2,9 +2,10 @@
 // Substitui o painel verde de 5 abas por: rail de ícones à esquerda,
 // chip do talhão no topo-direito e dock inferior com KPIs + CTA primário.
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { theme } from '../../styles/theme'
 import { getCategoriaInfo } from '../../lib/operacoes'
+import { listarCaminhamentosFazenda, listarPontosFazenda } from '../../lib/monitoramentos'
 import { useGpsRequest, useMediaQuery } from './hooks'
 import { SimpleFarmMap } from './maps'
 import { requestOfflineStorage } from './offline'
@@ -484,6 +485,25 @@ export function FazendaMapaPrincipal({
   const centerNonceRef = useRef(0)
   const [centerNonce, setCenterNonce] = useState(0)
   const [gpsBannerDismissed, setGpsBannerDismissed] = useState(false)
+  const [monitoramentoPontos, setMonitoramentoPontos] = useState([])
+  const [caminhamentos, setCaminhamentos] = useState([])
+
+  useEffect(() => {
+    if (!fazenda?.id) return
+    let active = true
+    ;(async () => {
+      const [pontosResult, caminhamentosResult] = await Promise.all([
+        listarPontosFazenda(fazenda.id).catch(() => []),
+        listarCaminhamentosFazenda(fazenda.id).catch(() => [])
+      ])
+      if (!active) return
+      setMonitoramentoPontos(pontosResult)
+      setCaminhamentos(caminhamentosResult)
+    })()
+    return () => {
+      active = false
+    }
+  }, [fazenda?.id, monitoramentosResumo])
 
   function handleGpsClick() {
     setGpsBannerDismissed(false)
@@ -566,6 +586,8 @@ export function FazendaMapaPrincipal({
         onGpsClick={handleGpsClick}
         showGpsBanner={showGpsBanner}
         onDismissGpsBanner={() => setGpsBannerDismissed(true)}
+        monitoramentoPontos={monitoramentoPontos}
+        caminhamentos={caminhamentos}
       />
     )
   }
@@ -582,6 +604,8 @@ export function FazendaMapaPrincipal({
         onFeatureClick={handleFeatureClick}
         devicePosition={gps.position}
         centerOnDeviceNonce={centerNonce}
+        monitoramentoPontos={monitoramentoPontos}
+        caminhamentos={caminhamentos}
       />
 
       {/* Rail vertical de ícones */}
@@ -834,7 +858,9 @@ function MapaMobile({
   centerNonce,
   onGpsClick,
   showGpsBanner,
-  onDismissGpsBanner
+  onDismissGpsBanner,
+  monitoramentoPontos = [],
+  caminhamentos = []
 }) {
   return (
     <section style={pageMobileStyle}>
@@ -848,6 +874,8 @@ function MapaMobile({
         onFeatureClick={handleFeatureClick}
         devicePosition={gpsPosition}
         centerOnDeviceNonce={centerNonce}
+        monitoramentoPontos={monitoramentoPontos}
+        caminhamentos={caminhamentos}
       />
 
       {/* Rail horizontal no topo */}

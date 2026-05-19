@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { theme } from '../../styles/theme'
 import {
   MAPBOX_TOKEN,
@@ -21,7 +21,8 @@ import {
   getMapBounds,
   projectCoord,
   getRingLabelCoord,
-  getMonitoramentoMeta
+  getMonitoramentoMeta,
+  escapeHtml
 } from './utils'
 import {
   simpleMapStyle,
@@ -33,6 +34,128 @@ import {
 } from './styles'
 
 const C = theme.normal
+
+const MONITORAMENTO_POINT_COLORS = {
+  nde: '#B0271F',
+  severa: '#E85A3A',
+  moderada: '#E8A84C',
+  leve: '#7EC850',
+  baixa: '#7EC850',
+  ocorrencia: '#D99A2B',
+  armadilha: '#7A5AA6',
+  amostragem: '#4A8AB8',
+  ponto: '#2F91FF'
+}
+
+const SEVERIDADE_PRIORITY = {
+  nde: 4,
+  severa: 3,
+  moderada: 2,
+  leve: 1,
+  baixa: 1
+}
+
+function toFiniteNumber(value) {
+  const num = Number(value)
+  return Number.isFinite(num) ? num : null
+}
+
+function pointLabel(point) {
+  return (
+    point.praga_doenca?.nome_comum ||
+    point.dados_especificos?.tipo_outras ||
+    point.tipo_registro ||
+    point.tipo ||
+    'Ponto'
+  )
+}
+
+function normalizeMonitoramentoPoint(item, index) {
+  const latitude = toFiniteNumber(item.latitude ?? item.lat)
+  const longitude = toFiniteNumber(item.longitude ?? item.lng)
+  if (latitude == null || longitude == null) return null
+  return {
+    ...item,
+    index,
+    latitude,
+    longitude,
+    label: pointLabel(item),
+    ocorrencias: Number(item.ocorrencias || 1)
+  }
+}
+
+function mergePointGroup(current, point) {
+  if (!current) {
+    return {
+      ...point,
+      labels: [point.label],
+      ocorrencias: point.ocorrencias || 1
+    }
+  }
+  const currentRank = SEVERIDADE_PRIORITY[current.severidade] || 0
+  const nextRank = SEVERIDADE_PRIORITY[point.severidade] || 0
+  return {
+    ...current,
+    severidade: nextRank > currentRank ? point.severidade : current.severidade,
+    label: nextRank > currentRank ? point.label : current.label,
+    labels: Array.from(new Set([...(current.labels || []), point.label].filter(Boolean))),
+    ocorrencias: (current.ocorrencias || 1) + (point.ocorrencias || 1)
+  }
+}
+
+function groupMonitoramentoPontos(items = []) {
+  const groups = new Map()
+  items.forEach((item, index) => {
+    const point = normalizeMonitoramentoPoint(item, index)
+    if (!point) return
+    const key = point.ponto_grupo_id || point.id || `${point.monitoramento_id || index}:${point.latitude}:${point.longitude}`
+    groups.set(key, mergePointGroup(groups.get(key), point))
+  })
+  return Array.from(groups.values())
+}
+
+function parseTrilha(value) {
+  if (Array.isArray(value)) return value
+  if (typeof value !== 'string') return []
+  try {
+    const parsed = JSON.parse(value)
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
+function normalizeTrailPoint(point) {
+  const latitude = toFiniteNumber(point.lat ?? point.latitude)
+  const longitude = toFiniteNumber(point.lng ?? point.longitude)
+  if (latitude == null || longitude == null) return null
+  return { latitude, longitude, ts: point.ts || point.created_at || null }
+}
+
+function normalizeCaminhamento(item, index) {
+  const pontos = parseTrilha(item.trilha)
+    .map(normalizeTrailPoint)
+    .filter(Boolean)
+  if (pontos.length < 2) return null
+  return { ...item, index, pontos }
+}
+
+function getMonitoramentoPointColor(point) {
+  return (
+    MONITORAMENTO_POINT_COLORS[point.severidade] ||
+    MONITORAMENTO_POINT_COLORS[point.tipo_registro] ||
+    MONITORAMENTO_POINT_COLORS[point.tipo] ||
+    MONITORAMENTO_POINT_COLORS.ponto
+  )
+}
+
+function monitoramentoPointTooltip(point) {
+  const labels = point.labels?.length ? point.labels : [point.label]
+  const title = point.ocorrencias > 1 ? `${point.ocorrencias} ocorrencias no ponto` : labels[0]
+  const details = labels.slice(0, 3).join(' / ')
+  const severidade = point.severidade ? `<small>${escapeHtml(point.severidade)}</small>` : ''
+  return `<strong>${escapeHtml(title)}</strong>${details && details !== title ? `<span>${escapeHtml(details)}</span>` : ''}${severidade}`
+}
 
 export function SimpleFarmMap({
   features = [],
@@ -49,7 +172,9 @@ export function SimpleFarmMap({
   onMapPoint,
   onPluviometroClick,
   devicePosition = null,
-  centerOnDeviceNonce = 0
+  centerOnDeviceNonce = 0,
+  monitoramentoPontos = [],
+  caminhamentos = []
 }) {
   const normalized = features
     .map((feature, index) => ({
@@ -86,6 +211,8 @@ export function SimpleFarmMap({
       onPluviometroClick={onPluviometroClick}
       devicePosition={devicePosition}
       centerOnDeviceNonce={centerOnDeviceNonce}
+      monitoramentoPontos={monitoramentoPontos}
+      caminhamentos={caminhamentos}
     />
   )
 }
@@ -102,13 +229,17 @@ function LeafletFarmMap({
   onMapPoint,
   onPluviometroClick,
   devicePosition = null,
-  centerOnDeviceNonce = 0
+  centerOnDeviceNonce = 0,
+  monitoramentoPontos = [],
+  caminhamentos = []
 }) {
   const mapNodeRef = useRef(null)
   const mapRef = useRef(null)
   const featureLayerRef = useRef(null)
   const markerLayerRef = useRef(null)
   const rainLayerRef = useRef(null)
+  const trackLayerRef = useRef(null)
+  const monitoramentoLayerRef = useRef(null)
   const deviceLayerRef = useRef(null)
   const tileLayerRef = useRef(null)
   const [leafletReady, setLeafletReady] = useState(false)
@@ -128,6 +259,11 @@ function LeafletFarmMap({
       nome: item.nome || `Pluviometro ${index + 1}`
     }))
     .filter(item => item.ativo !== false && Number.isFinite(item.latitude) && Number.isFinite(item.longitude))
+  const activeMonitoramentoPontos = useMemo(() => groupMonitoramentoPontos(monitoramentoPontos), [monitoramentoPontos])
+  const activeCaminhamentos = useMemo(
+    () => caminhamentos.map(normalizeCaminhamento).filter(Boolean),
+    [caminhamentos]
+  )
   const liveDevicePosition = devicePosition
   const deviceMarker =
     Number.isFinite(Number(liveDevicePosition?.latitude)) && Number.isFinite(Number(liveDevicePosition?.longitude))
@@ -155,8 +291,10 @@ function LeafletFarmMap({
           inertia: true
         })
         featureLayerRef.current = L.layerGroup().addTo(map)
+        trackLayerRef.current = L.layerGroup().addTo(map)
         markerLayerRef.current = L.layerGroup().addTo(map)
         rainLayerRef.current = L.layerGroup().addTo(map)
+        monitoramentoLayerRef.current = L.layerGroup().addTo(map)
         deviceLayerRef.current = L.layerGroup().addTo(map)
         mapRef.current = map
         setLeafletReady(true)
@@ -178,6 +316,8 @@ function LeafletFarmMap({
       featureLayerRef.current = null
       markerLayerRef.current = null
       rainLayerRef.current = null
+      trackLayerRef.current = null
+      monitoramentoLayerRef.current = null
       deviceLayerRef.current = null
       tileLayerRef.current = null
     }
@@ -283,6 +423,52 @@ function LeafletFarmMap({
       item.addTo(markerLayerRef.current)
     })
   }, [leafletReady, selectedMode, pluviometros, onPluviometroClick])
+
+  useEffect(() => {
+    if (!leafletReady || !window.L || !mapRef.current || !trackLayerRef.current || !monitoramentoLayerRef.current) return
+    const L = window.L
+    trackLayerRef.current.clearLayers()
+    monitoramentoLayerRef.current.clearLayers()
+
+    activeCaminhamentos.forEach(track => {
+      const latLngs = track.pontos.map(point => [point.latitude, point.longitude])
+      L.polyline(latLngs, {
+        color: 'rgba(255,255,255,0.72)',
+        weight: 6,
+        opacity: 0.42,
+        lineCap: 'round',
+        lineJoin: 'round',
+        interactive: false
+      }).addTo(trackLayerRef.current)
+      L.polyline(latLngs, {
+        color: '#45D483',
+        weight: 3,
+        opacity: 0.95,
+        lineCap: 'round',
+        lineJoin: 'round',
+        interactive: false
+      }).addTo(trackLayerRef.current)
+    })
+
+    activeMonitoramentoPontos.forEach(point => {
+      const color = getMonitoramentoPointColor(point)
+      const marker = L.circleMarker([point.latitude, point.longitude], {
+        radius: Math.min(11, 6 + Math.max(0, point.ocorrencias - 1)),
+        color: '#ffffff',
+        weight: 2,
+        opacity: 0.98,
+        fillColor: color,
+        fillOpacity: 0.95,
+        interactive: true
+      })
+      marker.bindTooltip(monitoramentoPointTooltip(point), {
+        direction: 'top',
+        offset: [0, -8],
+        opacity: 0.96
+      })
+      marker.addTo(monitoramentoLayerRef.current)
+    })
+  }, [leafletReady, activeMonitoramentoPontos, activeCaminhamentos])
 
   useEffect(() => {
     if (!leafletReady || !window.L || !mapRef.current || !deviceLayerRef.current) return

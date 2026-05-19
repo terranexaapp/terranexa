@@ -57,10 +57,34 @@ export async function listarPontosFazenda(fazendaId, { dataInicio, dataFim } = {
 
   const { data, error } = await supabase
     .from('monitoramento_pontos')
-    .select('id, monitoramento_id, tipo, latitude, longitude, precisao_m, observacoes, created_at')
+    .select(
+      'id, monitoramento_id, tipo, latitude, longitude, precisao_m, observacoes, created_at, ' +
+        'tipo_registro, dados_especificos, ponto_grupo_id, praga_doenca_id, estadio_fenologico, ' +
+        'severidade, percentual_dano, recomendacao, foto_url, ' +
+        'praga_doenca:pragas_doencas(id, nome_comum, nome_cientifico, tipo, nivel_dano_economico, foto_url)'
+    )
     .in('monitoramento_id', monIds)
   if (error) throw error
   return data || []
+}
+
+export async function listarCaminhamentosFazenda(fazendaId, { dataInicio, dataFim, talhaoIds } = {}) {
+  const { monitoramentos } = await listarMonitoramentosFazenda(fazendaId, { dataInicio, dataFim, talhaoIds })
+  const monIds = monitoramentos.map(m => m.id)
+  if (!monIds.length) return []
+
+  const monitoramentosMap = new Map(monitoramentos.map(item => [item.id, item]))
+  const { data, error } = await supabase
+    .from('monitoramento_caminhamentos')
+    .select('id, monitoramento_id, trilha, iniciado_em, finalizado_em, created_at')
+    .in('monitoramento_id', monIds)
+    .order('created_at', { ascending: true })
+  if (error) throw error
+
+  return (data || []).map(item => ({
+    ...item,
+    talhao_id: monitoramentosMap.get(item.monitoramento_id)?.talhao_id || null
+  }))
 }
 
 export async function criarMonitoramento({
@@ -68,7 +92,8 @@ export async function criarMonitoramento({
   observacoes,
   dano = 'sem_dano_economico',
   severidade = 'baixa',
-  status = 'realizado'
+  status = 'realizado',
+  visitado_em
 }) {
   const { data, error } = await supabase
     .from('monitoramentos')
@@ -78,7 +103,7 @@ export async function criarMonitoramento({
       severidade,
       observacoes: observacoes || null,
       status,
-      visitado_em: new Date().toISOString()
+      visitado_em: visitado_em || new Date().toISOString()
     })
     .select()
     .single()

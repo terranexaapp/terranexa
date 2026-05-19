@@ -508,7 +508,7 @@ export function FazendaDetalhePage() {
                   try {
                     await carregar()
                   } finally {
-                    setActiveView('mapa')
+                    setActiveView('monitoramento')
                   }
                 }}
               />

@@ -3,6 +3,7 @@ import { theme } from '../../styles/theme'
 import {
   listarMonitoramentosFazenda,
   listarPontosFazenda,
+  listarCaminhamentosFazenda,
   getSeveridadeInfo
 } from '../../lib/monitoramentos'
 import { MONITORAMENTO_LEGEND } from './constants'
@@ -14,7 +15,11 @@ import {
   formatCultura,
   daysSinceDate
 } from './utils'
-import { requestOfflineStorage } from './offline'
+import {
+  requestOfflineStorage,
+  countPendingMonitoringSessions,
+  syncPendingMonitoringSessions
+} from './offline'
 import { eyebrowStyle } from './styles'
 
 const C = theme.normal
@@ -24,6 +29,8 @@ const FONTS = {
   sans: "system-ui, -apple-system, 'Segoe UI', sans-serif",
   mono: "'SF Mono', Monaco, 'Courier New', monospace"
 }
+
+const emptyOfflineCount = { sessions: 0, points: 0, tracks: 0 }
 
 // ─── Cockpit-local styles (kept inline so this file is the only diff) ──────
 
@@ -75,6 +82,59 @@ function modeButtonStyle(active) {
     cursor: 'pointer',
     fontFamily: FONTS.sans
   }
+}
+
+function OfflineSyncCard({ pending = emptyOfflineCount, syncing, message, onSync, compact = false }) {
+  const totalItems = Number(pending.points || 0) + Number(pending.tracks || 0)
+  const hasPending = Number(pending.sessions || 0) > 0 || totalItems > 0
+
+  return (
+    <div
+      style={{
+        ...glassPanel,
+        padding: compact ? 10 : 12,
+        display: 'grid',
+        gap: 8,
+        pointerEvents: 'auto'
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center' }}>
+        <div style={{ minWidth: 0 }}>
+          <p style={{ margin: 0, fontSize: 9, color: C.textDim, fontFamily: FONTS.mono, fontWeight: 900 }}>
+            OFFLINE
+          </p>
+          <p style={{ margin: '2px 0 0', color: C.textDk, fontSize: compact ? 12 : 13, fontWeight: 900 }}>
+            {hasPending ? `${totalItems} itens pendentes` : 'Tudo sincronizado'}
+          </p>
+        </div>
+        <button
+          onClick={onSync}
+          disabled={!hasPending || syncing}
+          style={{
+            border: `1px solid ${hasPending ? C.greenDp : C.border}`,
+            background: hasPending ? C.greenDp : C.bg,
+            color: hasPending ? C.bg : C.textMid,
+            borderRadius: 8,
+            padding: compact ? '8px 10px' : '9px 12px',
+            fontSize: 11,
+            fontWeight: 900,
+            cursor: !hasPending || syncing ? 'not-allowed' : 'pointer',
+            opacity: syncing ? 0.72 : 1,
+            fontFamily: FONTS.sans,
+            whiteSpace: 'nowrap'
+          }}
+        >
+          {syncing ? 'Sincronizando...' : 'Sincronizar'}
+        </button>
+      </div>
+      <p style={{ margin: 0, color: hasPending ? C.amberDk : C.textMid, fontSize: 11, lineHeight: 1.35 }}>
+        {message ||
+          (hasPending
+            ? `${pending.sessions} visita(s), ${pending.points} ponto(s), ${pending.tracks} trilha(s) no aparelho.`
+            : 'Os registros locais ja foram enviados para a fazenda.')}
+      </p>
+    </div>
+  )
 }
 
 const leftColStyle = {
@@ -241,8 +301,13 @@ export function MonitoramentoCockpitView({
   const [selectedId, setSelectedId] = useState(null)
   const [historico, setHistorico] = useState([])
   const [pontos, setPontos] = useState([])
+  const [caminhamentos, setCaminhamentos] = useState([])
   const [loading, setLoading] = useState(false)
   const [loadError, setLoadError] = useState('')
+  const [reloadToken, setReloadToken] = useState(0)
+  const [offlinePending, setOfflinePending] = useState(emptyOfflineCount)
+  const [offlineSyncing, setOfflineSyncing] = useState(false)
+  const [offlineMessage, setOfflineMessage] = useState('')
 
   // Auto-select first talhão with severidade > moderada, or first talhão.
   useEffect(() => {
@@ -262,13 +327,15 @@ export function MonitoramentoCockpitView({
     ;(async () => {
       try {
         const dataInicio = new Date(Date.now() - periodo * 86400000).toISOString().slice(0, 10)
-        const [{ monitoramentos }, ptsArr] = await Promise.all([
+        const [{ monitoramentos }, ptsArr, caminhamentosArr] = await Promise.all([
           listarMonitoramentosFazenda(fazendaId, { dataInicio }),
-          listarPontosFazenda(fazendaId, { dataInicio })
+          listarPontosFazenda(fazendaId, { dataInicio }),
+          listarCaminhamentosFazenda(fazendaId, { dataInicio }).catch(() => [])
         ])
         if (!active) return
         setHistorico(monitoramentos)
         setPontos(ptsArr)
+        setCaminhamentos(caminhamentosArr)
       } catch (err) {
         if (!active) return
         setLoadError(err.message || 'Nao foi possivel carregar historico de monitoramento')
@@ -279,7 +346,24 @@ export function MonitoramentoCockpitView({
     return () => {
       active = false
     }
-  }, [fazendaId, periodo])
+  }, [fazendaId, periodo, reloadToken])
+
+  useEffect(() => {
+    if (!fazendaId) return
+    let active = true
+    async function refresh() {
+      const count = await countPendingMonitoringSessions(fazendaId)
+      if (active) setOfflinePending(count)
+    }
+    refresh()
+    window.addEventListener('online', refresh)
+    window.addEventListener('focus', refresh)
+    return () => {
+      active = false
+      window.removeEventListener('online', refresh)
+      window.removeEventListener('focus', refresh)
+    }
+  }, [fazendaId, reloadToken])
 
   const talhoesMap = useMemo(() => new Map(talhoes.map(t => [t.id, t])), [talhoes])
   const selected = selectedId ? talhoesMap.get(selectedId) : null
@@ -333,6 +417,28 @@ export function MonitoramentoCockpitView({
     setActiveView('monitoramento-registro')
   }
 
+  async function sincronizarOffline() {
+    setOfflineSyncing(true)
+    setOfflineMessage('')
+    try {
+      const result = await syncPendingMonitoringSessions({ fazendaId })
+      const nextCount = await countPendingMonitoringSessions(fazendaId)
+      setOfflinePending(nextCount)
+      setReloadToken(value => value + 1)
+      if (result.total === 0) {
+        setOfflineMessage('Nao ha registros offline pendentes.')
+      } else if (result.failed > 0) {
+        setOfflineMessage(`${result.synced} visita(s) enviadas, ${result.failed} com erro. Tente novamente com internet estavel.`)
+      } else {
+        setOfflineMessage(`${result.synced} visita(s) enviadas para a fazenda.`)
+      }
+    } catch (err) {
+      setOfflineMessage(err.message || 'Nao foi possivel sincronizar agora.')
+    } finally {
+      setOfflineSyncing(false)
+    }
+  }
+
   function handleFeatureClick(index) {
     const t = talhoes.find(x => x.codigo === mapFeatures[index]?.properties?.codigo)
     if (t) setSelectedId(t.id)
@@ -366,6 +472,10 @@ export function MonitoramentoCockpitView({
         selectedId={selectedId}
         setSelectedId={setSelectedId}
         abrirMonitoramento={abrirMonitoramento}
+        offlinePending={offlinePending}
+        offlineSyncing={offlineSyncing}
+        offlineMessage={offlineMessage}
+        sincronizarOffline={sincronizarOffline}
         navigate={navigate}
       />
     )
@@ -392,6 +502,8 @@ export function MonitoramentoCockpitView({
         pluviometros={[]}
         devicePosition={devicePosition}
         onFeatureClick={handleFeatureClick}
+        monitoramentoPontos={pontos}
+        caminhamentos={caminhamentos}
       />
 
       {/* Hero strip */}
@@ -464,6 +576,13 @@ export function MonitoramentoCockpitView({
             {loadError}
           </div>
         )}
+
+        <OfflineSyncCard
+          pending={offlinePending}
+          syncing={offlineSyncing}
+          message={offlineMessage}
+          onSync={sincronizarOffline}
+        />
 
         <div style={kpiStackStyle}>
           {[
@@ -836,6 +955,10 @@ function MonitoramentoCockpitMobile({
   selectedId,
   setSelectedId,
   abrirMonitoramento,
+  offlinePending,
+  offlineSyncing,
+  offlineMessage,
+  sincronizarOffline,
   navigate
 }) {
   const selected = talhoes.find(t => t.id === selectedId) || null
@@ -865,6 +988,14 @@ function MonitoramentoCockpitMobile({
           </button>
         ))}
       </div>
+
+      <OfflineSyncCard
+        pending={offlinePending}
+        syncing={offlineSyncing}
+        message={offlineMessage}
+        onSync={sincronizarOffline}
+        compact
+      />
 
       {loadError && (
         <div
