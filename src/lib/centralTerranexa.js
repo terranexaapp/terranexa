@@ -1,5 +1,6 @@
 import { supabase } from './supabase'
 import { FAZENDA_PAPEIS, getFazendaPapelMeta } from './fazendaPapeis'
+import { enviarEmailConviteFazenda } from './conviteEmail'
 
 const QUEUE_STATUSES = ['pendente_validacao', 'em_analise', 'aguardando_documentos']
 
@@ -217,6 +218,19 @@ export async function vincularUsuarioFazenda({ fazendaId, email, papel, userId =
     .select()
     .single()
   if (error) throw error
+  if (!userId) {
+    try {
+      const emailStatus = await enviarEmailConviteFazenda({
+        fazendaId,
+        email: normalizedEmail,
+        papel,
+        conviteToken: data.token
+      })
+      return { ...data, emailStatus }
+    } catch (err) {
+      return { ...data, emailError: err.message || 'Vinculo criado, mas o e-mail de convite nao foi enviado.' }
+    }
+  }
   return data
 }
 
@@ -260,7 +274,7 @@ export async function listarCatalogoPragasCulturas() {
       .order('ordem', { ascending: true }),
     supabase
       .from('catalogo_pragas')
-      .select('id, codigo, nome_comum, nome_cientifico, tipo, ativo, foto_url, nivel_dano_economico')
+      .select('id, codigo, nome_comum, nome_cientifico, tipo, ativo, sintomas, nivel_dano_economico, foto_url, foto_credito, foto_fonte_url, instrucoes_monitoramento, campos_monitoramento')
       .order('tipo', { ascending: true })
       .order('nome_comum', { ascending: true }),
     supabase
@@ -284,6 +298,66 @@ export async function listarCatalogoPragasCulturas() {
       culturaIds: culturasPorPraga[praga.id] || []
     }))
   }
+}
+
+function normalizeCatalogoPraga(payload) {
+  const campos = Array.isArray(payload.campos_monitoramento) ? payload.campos_monitoramento : []
+  return {
+    codigo: String(payload.codigo || '')
+      .trim()
+      .toUpperCase()
+      .replace(/[^A-Z0-9_]/g, '_')
+      .slice(0, 48),
+    nome_comum: String(payload.nome_comum || '').trim(),
+    nome_cientifico: payload.nome_cientifico?.trim() || null,
+    tipo: payload.tipo || 'praga',
+    ativo: payload.ativo !== false,
+    sintomas: payload.sintomas?.trim() || null,
+    nivel_dano_economico: payload.nivel_dano_economico?.trim() || null,
+    foto_url: payload.foto_url?.trim() || null,
+    foto_credito: payload.foto_credito?.trim() || null,
+    foto_fonte_url: payload.foto_fonte_url?.trim() || null,
+    instrucoes_monitoramento: payload.instrucoes_monitoramento?.trim() || null,
+    campos_monitoramento: campos
+      .map((campo, index) => ({
+        id: String(campo.id || campo.label || `campo_${index + 1}`)
+          .trim()
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .replace(/[^a-z0-9_]/g, '_')
+          .replace(/_+/g, '_')
+          .replace(/^_|_$/g, '')
+          .slice(0, 40),
+        label: String(campo.label || '').trim(),
+        tipo: campo.tipo || 'texto',
+        unidade: campo.unidade?.trim() || null,
+        opcoes: campo.opcoes?.trim() || null,
+        obrigatorio: Boolean(campo.obrigatorio)
+      }))
+      .filter(campo => campo.id && campo.label)
+  }
+}
+
+export async function salvarCatalogoPraga(payload) {
+  const normalized = normalizeCatalogoPraga(payload)
+  if (!normalized.codigo) throw new Error('Informe um codigo para o item do catalogo.')
+  if (!normalized.nome_comum) throw new Error('Informe o nome comum.')
+
+  const query = payload.id
+    ? supabase
+        .from('catalogo_pragas')
+        .update({ ...normalized, updated_at: new Date().toISOString() })
+        .eq('id', payload.id)
+    : supabase.from('catalogo_pragas').insert(normalized)
+
+  const { data, error } = await query
+    .select('id, codigo, nome_comum, nome_cientifico, tipo, ativo, sintomas, nivel_dano_economico, foto_url, foto_credito, foto_fonte_url, instrucoes_monitoramento, campos_monitoramento')
+    .single()
+  if (error) throw error
+
+  await supabase.rpc('sincronizar_catalogo_pragas_todas_fazendas').catch(() => null)
+  return { ...data, culturaIds: payload.culturaIds || [] }
 }
 
 export async function salvarCulturasPraga({ catalogoPragaId, culturaIds }) {

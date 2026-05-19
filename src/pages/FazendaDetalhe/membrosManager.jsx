@@ -35,6 +35,7 @@ export function MembrosManager({ fazendaId }) {
   const [mode, setMode] = useState('idle')
   const [draft, setDraft] = useState(emptyDraft())
   const [formError, setFormError] = useState('')
+  const [emailNotice, setEmailNotice] = useState('')
   const [saving, setSaving] = useState(false)
   const [copiedId, setCopiedId] = useState(null)
 
@@ -62,6 +63,7 @@ export function MembrosManager({ fazendaId }) {
     setMode('convite')
     setDraft(emptyDraft())
     setFormError('')
+    setEmailNotice('')
   }
 
   function cancel() {
@@ -79,9 +81,10 @@ export function MembrosManager({ fazendaId }) {
     }
     setSaving(true)
     try {
-      await convidarMembro({ fazenda_id: fazendaId, email: draft.email, papel: draft.papel })
+      const convite = await convidarMembro({ fazenda_id: fazendaId, email: draft.email, papel: draft.papel })
       await carregar()
       cancel()
+      setEmailNotice(convite.emailError || 'Convite criado e e-mail enviado ao usuario.')
     } catch (err) {
       if (err.message?.includes('unique') || err.code === '23505') {
         setFormError('Este e-mail já foi convidado para esta fazenda.')
@@ -156,6 +159,7 @@ export function MembrosManager({ fazendaId }) {
       </div>
 
       {loadError && <div style={formErrorStyle}>{loadError}</div>}
+      {emailNotice && <div style={emailNotice.includes('nao foi enviado') ? formErrorStyle : successNoticeStyle}>{emailNotice}</div>}
 
       {mode === 'convite' && (
         <form onSubmit={handleConvitar} style={formStyle}>
@@ -398,6 +402,15 @@ const papelCardStyle = {
   transition: 'border-color .15s ease, background .15s ease'
 }
 const footerStyle = { display: 'flex', gap: 8, alignItems: 'center' }
+const successNoticeStyle = {
+  background: C.greenLight,
+  border: `1px solid ${C.greenDp}`,
+  borderRadius: 10,
+  padding: '9px 11px',
+  color: C.greenDp,
+  fontSize: 12,
+  fontWeight: 800
+}
 const sectionTitleStyle = {
   margin: '0 0 8px',
   color: C.textDim,

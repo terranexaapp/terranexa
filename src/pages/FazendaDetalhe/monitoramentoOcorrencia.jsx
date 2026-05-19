@@ -236,6 +236,20 @@ function itemDisponivelNoTalhao(praga, categoria, culturaTalhao) {
   return culturas.includes(culturaTalhao)
 }
 
+function camposMonitoramento(praga) {
+  return Array.isArray(praga?.campos_monitoramento)
+    ? praga.campos_monitoramento.filter(campo => campo?.id && campo?.label)
+    : []
+}
+
+function opcoesCampoMonitoramento(campo) {
+  if (Array.isArray(campo?.opcoes)) return campo.opcoes
+  return String(campo?.opcoes || '')
+    .split(',')
+    .map(opcao => opcao.trim())
+    .filter(Boolean)
+}
+
 // ─── Ícones SVG (mesmos do design v2) ────────────────────────────────────────
 const Icon = {
   Back: p => (
@@ -569,7 +583,12 @@ export function MonitoramentoOcorrenciaView({ fazenda, fazendaId, talhao, onBack
   function iniciarFormulario(categoria, praga = null) {
     setCategoriaSel(categoria)
     setPragaSel(praga)
-    setForm({})
+    setForm(
+      camposMonitoramento(praga).reduce((acc, campo) => {
+        if (campo.tipo === 'booleano') acc[campo.id] = false
+        return acc
+      }, {})
+    )
     setFotoPreview(null)
     setFotoFile(null)
     setDistanciaInput('')
@@ -586,6 +605,11 @@ export function MonitoramentoOcorrenciaView({ fazenda, fazendaId, talhao, onBack
 
   function adicionarOcorrencia() {
     const formType = detectFormType(pragaSel, categoriaSel)
+    const campoObrigatorio = camposMonitoramento(pragaSel).find(campo => campo.obrigatorio && !form[campo.id])
+    if (campoObrigatorio) {
+      setErro(`Preencha o campo obrigatorio: ${campoObrigatorio.label}.`)
+      return
+    }
     const draft = {
       id: uuid(),
       categoria: categoriaSel,
@@ -1363,6 +1387,100 @@ export function MonitoramentoOcorrenciaView({ fazenda, fazendaId, talhao, onBack
     )
   }
 
+  function FormInfoCatalogo() {
+    if (!pragaSel) return null
+    const rows = [
+      ['Sintomas', pragaSel.sintomas],
+      ['Nivel de dano economico', pragaSel.nivel_dano_economico],
+      ['Como monitorar', pragaSel.instrucoes_monitoramento]
+    ].filter(([, value]) => value)
+    if (!rows.length) return null
+
+    return (
+      <div className="m-form-section">
+        <div className="m-form-label">Referencias de campo</div>
+        <div style={{ display: 'grid', gap: 8 }}>
+          {rows.map(([label, value]) => (
+            <div
+              key={label}
+              style={{
+                background: 'rgba(255,255,255,0.08)',
+                border: '1px solid rgba(255,255,255,0.12)',
+                borderRadius: 12,
+                padding: '9px 10px'
+              }}
+            >
+              <div style={{ fontFamily: 'var(--m-font-mono)', fontSize: 10, color: 'var(--m-ink-3)', marginBottom: 3 }}>
+                {label}
+              </div>
+              <div style={{ color: 'var(--m-ink-1)', fontSize: 13, lineHeight: 1.45 }}>{value}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  function FormCamposExtras() {
+    const campos = camposMonitoramento(pragaSel)
+    if (!campos.length) return null
+
+    return (
+      <div className="m-form-section">
+        <div className="m-form-label">Informacoes adicionais</div>
+        <div style={{ display: 'grid', gap: 9 }}>
+          {campos.map(campo => {
+            const opcoes = opcoesCampoMonitoramento(campo)
+            if (campo.tipo === 'booleano') {
+              return (
+                <label key={campo.id} style={{ display: 'flex', gap: 9, alignItems: 'center', color: 'var(--m-ink-1)', fontSize: 13 }}>
+                  <input
+                    type="checkbox"
+                    checked={Boolean(form[campo.id])}
+                    onChange={e => setField(campo.id, e.target.checked)}
+                  />
+                  {campo.label}{campo.obrigatorio ? ' *' : ''}
+                </label>
+              )
+            }
+            if (campo.tipo === 'selecao' && opcoes.length > 0) {
+              return (
+                <label key={campo.id} style={{ display: 'grid', gap: 5 }}>
+                  <span className="m-form-label" style={{ margin: 0 }}>{campo.label}{campo.obrigatorio ? ' *' : ''}</span>
+                  <select
+                    className="m-input"
+                    value={form[campo.id] || ''}
+                    onChange={e => setField(campo.id, e.target.value)}
+                  >
+                    <option value="">Selecionar</option>
+                    {opcoes.map(opcao => (
+                      <option key={opcao} value={opcao}>
+                        {opcao}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )
+            }
+            return (
+              <label key={campo.id} style={{ display: 'grid', gap: 5 }}>
+                <span className="m-form-label" style={{ margin: 0 }}>
+                  {campo.label}{campo.unidade ? ` (${campo.unidade})` : ''}{campo.obrigatorio ? ' *' : ''}
+                </span>
+                <input
+                  className="m-input"
+                  type={campo.tipo === 'numero' || campo.tipo === 'contador' ? 'number' : 'text'}
+                  value={form[campo.id] || ''}
+                  onChange={e => setField(campo.id, e.target.value)}
+                />
+              </label>
+            )
+          })}
+        </div>
+      </div>
+    )
+  }
+
   function renderFormulario() {
     const catId = categoriaSel?.id
     const formType = detectFormType(pragaSel, categoriaSel)
@@ -1386,6 +1504,7 @@ export function MonitoramentoOcorrenciaView({ fazenda, fazendaId, talhao, onBack
         </div>
 
         <div className="m-form">
+          {FormInfoCatalogo()}
           {formType === 'lagarta'   && FormLagarta()}
           {formType === 'percevejo' && FormPercevejo()}
           {formType === 'daninha'   && FormDaninha()}
@@ -1394,6 +1513,7 @@ export function MonitoramentoOcorrenciaView({ fazenda, fazendaId, talhao, onBack
           {catId === 'colheita'     && FormColheita()}
           {catId === 'outras'       && FormOutras()}
           {formType === 'generica' && catId !== 'outras' && catId !== 'estadio' && catId !== 'plantio' && catId !== 'colheita' && FormGenerica()}
+          {FormCamposExtras()}
 
           {mostrarObs && (
             <div className="m-form-section">

@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { buscarConviteInfo, aceitarConvite } from '../lib/convites'
 import { getFazendaPapelMeta } from '../lib/fazendaPapeis'
+import { supabase } from '../lib/supabase'
 import { theme } from '../styles/theme'
 import { Logo } from '../components/Logo'
 
@@ -11,6 +12,7 @@ const C = theme.normal
 export function AceitarConvitePage() {
   const [searchParams] = useSearchParams()
   const token = searchParams.get('token')
+  const setupSenha = searchParams.get('setup') === 'senha'
   const navigate = useNavigate()
   const { session, loading: authLoading } = useAuth()
 
@@ -19,6 +21,7 @@ export function AceitarConvitePage() {
   const [accepting, setAccepting] = useState(false)
   const [acceptError, setAcceptError] = useState('')
   const [done, setDone] = useState(false)
+  const [passwordDraft, setPasswordDraft] = useState({ password: '', confirm: '' })
 
   useEffect(() => {
     if (!token) {
@@ -37,6 +40,31 @@ export function AceitarConvitePage() {
     setAccepting(true)
     setAcceptError('')
     try {
+      if (info?.email && session?.user?.email?.toLowerCase() !== String(info.email).toLowerCase()) {
+        setAcceptError(`Este convite foi enviado para ${info.email}. Faca login com esse e-mail.`)
+        setAccepting(false)
+        return
+      }
+
+      if (setupSenha) {
+        if (passwordDraft.password.length < 8) {
+          setAcceptError('Crie uma senha com pelo menos 8 caracteres.')
+          setAccepting(false)
+          return
+        }
+        if (passwordDraft.password !== passwordDraft.confirm) {
+          setAcceptError('As senhas informadas nao conferem.')
+          setAccepting(false)
+          return
+        }
+        const { error: passwordError } = await supabase.auth.updateUser({ password: passwordDraft.password })
+        if (passwordError) {
+          setAcceptError(passwordError.message || 'Nao foi possivel definir a senha.')
+          setAccepting(false)
+          return
+        }
+      }
+
       const result = await aceitarConvite(token)
       if (result?.error) {
         const msgs = {
@@ -57,7 +85,7 @@ export function AceitarConvitePage() {
   }
 
   function handleLogin() {
-    const redirect = `/aceitar-convite?token=${token}`
+    const redirect = `/aceitar-convite?token=${token}${setupSenha ? '&setup=senha' : ''}`
     navigate(`/login?redirect=${encodeURIComponent(redirect)}`)
   }
 
@@ -126,6 +154,35 @@ export function AceitarConvitePage() {
             {acceptError && <div style={errorBoxStyle}>{acceptError}</div>}
 
             {session ? (
+              setupSenha ? (
+                <div style={{ display: 'grid', gap: 10 }}>
+                  <p style={{ ...subtitleStyle, marginBottom: 0 }}>
+                    Crie sua senha para acessar o app depois pelo login normal.
+                  </p>
+                  <input
+                    type="password"
+                    value={passwordDraft.password}
+                    onChange={e => setPasswordDraft(draft => ({ ...draft, password: e.target.value }))}
+                    placeholder="Senha"
+                    style={inputStyle}
+                  />
+                  <input
+                    type="password"
+                    value={passwordDraft.confirm}
+                    onChange={e => setPasswordDraft(draft => ({ ...draft, confirm: e.target.value }))}
+                    placeholder="Confirmar senha"
+                    style={inputStyle}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAceitar}
+                    disabled={accepting}
+                    style={{ ...primaryBtnStyle, opacity: accepting ? 0.6 : 1 }}
+                  >
+                    {accepting ? 'Salvando...' : 'Definir senha e aceitar convite'}
+                  </button>
+                </div>
+              ) : (
               <button
                 type="button"
                 onClick={handleAceitar}
@@ -134,6 +191,7 @@ export function AceitarConvitePage() {
               >
                 {accepting ? 'Aceitando…' : 'Aceitar convite'}
               </button>
+              )
             ) : (
               <div style={{ display: 'grid', gap: 10 }}>
                 <p style={{ ...subtitleStyle, marginBottom: 4 }}>
@@ -216,6 +274,15 @@ const primaryBtnStyle = {
   cursor: 'pointer',
   textAlign: 'center',
   transition: 'opacity .15s'
+}
+const inputStyle = {
+  width: '100%',
+  boxSizing: 'border-box',
+  border: `1px solid ${C.border}`,
+  borderRadius: 10,
+  padding: '12px 13px',
+  color: C.textDk,
+  fontSize: 14
 }
 const errorBoxStyle = {
   background: C.redLight,

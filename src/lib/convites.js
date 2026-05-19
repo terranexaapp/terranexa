@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { enviarEmailConviteFazenda } from './conviteEmail'
 
 function newInviteToken() {
   return typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : undefined
@@ -28,7 +29,17 @@ export async function convidarMembro({ fazenda_id, email, papel }) {
     .select()
     .single()
   if (error) throw error
-  return data
+  try {
+    const emailStatus = await enviarEmailConviteFazenda({
+      fazendaId: fazenda_id,
+      email: payload.email,
+      papel,
+      conviteToken: data.token
+    })
+    return { ...data, emailStatus }
+  } catch (err) {
+    return { ...data, emailError: err.message || 'Convite criado, mas o e-mail nao foi enviado.' }
+  }
 }
 
 export async function listarMembros(fazendaId) {

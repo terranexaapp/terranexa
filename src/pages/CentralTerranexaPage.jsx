@@ -15,6 +15,7 @@ import {
   listarUsuariosCadastrados,
   pedirDocumentos,
   rejeitarSolicitacao,
+  salvarCatalogoPraga,
   salvarCulturasPraga,
   vincularUsuarioFazenda
 } from '../lib/centralTerranexa'
@@ -47,6 +48,26 @@ const STATUS_LABEL = {
 const RISCO_LABEL = { baixo: 'Baixo', medio: 'Medio', alto: 'Alto' }
 const HIERARQUIA_INICIAL = { proprietarios: [], fazendas: [], papeis: FAZENDA_PAPEIS, avisos: [] }
 const AGRO_CATALOGO_INICIAL = { culturas: [], pragas: [], avisos: [] }
+const CENTRAL_TABS = [
+  { id: 'comercial', label: 'Comercial' },
+  { id: 'usuarios', label: 'Usuarios e fazendas' },
+  { id: 'permissoes', label: 'Permissoes' },
+  { id: 'agro', label: 'Pragas, doencas e daninhas' }
+]
+const AGRO_TIPOS = [
+  { id: 'praga', label: 'Praga' },
+  { id: 'doenca', label: 'Doenca' },
+  { id: 'daninha', label: 'Daninha' },
+  { id: 'deficiencia', label: 'Deficiencia' },
+  { id: 'outro', label: 'Outro' }
+]
+const MONITORING_FIELD_TYPES = [
+  { id: 'texto', label: 'Texto' },
+  { id: 'numero', label: 'Numero' },
+  { id: 'selecao', label: 'Selecao' },
+  { id: 'contador', label: 'Contador' },
+  { id: 'booleano', label: 'Sim/Nao' }
+]
 const FILTERS = [
   ['fila', 'Fila'],
   ['pendente_validacao', 'Pendentes'],
@@ -94,9 +115,68 @@ function buildPermissionsDraft(papeis) {
   }, {})
 }
 
+function normalizeAgroFieldDraft(campo = {}, index = 0) {
+  const label = campo.label || ''
+  const idBase = campo.id || label || `campo_${index + 1}`
+  return {
+    id: String(idBase)
+      .trim()
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9_]/g, '_')
+      .replace(/_+/g, '_')
+      .replace(/^_|_$/g, '')
+      .slice(0, 40),
+    label,
+    tipo: campo.tipo || 'texto',
+    unidade: campo.unidade || '',
+    opcoes: Array.isArray(campo.opcoes) ? campo.opcoes.join(', ') : campo.opcoes || '',
+    obrigatorio: Boolean(campo.obrigatorio)
+  }
+}
+
+function emptyAgroDraft(tipo = 'praga') {
+  return {
+    id: null,
+    codigo: '',
+    nome_comum: '',
+    nome_cientifico: '',
+    tipo,
+    ativo: true,
+    sintomas: '',
+    nivel_dano_economico: '',
+    foto_url: '',
+    foto_credito: '',
+    foto_fonte_url: '',
+    instrucoes_monitoramento: '',
+    campos_monitoramento: []
+  }
+}
+
+function buildAgroDraft(praga = null) {
+  if (!praga) return emptyAgroDraft()
+  return {
+    id: praga.id,
+    codigo: praga.codigo || '',
+    nome_comum: praga.nome_comum || '',
+    nome_cientifico: praga.nome_cientifico || '',
+    tipo: praga.tipo || 'praga',
+    ativo: praga.ativo !== false,
+    sintomas: praga.sintomas || '',
+    nivel_dano_economico: praga.nivel_dano_economico || '',
+    foto_url: praga.foto_url || '',
+    foto_credito: praga.foto_credito || '',
+    foto_fonte_url: praga.foto_fonte_url || '',
+    instrucoes_monitoramento: praga.instrucoes_monitoramento || '',
+    campos_monitoramento: (praga.campos_monitoramento || []).map(normalizeAgroFieldDraft)
+  }
+}
+
 export function CentralTerranexaPage() {
   const navigate = useNavigate()
   const { profile, signOut } = useAuth()
+  const [activeTab, setActiveTab] = useState('comercial')
   const [filter, setFilter] = useState('fila')
   const [solicitacoes, setSolicitacoes] = useState([])
   const [contas, setContas] = useState([])
@@ -117,6 +197,8 @@ export function CentralTerranexaPage() {
   const [agroType, setAgroType] = useState('todos')
   const [agroCulture, setAgroCulture] = useState('todas')
   const [agroSavingId, setAgroSavingId] = useState('')
+  const [agroSavingDetails, setAgroSavingDetails] = useState(false)
+  const [agroDraft, setAgroDraft] = useState(null)
   const [agroMessage, setAgroMessage] = useState('')
   const [agroError, setAgroError] = useState('')
   const [selectedId, setSelectedId] = useState(null)
@@ -240,6 +322,12 @@ export function CentralTerranexaPage() {
       setHierarquia(hierarquiaData)
       setPermissionsDraft(buildPermissionsDraft(hierarquiaData.papeis))
       setAgroCatalogo(agroData)
+      setAgroDraft(draft => {
+        if (!agroData.pragas?.length) return draft
+        if (!draft) return buildAgroDraft(agroData.pragas[0])
+        const current = draft.id ? agroData.pragas.find(praga => praga.id === draft.id) : null
+        return current ? buildAgroDraft(current) : draft
+      })
       setLinkDraft(draft => ({
         ...draft,
         fazendaId: hierarquiaData.fazendas.some(fazenda => fazenda.id === draft.fazendaId)
@@ -343,14 +431,20 @@ export function CentralTerranexaPage() {
     setLinkError('')
     setLinkMessage('')
     try {
-      await vincularUsuarioFazenda({
+      const resultado = await vincularUsuarioFazenda({
         fazendaId: linkDraft.fazendaId,
         userId: linkDraft.userId || null,
         email: linkDraft.email,
         papel: linkDraft.papel,
         convidadoPor: profile.id
       })
-      setLinkMessage('Vinculo atualizado com sucesso.')
+      setLinkMessage(
+        resultado.emailError
+          ? resultado.emailError
+          : resultado.emailStatus
+            ? 'Vinculo criado e e-mail enviado para o usuario definir senha.'
+            : 'Vinculo atualizado com sucesso.'
+      )
       setLinkDraft(draft => ({ ...draft, userId: '', email: '' }))
       await carregar()
     } catch (err) {
@@ -412,6 +506,7 @@ export function CentralTerranexaPage() {
   }
 
   function handleToggleCulturaPraga(pragaId, culturaId) {
+    let nextCulturaIds = []
     setAgroCatalogo(catalogo => ({
       ...catalogo,
       pragas: catalogo.pragas.map(praga => {
@@ -419,9 +514,11 @@ export function CentralTerranexaPage() {
         const current = new Set(praga.culturaIds || [])
         if (current.has(culturaId)) current.delete(culturaId)
         else current.add(culturaId)
-        return { ...praga, culturaIds: [...current] }
+        nextCulturaIds = [...current]
+        return { ...praga, culturaIds: nextCulturaIds }
       })
     }))
+    setAgroDraft(draft => (draft?.id === pragaId ? { ...draft, culturaIds: nextCulturaIds } : draft))
   }
 
   async function handleSalvarCulturasPraga(praga) {
@@ -434,11 +531,76 @@ export function CentralTerranexaPage() {
         culturaIds: praga.culturaIds || []
       })
       setAgroMessage(`${praga.nome_comum} atualizado. ${Number(totalFazendas || 0)} fazendas sincronizadas.`)
-      setAgroCatalogo(await listarCatalogoPragasCulturas())
+      const refreshed = await listarCatalogoPragasCulturas()
+      setAgroCatalogo(refreshed)
+      const current = refreshed.pragas.find(item => item.id === praga.id)
+      if (current) setAgroDraft(buildAgroDraft(current))
     } catch (err) {
       setAgroError(err.message || 'Nao foi possivel salvar as culturas desta praga/doenca.')
     } finally {
       setAgroSavingId('')
+    }
+  }
+
+  function handleNovoCatalogoPraga(tipo = 'praga') {
+    setAgroDraft(emptyAgroDraft(tipo))
+    setAgroError('')
+    setAgroMessage('')
+    setActiveTab('agro')
+  }
+
+  function handleEditarCatalogoPraga(praga) {
+    setAgroDraft(buildAgroDraft(praga))
+    setAgroError('')
+    setAgroMessage('')
+  }
+
+  function handleChangeAgroDraft(key, value) {
+    setAgroDraft(draft => ({ ...(draft || emptyAgroDraft()), [key]: value }))
+  }
+
+  function handleAddCampoMonitoramento() {
+    setAgroDraft(draft => ({
+      ...(draft || emptyAgroDraft()),
+      campos_monitoramento: [
+        ...((draft || emptyAgroDraft()).campos_monitoramento || []),
+        normalizeAgroFieldDraft({ id: '', label: '', tipo: 'texto' }, (draft?.campos_monitoramento || []).length)
+      ]
+    }))
+  }
+
+  function handleChangeCampoMonitoramento(index, key, value) {
+    setAgroDraft(draft => ({
+      ...(draft || emptyAgroDraft()),
+      campos_monitoramento: (draft?.campos_monitoramento || []).map((campo, idx) =>
+        idx === index ? normalizeAgroFieldDraft({ ...campo, [key]: value }, idx) : campo
+      )
+    }))
+  }
+
+  function handleRemoveCampoMonitoramento(index) {
+    setAgroDraft(draft => ({
+      ...(draft || emptyAgroDraft()),
+      campos_monitoramento: (draft?.campos_monitoramento || []).filter((_, idx) => idx !== index)
+    }))
+  }
+
+  async function handleSalvarCatalogoPraga() {
+    if (!agroDraft) return
+    setAgroSavingDetails(true)
+    setAgroError('')
+    setAgroMessage('')
+    try {
+      const saved = await salvarCatalogoPraga(agroDraft)
+      const refreshed = await listarCatalogoPragasCulturas()
+      setAgroCatalogo(refreshed)
+      const current = refreshed.pragas.find(item => item.id === saved.id) || saved
+      setAgroDraft(buildAgroDraft(current))
+      setAgroMessage(`${saved.nome_comum} salvo e sincronizado para o monitoramento.`)
+    } catch (err) {
+      setAgroError(err.message || 'Nao foi possivel salvar as informacoes do catalogo.')
+    } finally {
+      setAgroSavingDetails(false)
     }
   }
 
@@ -483,10 +645,28 @@ export function CentralTerranexaPage() {
           <Stat label="Hectares ativos" value={formatHa(stats.hectaresAtivos)} />
         </div>
 
-        {error ? (
-          <ErrorPanel error={error} onRetry={() => carregar({ keepSelection: false })} />
-        ) : (
-          <div className="tn-central-workspace" style={s.workspace}>
+        <nav className="tn-central-menu" style={s.centralMenu} aria-label="Menu da Central TerraNexa">
+          {CENTRAL_TABS.map(tab => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id)}
+              style={{
+                ...s.centralMenuBtn,
+                ...(activeTab === tab.id ? s.centralMenuBtnActive : {})
+              }}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </nav>
+
+        {activeTab === 'comercial' && (
+          <>
+            {error ? (
+              <ErrorPanel error={error} onRetry={() => carregar({ keepSelection: false })} />
+            ) : (
+              <div className="tn-central-workspace" style={s.workspace}>
             <section style={s.queuePane}>
               <div style={s.filterRow}>
                 {FILTERS.map(([key, label]) => (
@@ -641,10 +821,10 @@ export function CentralTerranexaPage() {
                 </>
               )}
             </section>
-          </div>
-        )}
+              </div>
+            )}
 
-        <section style={s.accountsSection}>
+            <section style={s.accountsSection}>
           <div style={s.accountsHeader}>
             <p style={s.eyebrow}>CONTAS</p>
             <span style={s.smallMeta}>{contas.length} contas</span>
@@ -675,36 +855,53 @@ export function CentralTerranexaPage() {
               </tbody>
             </table>
           </div>
-        </section>
+            </section>
+          </>
+        )}
 
-        <PermissionsMatrixSection
-          papeis={papeisDisponiveis}
-          draft={permissionsDraft}
-          saving={permissionSaving}
-          message={permissionMessage}
-          error={permissionError}
-          onToggle={handleTogglePermissao}
-          onSetGroup={handleSetPermissoesGrupo}
-          onSave={handleSalvarPermissoes}
-        />
+        {activeTab === 'permissoes' && (
+          <PermissionsMatrixSection
+            papeis={papeisDisponiveis}
+            draft={permissionsDraft}
+            saving={permissionSaving}
+            message={permissionMessage}
+            error={permissionError}
+            onToggle={handleTogglePermissao}
+            onSetGroup={handleSetPermissoesGrupo}
+            onSave={handleSalvarPermissoes}
+          />
+        )}
 
-        <AgroCatalogSection
-          catalogo={agroCatalogo}
-          pragas={agroPragasFiltradas}
-          search={agroSearch}
-          type={agroType}
-          culture={agroCulture}
-          savingId={agroSavingId}
-          message={agroMessage}
-          error={agroError}
-          onSearch={setAgroSearch}
-          onType={setAgroType}
-          onCulture={setAgroCulture}
-          onToggleCulture={handleToggleCulturaPraga}
-          onSave={handleSalvarCulturasPraga}
-        />
+        {activeTab === 'agro' && (
+          <AgroCatalogSection
+            catalogo={agroCatalogo}
+            pragas={agroPragasFiltradas}
+            search={agroSearch}
+            type={agroType}
+            culture={agroCulture}
+            savingId={agroSavingId}
+            savingDetails={agroSavingDetails}
+            draft={agroDraft}
+            message={agroMessage}
+            error={agroError}
+            onSearch={setAgroSearch}
+            onType={setAgroType}
+            onCulture={setAgroCulture}
+            onToggleCulture={handleToggleCulturaPraga}
+            onSave={handleSalvarCulturasPraga}
+            onEdit={handleEditarCatalogoPraga}
+            onNew={handleNovoCatalogoPraga}
+            onDraftChange={handleChangeAgroDraft}
+            onAddField={handleAddCampoMonitoramento}
+            onFieldChange={handleChangeCampoMonitoramento}
+            onFieldRemove={handleRemoveCampoMonitoramento}
+            onSaveDetails={handleSalvarCatalogoPraga}
+          />
+        )}
 
-        <section style={s.hierarchySection}>
+        {activeTab === 'usuarios' && (
+          <>
+            <section style={s.hierarchySection}>
           <div style={s.accountsHeader}>
             <div>
               <p style={s.eyebrow}>HIERARQUIA</p>
@@ -803,7 +1000,7 @@ export function CentralTerranexaPage() {
           </div>
         </section>
 
-        <section style={s.usersSection}>
+            <section style={s.usersSection}>
           <div style={s.accountsHeader}>
             <div>
               <p style={s.eyebrow}>USUARIOS</p>
@@ -866,7 +1063,9 @@ export function CentralTerranexaPage() {
               </tbody>
             </table>
           </div>
-        </section>
+            </section>
+          </>
+        )}
       </main>
     </div>
   )
@@ -1089,15 +1288,24 @@ function AgroCatalogSection({
   type,
   culture,
   savingId,
+  savingDetails,
+  draft,
   message,
   error,
   onSearch,
   onType,
   onCulture,
   onToggleCulture,
-  onSave
+  onSave,
+  onEdit,
+  onNew,
+  onDraftChange,
+  onAddField,
+  onFieldChange,
+  onFieldRemove,
+  onSaveDetails
 }) {
-  const tipos = ['todos', ...new Set((catalogo.pragas || []).map(praga => praga.tipo).filter(Boolean))]
+  const tipos = ['todos', ...AGRO_TIPOS.map(tipo => tipo.id)]
   return (
     <section style={s.agroSection}>
       <div style={s.accountsHeader}>
@@ -1108,6 +1316,14 @@ function AgroCatalogSection({
         <span style={s.smallMeta}>
           {pragas.length} de {catalogo.pragas.length} itens
         </span>
+      </div>
+
+      <div style={s.agroQuickActions}>
+        {AGRO_TIPOS.filter(tipo => ['praga', 'doenca', 'daninha'].includes(tipo.id)).map(tipo => (
+          <button key={tipo.id} type="button" onClick={() => onNew(tipo.id)} style={s.secondaryBtn}>
+            Novo: {tipo.label}
+          </button>
+        ))}
       </div>
 
       {catalogo.avisos?.length > 0 && (
@@ -1146,46 +1362,213 @@ function AgroCatalogSection({
         </select>
       </div>
 
-      <div style={s.agroList}>
-        {pragas.map(praga => (
-          <article key={praga.id} style={s.agroRow}>
-            <div style={s.agroRowHeader}>
-              <div>
-                <strong style={s.agroTitle}>{praga.nome_comum}</strong>
-                <p style={s.agroMeta}>
-                  {praga.nome_cientifico || 'Sem nome cientifico'} / {praga.codigo}
-                </p>
-              </div>
-              <span style={{ ...s.badge, ...agroTypeTone(praga.tipo) }}>{agroTypeLabel(praga.tipo)}</span>
+      <div className="tn-central-agro-layout" style={s.agroLayout}>
+        <div style={s.agroListPane}>
+          <div style={s.agroList}>
+            {pragas.map(praga => (
+              <article key={praga.id} style={{ ...s.agroRow, borderColor: draft?.id === praga.id ? C.greenDp : C.borderSoft }}>
+                <div style={s.agroRowHeader}>
+                  <button type="button" onClick={() => onEdit(praga)} style={s.agroEditButton}>
+                    <strong style={s.agroTitle}>{praga.nome_comum}</strong>
+                    <span style={s.agroMeta}>
+                      {praga.nome_cientifico || 'Sem nome cientifico'} / {praga.codigo}
+                    </span>
+                  </button>
+                  <span style={{ ...s.badge, ...agroTypeTone(praga.tipo) }}>{agroTypeLabel(praga.tipo)}</span>
+                </div>
+                <div className="tn-central-culture-checks" style={s.cultureChecks}>
+                  {catalogo.culturas.map(cultura => (
+                    <label key={`${praga.id}-${cultura.id}`} style={s.cultureCheck}>
+                      <input
+                        type="checkbox"
+                        checked={Boolean(praga.culturaIds?.includes(cultura.id))}
+                        onChange={() => onToggleCulture(praga.id, cultura.id)}
+                      />
+                      <span>{cultura.nome}</span>
+                    </label>
+                  ))}
+                </div>
+                <div style={s.agroFooter}>
+                  <span style={s.smallMeta}>
+                    {praga.culturaIds?.length || 0} culturas direcionadas
+                  </span>
+                  <button
+                    type="button"
+                    disabled={savingId === praga.id}
+                    onClick={() => onSave(praga)}
+                    style={s.secondaryBtn}
+                  >
+                    {savingId === praga.id ? 'Salvando...' : 'Salvar culturas'}
+                  </button>
+                </div>
+              </article>
+            ))}
+            {pragas.length === 0 && <p style={s.emptyText}>Nenhum item encontrado neste filtro.</p>}
+          </div>
+        </div>
+
+        <aside style={s.agroEditor}>
+          <div style={s.agroEditorHeader}>
+            <div>
+              <p style={s.eyebrow}>MONITORAMENTO</p>
+              <h3 style={s.usersTitle}>{draft?.id ? 'Informacoes do item' : 'Novo item do catalogo'}</h3>
             </div>
-            <div className="tn-central-culture-checks" style={s.cultureChecks}>
-              {catalogo.culturas.map(cultura => (
-                <label key={`${praga.id}-${cultura.id}`} style={s.cultureCheck}>
+            {draft?.tipo && <span style={{ ...s.badge, ...agroTypeTone(draft.tipo) }}>{agroTypeLabel(draft.tipo)}</span>}
+          </div>
+
+          {!draft ? (
+            <p style={s.emptyText}>Selecione um item ou crie um novo cadastro.</p>
+          ) : (
+            <>
+              <div className="tn-central-agro-editor-grid" style={s.agroEditorGrid}>
+                <Field label="Tipo">
+                  <select value={draft.tipo} onChange={e => onDraftChange('tipo', e.target.value)} style={s.input}>
+                    {AGRO_TIPOS.map(tipo => (
+                      <option key={tipo.id} value={tipo.id}>
+                        {tipo.label}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Codigo">
+                  <input
+                    value={draft.codigo}
+                    onChange={e => onDraftChange('codigo', e.target.value)}
+                    placeholder="EX: LAG_SOJA"
+                    style={s.input}
+                  />
+                </Field>
+                <label style={{ ...s.checkboxLabel, alignSelf: 'end', minHeight: 38 }}>
                   <input
                     type="checkbox"
-                    checked={Boolean(praga.culturaIds?.includes(cultura.id))}
-                    onChange={() => onToggleCulture(praga.id, cultura.id)}
+                    checked={draft.ativo}
+                    onChange={e => onDraftChange('ativo', e.target.checked)}
                   />
-                  <span>{cultura.nome}</span>
+                  Ativo
                 </label>
-              ))}
-            </div>
-            <div style={s.agroFooter}>
-              <span style={s.smallMeta}>
-                {praga.culturaIds?.length || 0} culturas direcionadas
-              </span>
+              </div>
+
+              <Field label="Nome comum">
+                <input
+                  value={draft.nome_comum}
+                  onChange={e => onDraftChange('nome_comum', e.target.value)}
+                  placeholder="Nome usado no campo"
+                  style={s.input}
+                />
+              </Field>
+
+              <Field label="Nome cientifico">
+                <input
+                  value={draft.nome_cientifico}
+                  onChange={e => onDraftChange('nome_cientifico', e.target.value)}
+                  placeholder="Opcional"
+                  style={s.input}
+                />
+              </Field>
+
+              <Field label="Foto URL">
+                <input
+                  value={draft.foto_url}
+                  onChange={e => onDraftChange('foto_url', e.target.value)}
+                  placeholder="https://..."
+                  style={s.input}
+                />
+              </Field>
+
+              <Field label="Sintomas">
+                <textarea
+                  value={draft.sintomas}
+                  onChange={e => onDraftChange('sintomas', e.target.value)}
+                  placeholder="Sintomas que ajudam a identificar no monitoramento"
+                  style={{ ...s.textarea, minHeight: 70 }}
+                />
+              </Field>
+
+              <Field label="Nivel de dano economico">
+                <textarea
+                  value={draft.nivel_dano_economico}
+                  onChange={e => onDraftChange('nivel_dano_economico', e.target.value)}
+                  placeholder="Ex: 2 percevejos por metro"
+                  style={{ ...s.textarea, minHeight: 62 }}
+                />
+              </Field>
+
+              <Field label="Instrucoes para monitoramento">
+                <textarea
+                  value={draft.instrucoes_monitoramento}
+                  onChange={e => onDraftChange('instrucoes_monitoramento', e.target.value)}
+                  placeholder="Como avaliar no campo, onde procurar, periodo ideal"
+                  style={{ ...s.textarea, minHeight: 76 }}
+                />
+              </Field>
+
+              <div style={s.monitorFieldsHeader}>
+                <div>
+                  <p style={s.eyebrow}>CAMPOS EXTRAS</p>
+                  <h4 style={s.sectionTitle}>Dados pedidos no monitoramento</h4>
+                </div>
+                <button type="button" onClick={onAddField} style={s.secondaryBtn}>
+                  Adicionar campo
+                </button>
+              </div>
+
+              <div style={s.monitorFieldsList}>
+                {(draft.campos_monitoramento || []).map((campo, index) => (
+                  <div key={`${campo.id}-${index}`} className="tn-central-monitor-field" style={s.monitorFieldRow}>
+                    <input
+                      value={campo.label}
+                      onChange={e => onFieldChange(index, 'label', e.target.value)}
+                      placeholder="Nome do campo"
+                      style={s.input}
+                    />
+                    <select value={campo.tipo} onChange={e => onFieldChange(index, 'tipo', e.target.value)} style={s.input}>
+                      {MONITORING_FIELD_TYPES.map(option => (
+                        <option key={option.id} value={option.id}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      value={campo.unidade}
+                      onChange={e => onFieldChange(index, 'unidade', e.target.value)}
+                      placeholder="Unidade"
+                      style={s.input}
+                    />
+                    <input
+                      value={campo.opcoes}
+                      onChange={e => onFieldChange(index, 'opcoes', e.target.value)}
+                      placeholder="Opcoes, se selecao"
+                      style={s.input}
+                    />
+                    <label style={s.checkboxLabel}>
+                      <input
+                        type="checkbox"
+                        checked={campo.obrigatorio}
+                        onChange={e => onFieldChange(index, 'obrigatorio', e.target.checked)}
+                      />
+                      Obrigatorio
+                    </label>
+                    <button type="button" onClick={() => onFieldRemove(index)} style={s.ghostBtn}>
+                      Remover
+                    </button>
+                  </div>
+                ))}
+                {(!draft.campos_monitoramento || draft.campos_monitoramento.length === 0) && (
+                  <p style={s.emptyText}>Nenhum campo extra configurado.</p>
+                )}
+              </div>
+
               <button
                 type="button"
-                disabled={savingId === praga.id}
-                onClick={() => onSave(praga)}
-                style={s.secondaryBtn}
+                disabled={savingDetails}
+                onClick={onSaveDetails}
+                style={{ ...s.primaryBtn, justifySelf: 'start' }}
               >
-                {savingId === praga.id ? 'Salvando...' : 'Salvar culturas'}
+                {savingDetails ? 'Salvando...' : 'Salvar informacoes'}
               </button>
-            </div>
-          </article>
-        ))}
-        {pragas.length === 0 && <p style={s.emptyText}>Nenhum item encontrado neste filtro.</p>}
+            </>
+          )}
+        </aside>
       </div>
     </section>
   )
@@ -1419,6 +1802,31 @@ const s = {
   stat: { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: '14px 16px' },
   statLabel: { display: 'block', color: C.textDim, fontSize: 11, marginBottom: 6 },
   statValue: { fontSize: 21, lineHeight: 1 },
+  centralMenu: {
+    display: 'flex',
+    gap: 8,
+    flexWrap: 'wrap',
+    margin: '0 0 16px',
+    padding: 6,
+    background: C.bg,
+    border: `1px solid ${C.border}`,
+    borderRadius: 8
+  },
+  centralMenuBtn: {
+    border: `1px solid transparent`,
+    borderRadius: 8,
+    padding: '9px 12px',
+    background: 'transparent',
+    color: C.textMid,
+    fontSize: 12,
+    fontWeight: 900,
+    cursor: 'pointer'
+  },
+  centralMenuBtnActive: {
+    borderColor: C.greenDp,
+    background: C.greenDp,
+    color: C.bg
+  },
   workspace: { display: 'grid', gridTemplateColumns: '380px minmax(0, 1fr)', gap: 14, alignItems: 'start' },
   queuePane: { background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: 12 },
   filterRow: { display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 },
@@ -1664,6 +2072,9 @@ const s = {
     lineHeight: 1.25
   },
   agroTools: { display: 'grid', gridTemplateColumns: 'minmax(220px, 1.5fr) minmax(160px, 0.7fr) minmax(160px, 0.8fr)', gap: 8, marginBottom: 10 },
+  agroQuickActions: { display: 'flex', gap: 8, flexWrap: 'wrap', margin: '0 0 10px' },
+  agroLayout: { display: 'grid', gridTemplateColumns: 'minmax(360px, 0.95fr) minmax(0, 1.2fr)', gap: 12, alignItems: 'start' },
+  agroListPane: { minWidth: 0 },
   agroList: { display: 'grid', gap: 9 },
   agroRow: {
     border: `1px solid ${C.borderSoft}`,
@@ -1678,6 +2089,17 @@ const s = {
     justifyContent: 'space-between',
     gap: 10,
     marginBottom: 9
+  },
+  agroEditButton: {
+    display: 'grid',
+    gap: 3,
+    minWidth: 0,
+    padding: 0,
+    border: 'none',
+    background: 'transparent',
+    textAlign: 'left',
+    cursor: 'pointer',
+    fontFamily: 'inherit'
   },
   agroTitle: { display: 'block', color: C.textDk, fontSize: 14, lineHeight: 1.2 },
   agroMeta: { margin: '3px 0 0', color: C.textMid, fontSize: 11, lineHeight: 1.35 },
@@ -1703,6 +2125,45 @@ const s = {
     marginTop: 10,
     paddingTop: 9,
     borderTop: `1px solid ${C.borderSoft}`
+  },
+  agroEditor: {
+    display: 'grid',
+    gap: 10,
+    border: `1px solid ${C.borderSoft}`,
+    borderRadius: 8,
+    padding: 12,
+    background: '#FBFCF8',
+    minWidth: 0,
+    position: 'sticky',
+    top: 84
+  },
+  agroEditorHeader: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 10,
+    paddingBottom: 9,
+    borderBottom: `1px solid ${C.borderSoft}`
+  },
+  agroEditorGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 8, alignItems: 'end' },
+  monitorFieldsHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    borderTop: `1px solid ${C.borderSoft}`,
+    paddingTop: 10
+  },
+  monitorFieldsList: { display: 'grid', gap: 8 },
+  monitorFieldRow: {
+    display: 'grid',
+    gridTemplateColumns: '1.2fr 0.8fr 0.7fr 1fr auto auto',
+    gap: 7,
+    alignItems: 'center',
+    border: `1px solid ${C.borderSoft}`,
+    borderRadius: 8,
+    background: C.bg,
+    padding: 8
   },
   smallMeta: { color: C.textDim, fontSize: 12 },
   tableWrap: { overflowX: 'auto' },
@@ -1790,7 +2251,12 @@ if (typeof document !== 'undefined' && !document.getElementById('tn-central-styl
       .tn-central-workspace,
       .tn-central-link-form,
       .tn-central-permissions-grid,
-      .tn-central-agro-tools { grid-template-columns: 1fr !important; }
+      .tn-central-agro-tools,
+      .tn-central-agro-layout,
+      .tn-central-agro-editor-grid,
+      .tn-central-monitor-field { grid-template-columns: 1fr !important; }
+      .tn-central-menu { overflow-x: auto; flex-wrap: nowrap !important; }
+      .tn-central-menu button { flex: 0 0 auto; }
     }
     @media (max-width: 760px) {
       .tn-central-stats { grid-template-columns: 1fr 1fr !important; }
