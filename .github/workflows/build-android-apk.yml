@@ -1,0 +1,59 @@
+name: Build Android APK - TerraNexa
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-apk:
+    name: Gerar APK Android
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Baixar código do repositório
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Instalar dependências do projeto
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+
+      - name: Gerar build web sem PWA para Android
+        env:
+          TERRANEXA_ANDROID_BUILD: 'true'
+        run: npm run build --if-present
+
+      - name: Sincronizar Capacitor com Android
+        run: npx cap sync android
+
+      - name: Configurar Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - name: Dar permissão ao Gradle
+        run: chmod +x android/gradlew
+
+      - name: Gerar APK Debug
+        run: |
+          cd android
+          ./gradlew assembleDebug
+
+      - name: Enviar APK para download
+        uses: actions/upload-artifact@v4
+        with:
+          name: TerraNexa-APK-Debug
+          path: android/app/build/outputs/apk/debug/*.apk
