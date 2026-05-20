@@ -425,6 +425,7 @@ export function FazendaDetalhePage() {
                 navigate={navigate}
                 setActiveView={setActiveView}
                 setMenuOpen={setMenuOpen}
+                acesso={acesso}
               />
             )}
             {activeView === 'dashboard' && (
@@ -440,6 +441,7 @@ export function FazendaDetalhePage() {
                 talhoesSemMonitoramento={talhoesSemMonitoramento}
                 navigate={navigate}
                 setActiveView={setActiveView}
+                acesso={acesso}
               />
             )}
             {activeView === 'chuvas' && (
@@ -457,6 +459,7 @@ export function FazendaDetalhePage() {
                 abrirTalhao={abrirTalhao}
                 setActiveView={setActiveView}
                 navigate={navigate}
+                acesso={acesso}
               />
             )}
             {activeView === 'monitoramento-inbox' && (
@@ -468,6 +471,7 @@ export function FazendaDetalhePage() {
                 abrirTalhao={abrirTalhao}
                 setActiveView={setActiveView}
                 navigate={navigate}
+                acesso={acesso}
               />
             )}
             {activeView === 'gerencial' && (

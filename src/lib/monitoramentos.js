@@ -1,4 +1,8 @@
 import { supabase } from './supabase'
+import { getCurrentUserIdentity } from './userIdentity'
+
+const MONITORAMENTO_SELECT =
+  'id, talhao_id, tecnico_id, tecnico_nome, visitado_em, dano, severidade, observacoes, status, created_at'
 
 export async function listarUltimosMonitoramentos(talhaoIds = []) {
   const ids = Array.from(new Set((talhaoIds || []).filter(Boolean)))
@@ -6,7 +10,7 @@ export async function listarUltimosMonitoramentos(talhaoIds = []) {
 
   const { data, error } = await supabase
     .from('monitoramentos')
-    .select('id, talhao_id, visitado_em, dano, severidade, observacoes, status, created_at')
+    .select(MONITORAMENTO_SELECT)
     .in('talhao_id', ids)
     .order('visitado_em', { ascending: false })
 
@@ -36,7 +40,7 @@ export async function listarMonitoramentosFazenda(fazendaId, { dataInicio, dataF
 
   let q = supabase
     .from('monitoramentos')
-    .select('id, talhao_id, visitado_em, dano, severidade, observacoes, status, created_at')
+    .select(MONITORAMENTO_SELECT)
     .in('talhao_id', allowed)
     .order('visitado_em', { ascending: false })
   if (dataInicio) q = q.gte('visitado_em', dataInicio)
@@ -95,10 +99,13 @@ export async function criarMonitoramento({
   status = 'realizado',
   visitado_em
 }) {
+  const identity = await getCurrentUserIdentity()
   const { data, error } = await supabase
     .from('monitoramentos')
     .insert({
       talhao_id,
+      tecnico_id: identity.id,
+      tecnico_nome: identity.nome || identity.email || null,
       dano,
       severidade,
       observacoes: observacoes || null,

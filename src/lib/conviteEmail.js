@@ -5,7 +5,7 @@ function conviteRedirectUrl(token) {
   return `${window.location.origin}/aceitar-convite?token=${token}&setup=senha`
 }
 
-async function enviarMagicLinkConvite({ email, conviteToken, fazendaId, papel }) {
+async function enviarMagicLinkConvite({ email, nome, conviteToken, fazendaId, papel }) {
   const emailRedirectTo = conviteRedirectUrl(conviteToken)
   if (!emailRedirectTo) throw new Error('Convite criado, mas nao foi possivel montar o link de acesso.')
 
@@ -16,6 +16,7 @@ async function enviarMagicLinkConvite({ email, conviteToken, fazendaId, papel })
       shouldCreateUser: true,
       data: {
         origem: 'terranexa_convite',
+        nome: nome || null,
         convite_token: conviteToken,
         fazenda_id: fazendaId,
         papel
@@ -26,7 +27,7 @@ async function enviarMagicLinkConvite({ email, conviteToken, fazendaId, papel })
   return { sent: true, metodo: 'magic_link', redirectTo: emailRedirectTo }
 }
 
-export async function enviarEmailConviteFazenda({ fazendaId, email, papel, conviteToken }) {
+export async function enviarEmailConviteFazenda({ fazendaId, email, nome, papel, conviteToken }) {
   const {
     data: { session }
   } = await supabase.auth.getSession()
@@ -41,15 +42,15 @@ export async function enviarEmailConviteFazenda({ fazendaId, email, papel, convi
         'Content-Type': 'application/json',
         Authorization: `Bearer ${session.access_token}`
       },
-      body: JSON.stringify({ fazendaId, email, papel })
+      body: JSON.stringify({ fazendaId, email, nome, papel })
     })
   } catch {
-    return enviarMagicLinkConvite({ email, conviteToken, fazendaId, papel })
+    return enviarMagicLinkConvite({ email, nome, conviteToken, fazendaId, papel })
   }
 
   const payload = await response.json().catch(() => ({}))
   if (!response.ok && payload.error === 'configuracao_indisponivel') {
-    return enviarMagicLinkConvite({ email, conviteToken, fazendaId, papel })
+    return enviarMagicLinkConvite({ email, nome, conviteToken, fazendaId, papel })
   }
   if (!response.ok) {
     throw new Error(payload.message || 'Convite criado, mas o e-mail nao foi enviado.')

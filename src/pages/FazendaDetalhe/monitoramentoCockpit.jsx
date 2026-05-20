@@ -6,6 +6,7 @@ import {
   listarCaminhamentosFazenda,
   getSeveridadeInfo
 } from '../../lib/monitoramentos'
+import { podeAbrirOrdemServico, podeVerPeriodosLongosMonitoramento } from '../../lib/fazendaPapeis'
 import { MONITORAMENTO_LEGEND } from './constants'
 import { SimpleFarmMap } from './maps'
 import { useMediaQuery, useDevicePosition } from './hooks'
@@ -292,12 +293,13 @@ export function MonitoramentoCockpitView({
   monitoramentosResumo = {},
   abrirTalhao,
   setActiveView,
-  navigate
+  navigate,
+  acesso
 }) {
   const isDesktop = useMediaQuery('(min-width: 900px)')
   const devicePosition = useDevicePosition(!isDesktop)
   const [modo, setModo] = useState('severidade') // 'severidade' | 'atraso'
-  const [periodo, setPeriodo] = useState(30)
+  const [periodo, setPeriodo] = useState(8)
   const [selectedId, setSelectedId] = useState(null)
   const [historico, setHistorico] = useState([])
   const [pontos, setPontos] = useState([])
@@ -308,6 +310,13 @@ export function MonitoramentoCockpitView({
   const [offlinePending, setOfflinePending] = useState(emptyOfflineCount)
   const [offlineSyncing, setOfflineSyncing] = useState(false)
   const [offlineMessage, setOfflineMessage] = useState('')
+  const canOpenOs = podeAbrirOrdemServico(acesso)
+  const canUseLongPeriods = isDesktop && podeVerPeriodosLongosMonitoramento(acesso)
+  const periodOptions = useMemo(() => (canUseLongPeriods ? [8, 30, 90] : [8]), [canUseLongPeriods])
+
+  useEffect(() => {
+    if (!periodOptions.includes(periodo)) setPeriodo(8)
+  }, [periodOptions, periodo])
 
   // Auto-select first talhão with severidade > moderada, or first talhão.
   useEffect(() => {
@@ -462,7 +471,7 @@ export function MonitoramentoCockpitView({
   if (!isDesktop) {
     return (
       <MonitoramentoCockpitMobile
-        talhoes={talhoes}
+        talhoes={talhoes.filter(t => historico.some(h => h.talhao_id === t.id))}
         monitoramentosResumo={monitoramentosResumo}
         historico={historico}
         loading={loading}
@@ -477,6 +486,7 @@ export function MonitoramentoCockpitView({
         offlineMessage={offlineMessage}
         sincronizarOffline={sincronizarOffline}
         navigate={navigate}
+        canOpenOs={canOpenOs}
       />
     )
   }
@@ -680,7 +690,7 @@ export function MonitoramentoCockpitView({
         <div style={periodPanelStyle}>
           <p style={eyebrowStyle}>PERÍODO</p>
           <div style={{ display: 'flex', gap: 4, marginTop: 8 }}>
-            {[7, 30, 90].map(d => (
+            {periodOptions.map(d => (
               <button key={d} onClick={() => setPeriodo(d)} style={periodButtonStyle(periodo === d)}>
                 {d}d
               </button>
@@ -809,9 +819,11 @@ export function MonitoramentoCockpitView({
               <button onClick={abrirMonitoramento} style={{ ...primaryBtnStyle, flex: 1 }}>
                 + Registrar visita
               </button>
-              <button onClick={() => navigate('/os')} style={secondaryBtnStyle}>
-                Abrir OS
-              </button>
+              {canOpenOs && (
+                <button onClick={() => navigate('/os')} style={secondaryBtnStyle}>
+                  Abrir OS
+                </button>
+              )}
             </div>
           </div>
 
@@ -959,10 +971,19 @@ function MonitoramentoCockpitMobile({
   offlineSyncing,
   offlineMessage,
   sincronizarOffline,
-  navigate
+  navigate,
+  canOpenOs
 }) {
   const selected = talhoes.find(t => t.id === selectedId) || null
   const selMeta = selected ? getMonitoramentoMeta(monitoramentosResumo[selected.id]) : null
+
+  useEffect(() => {
+    if (talhoes.length === 0) {
+      if (selectedId) setSelectedId(null)
+      return
+    }
+    if (!talhoes.some(t => t.id === selectedId)) setSelectedId(talhoes[0].id)
+  }, [talhoes, selectedId, setSelectedId])
 
   return (
     <section style={{ display: 'grid', gap: 12, padding: 12 }}>
@@ -982,7 +1003,7 @@ function MonitoramentoCockpitMobile({
       </div>
 
       <div style={{ display: 'flex', gap: 6 }}>
-        {[7, 30, 90].map(d => (
+        {[8].map(d => (
           <button key={d} onClick={() => setPeriodo(d)} style={periodButtonStyle(periodo === d)}>
             {d}d
           </button>
@@ -1065,6 +1086,21 @@ function MonitoramentoCockpitMobile({
             </button>
           )
         })}
+        {talhoes.length === 0 && !loading && (
+          <div
+            style={{
+              background: C.bg,
+              border: `1px dashed ${C.border}`,
+              borderRadius: 12,
+              padding: 16,
+              color: C.textMid,
+              fontSize: 12,
+              lineHeight: 1.45
+            }}
+          >
+            Nenhum talhao teve monitoramento registrado nos ultimos 8 dias.
+          </div>
+        )}
       </div>
 
       {selected && (
@@ -1100,9 +1136,11 @@ function MonitoramentoCockpitMobile({
             <button onClick={abrirMonitoramento} style={{ ...primaryBtnStyle, flex: 1 }}>
               + Registrar visita
             </button>
-            <button onClick={() => navigate('/os')} style={secondaryBtnStyle}>
-              Abrir OS
-            </button>
+            {canOpenOs && (
+              <button onClick={() => navigate('/os')} style={secondaryBtnStyle}>
+                Abrir OS
+              </button>
+            )}
           </div>
 
           {historico.filter(h => h.talhao_id === selectedId).length > 0 && (

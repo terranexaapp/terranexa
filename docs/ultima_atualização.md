@@ -1,5 +1,32 @@
 # Última Atualização TerraNexa
 
+## 2026-05-20 - Nomes de usuarios e fluxo mobile de campo
+
+### Onde paramos
+
+- A Central passou a trabalhar com `Nome no app` para membros de fazenda; novos convites exigem nome e vinculos antigos podem ser corrigidos com `Salvar nome`.
+- Criada a rota `api/atualizar-nome-usuario-fazenda.js` para atualizar `fazenda_membros.nome` e `profiles.nome` com service role no backend.
+- Monitoramentos, operacoes e OS agora gravam nome do tecnico/executor/criador/fechador.
+- No mobile, o Scouting fica em 8 dias e lista apenas talhoes com monitoramento realizado no periodo.
+- Periodos 30d/90d ficam apenas para gerente/agronomo/proprietario no desktop.
+- Tecnico, operador e coordenador nao veem abertura de OS; o mapa mobile recebeu rail lateral direito com Menu, Resumo, Monitoramento e GPS.
+- Historicos locais de pontos/caminhamentos sao limpos apos sincronizacao sem falha.
+
+### Proxima retomada
+
+- Aplicar `database/014_usuarios_nomes_mobile_monitoramento.sql` no SQL Editor do Supabase de producao.
+- Confirmar `SUPABASE_SERVICE_ROLE_KEY` na Vercel.
+- Em usuarios antigos, preencher `Nome no app` e clicar `Salvar nome` para remover a duplicidade de e-mail na hierarquia e alimentar os registros futuros.
+- Testar em mobile: Scouting 8d, mapa sem `Abrir OS` para tecnico/operador/coordenador e sync limpando historico local.
+
+### Status
+
+- `git diff --check` passou.
+- `node --check api/enviar-convite.js` passou.
+- `node --check api/atualizar-nome-usuario-fazenda.js` passou.
+- Build de producao passou com Vite.
+- O conector Supabase desta sessao nao expos execucao SQL; migration 014 ainda precisa ser aplicada no Supabase.
+
 ## 2026-05-20 - Correcao RLS ao salvar culturas do catalogo
 
 ### Onde paramos

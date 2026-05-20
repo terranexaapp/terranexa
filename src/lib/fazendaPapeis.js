@@ -36,6 +36,9 @@ export const FAZENDA_PERMISSAO_GROUPS = [
   }
 ]
 
+export const PAPEIS_CAMPO_SEM_ABRIR_OS = ['tecnico', 'operador', 'coordenador_equipe']
+export const PAPEIS_COM_PERIODO_LONGO_MONITORAMENTO = ['proprietario', 'gerente', 'agronomo']
+
 export const FAZENDA_PAPEIS = [
   {
     papel: 'gerente',
@@ -101,7 +104,7 @@ export const FAZENDA_PAPEIS = [
     permissoes: {
       dashboard: true,
       mapa: true,
-      chuvas: true,
+      chuvas: false,
       solo: false,
       monitoramento: true,
       monitoramento_registro: true,
@@ -117,7 +120,7 @@ export const FAZENDA_PAPEIS = [
       membros: false,
       relatorios: false,
       operacoes_resumo: true,
-      os_apontamento: true,
+      os_apontamento: false,
       os_fechar: false
     }
   },
@@ -131,8 +134,8 @@ export const FAZENDA_PAPEIS = [
       mapa: true,
       chuvas: false,
       solo: false,
-      monitoramento: false,
-      monitoramento_registro: false,
+      monitoramento: true,
+      monitoramento_registro: true,
       gerencial: false,
       talhoes: false,
       pluviometros: false,
@@ -145,7 +148,7 @@ export const FAZENDA_PAPEIS = [
       membros: false,
       relatorios: false,
       operacoes_resumo: true,
-      os_apontamento: true,
+      os_apontamento: false,
       os_fechar: true
     }
   },
@@ -173,7 +176,7 @@ export const FAZENDA_PAPEIS = [
       membros: false,
       relatorios: false,
       operacoes_resumo: true,
-      os_apontamento: true,
+      os_apontamento: false,
       os_fechar: false
     }
   }
@@ -204,6 +207,24 @@ export function getFazendaPapelMeta(papel, fallback = null) {
     resumo: 'Papel nao catalogado.',
     permissoes: {}
   }
+}
+
+function papelFromAcesso(acessoOuPapel) {
+  return typeof acessoOuPapel === 'string' ? acessoOuPapel : acessoOuPapel?.papel
+}
+
+export function usaMenuCampoEnxuto(acessoOuPapel) {
+  return PAPEIS_CAMPO_SEM_ABRIR_OS.includes(papelFromAcesso(acessoOuPapel))
+}
+
+export function podeAbrirOrdemServico(acesso) {
+  if (!acesso?.papel) return false
+  if (usaMenuCampoEnxuto(acesso)) return false
+  return Boolean(acesso.permissoes?.os_apontamento || acesso.papel === 'proprietario')
+}
+
+export function podeVerPeriodosLongosMonitoramento(acessoOuPapel) {
+  return PAPEIS_COM_PERIODO_LONGO_MONITORAMENTO.includes(papelFromAcesso(acessoOuPapel))
 }
 
 export function resumirPermissoes(permissoes = {}, limit = 5) {

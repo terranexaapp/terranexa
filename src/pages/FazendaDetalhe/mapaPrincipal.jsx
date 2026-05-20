@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from 'react'
 import { theme } from '../../styles/theme'
 import { getCategoriaInfo } from '../../lib/operacoes'
 import { listarCaminhamentosFazenda, listarPontosFazenda } from '../../lib/monitoramentos'
+import { podeAbrirOrdemServico, usaMenuCampoEnxuto } from '../../lib/fazendaPapeis'
 import { useGpsRequest, useMediaQuery } from './hooks'
 import { SimpleFarmMap } from './maps'
 import { requestOfflineStorage } from './offline'
@@ -478,7 +479,8 @@ export function FazendaMapaPrincipal({
   alternarTalhao,
   navigate,
   setActiveView,
-  setMenuOpen
+  setMenuOpen,
+  acesso
 }) {
   const isDesktop = useMediaQuery('(min-width: 900px)')
   const gps = useGpsRequest()
@@ -490,6 +492,11 @@ export function FazendaMapaPrincipal({
 
   useEffect(() => {
     if (!fazenda?.id) return
+    if (!isDesktop) {
+      setMonitoramentoPontos([])
+      setCaminhamentos([])
+      return
+    }
     let active = true
     ;(async () => {
       const [pontosResult, caminhamentosResult] = await Promise.all([
@@ -503,7 +510,7 @@ export function FazendaMapaPrincipal({
     return () => {
       active = false
     }
-  }, [fazenda?.id, monitoramentosResumo])
+  }, [fazenda?.id, monitoramentosResumo, isDesktop])
 
   function handleGpsClick() {
     setGpsBannerDismissed(false)
@@ -518,6 +525,8 @@ export function FazendaMapaPrincipal({
 
   const gpsActive = gps.status === 'active'
   const showGpsBanner = !gpsBannerDismissed && gps.status !== 'idle' && gps.status !== 'active'
+  const canOpenOs = podeAbrirOrdemServico(acesso)
+  const compactFieldMenu = usaMenuCampoEnxuto(acesso)
 
   const features = talhoes
     .map(t => ({ talhao: t, feature: normalizeFeature(t.geometria, t.codigo) }))
@@ -578,6 +587,8 @@ export function FazendaMapaPrincipal({
         setActiveView={setActiveView}
         navigate={navigate}
         setMenuOpen={setMenuOpen}
+        canOpenOs={canOpenOs}
+        compactFieldMenu={compactFieldMenu}
         gpsStatus={gps.status}
         gpsPosition={gps.position}
         gpsBlockedReason={gps.blockedReason}
@@ -625,21 +636,27 @@ export function FazendaMapaPrincipal({
         >
           <Ico.Leaf />
         </button>
-        <button
-          onClick={() => navigate('/os')}
-          style={railIconStyle(false)}
-          title="Ordens de servico"
-          aria-label="Ordens de servico"
-        >
-          <Ico.History />
-          {ultimaOpAberta && <span style={railBadgeStyle} />}
-        </button>
-        <button onClick={() => setActiveView('chuvas')} style={railIconStyle(false)} title="Chuvas" aria-label="Chuvas">
-          <Ico.Drop />
-        </button>
-        <button onClick={() => setActiveView('solo')} style={railIconStyle(false)} title="Solo" aria-label="Solo">
-          <Ico.Soil />
-        </button>
+        {!compactFieldMenu && canOpenOs && (
+          <button
+            onClick={() => navigate('/os')}
+            style={railIconStyle(false)}
+            title="Ordens de servico"
+            aria-label="Ordens de servico"
+          >
+            <Ico.History />
+            {ultimaOpAberta && <span style={railBadgeStyle} />}
+          </button>
+        )}
+        {!compactFieldMenu && (
+          <>
+            <button onClick={() => setActiveView('chuvas')} style={railIconStyle(false)} title="Chuvas" aria-label="Chuvas">
+              <Ico.Drop />
+            </button>
+            <button onClick={() => setActiveView('solo')} style={railIconStyle(false)} title="Solo" aria-label="Solo">
+              <Ico.Soil />
+            </button>
+          </>
+        )}
         <hr style={railDividerStyle} />
         <button
           type="button"
@@ -822,10 +839,12 @@ export function FazendaMapaPrincipal({
               <Ico.Plus />
               Monitorar
             </button>
-            <button onClick={() => navigate('/os')} style={primaryCtaStyle}>
-              <Ico.Order />
-              Abrir OS
-            </button>
+            {canOpenOs && (
+              <button onClick={() => navigate('/os')} style={primaryCtaStyle}>
+                <Ico.Order />
+                Abrir OS
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -851,6 +870,8 @@ function MapaMobile({
   setActiveView,
   navigate,
   setMenuOpen,
+  canOpenOs,
+  compactFieldMenu,
   gpsStatus,
   gpsPosition,
   gpsBlockedReason,
@@ -878,47 +899,52 @@ function MapaMobile({
         caminhamentos={caminhamentos}
       />
 
-      {/* Rail horizontal no topo */}
+      {/* Rail lateral mobile */}
       <nav
         style={{
           position: 'absolute',
-          top: 12,
-          left: 12,
-          right: 12,
+          top: 86,
+          right: 10,
           background: 'rgba(255,255,255,0.96)',
           border: `1px solid ${C.border}`,
           borderRadius: 14,
-          padding: 6,
-          display: 'flex',
+          padding: '7px 5px',
+          display: 'grid',
           gap: 4,
-          alignItems: 'center',
+          justifyItems: 'center',
           boxShadow: '0 8px 24px rgba(0,0,0,0.18)',
           zIndex: 6,
-          overflowX: 'auto'
+          maxWidth: 58
         }}
         aria-label="Atalhos do mapa"
       >
         <button onClick={() => setMenuOpen(true)} style={railIconStyle(false)} aria-label="Menu">
           <Ico.Menu />
         </button>
-        <span style={{ width: 1, height: 26, background: C.borderSoft, flexShrink: 0 }} />
+        <span style={{ width: 32, height: 1, background: C.borderSoft }} />
         <button style={railIconStyle(true)} aria-label="Resumo">
           <Ico.Sum />
         </button>
         <button onClick={() => setActiveView('monitoramento')} style={railIconStyle(false)} aria-label="Monitoramento">
           <Ico.Leaf />
         </button>
-        <button onClick={() => navigate('/os')} style={railIconStyle(false)} aria-label="Ordens de servico">
-          <Ico.History />
-          {ultimaOpAberta && <span style={railBadgeStyle} />}
-        </button>
-        <button onClick={() => setActiveView('chuvas')} style={railIconStyle(false)} aria-label="Chuvas">
-          <Ico.Drop />
-        </button>
-        <button onClick={() => setActiveView('solo')} style={railIconStyle(false)} aria-label="Solo">
-          <Ico.Soil />
-        </button>
-        <span style={{ width: 1, height: 26, background: C.borderSoft, flexShrink: 0 }} />
+        {!compactFieldMenu && canOpenOs && (
+          <button onClick={() => navigate('/os')} style={railIconStyle(false)} aria-label="Ordens de servico">
+            <Ico.History />
+            {ultimaOpAberta && <span style={railBadgeStyle} />}
+          </button>
+        )}
+        {!compactFieldMenu && (
+          <>
+            <button onClick={() => setActiveView('chuvas')} style={railIconStyle(false)} aria-label="Chuvas">
+              <Ico.Drop />
+            </button>
+            <button onClick={() => setActiveView('solo')} style={railIconStyle(false)} aria-label="Solo">
+              <Ico.Soil />
+            </button>
+          </>
+        )}
+        <span style={{ width: 32, height: 1, background: C.borderSoft }} />
         <button
           type="button"
           onClick={onGpsClick}
@@ -929,16 +955,20 @@ function MapaMobile({
           <Ico.Gps />
           {gpsStatus === 'requesting' && <span style={railBadgeStyle} />}
         </button>
-        <div style={{ flex: 1, minWidth: 4 }} />
         <span
           style={{
             fontFamily: FONTS.mono,
             fontSize: 10,
             color: C.textMid,
-            padding: '0 8px',
+            padding: '4px 0',
             whiteSpace: 'nowrap',
             fontWeight: 700,
-            letterSpacing: '0.4px'
+            letterSpacing: '0.4px',
+            writingMode: 'vertical-rl',
+            transform: 'rotate(180deg)',
+            maxHeight: 70,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis'
           }}
         >
           {selected?.codigo || fazenda?.nome || ''}
@@ -1076,10 +1106,12 @@ function MapaMobile({
               <Ico.Plus />
               Monitorar
             </button>
-            <button onClick={() => navigate('/os')} style={{ ...primaryCtaStyle, flex: 1, justifyContent: 'center' }}>
-              <Ico.Order />
-              Abrir OS
-            </button>
+            {canOpenOs && (
+              <button onClick={() => navigate('/os')} style={{ ...primaryCtaStyle, flex: 1, justifyContent: 'center' }}>
+                <Ico.Order />
+                Abrir OS
+              </button>
+            )}
           </div>
         </div>
       )}

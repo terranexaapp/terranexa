@@ -97,7 +97,7 @@ values
     '{
       "dashboard": true,
       "mapa": true,
-      "chuvas": true,
+      "chuvas": false,
       "solo": false,
       "monitoramento": true,
       "monitoramento_registro": true,
@@ -113,7 +113,7 @@ values
       "membros": false,
       "relatorios": false,
       "operacoes_resumo": true,
-      "os_apontamento": true,
+      "os_apontamento": false,
       "os_fechar": false
     }'::jsonb,
     true
@@ -128,8 +128,8 @@ values
       "mapa": true,
       "chuvas": false,
       "solo": false,
-      "monitoramento": false,
-      "monitoramento_registro": false,
+      "monitoramento": true,
+      "monitoramento_registro": true,
       "gerencial": false,
       "talhoes": false,
       "pluviometros": false,
@@ -142,7 +142,7 @@ values
       "membros": false,
       "relatorios": false,
       "operacoes_resumo": true,
-      "os_apontamento": true,
+      "os_apontamento": false,
       "os_fechar": true
     }'::jsonb,
     true
@@ -171,7 +171,7 @@ values
       "membros": false,
       "relatorios": false,
       "operacoes_resumo": true,
-      "os_apontamento": true,
+      "os_apontamento": false,
       "os_fechar": false
     }'::jsonb,
     true

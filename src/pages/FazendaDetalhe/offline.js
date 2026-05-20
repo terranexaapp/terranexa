@@ -159,6 +159,24 @@ function sessionMatchesFazenda(session, fazendaId) {
   return !fazendaId || session.fazendaId === fazendaId
 }
 
+function clearLegacyMonitoringHistory(fazendaId) {
+  if (typeof window === 'undefined') return
+  try {
+    const raw = window.localStorage.getItem(MONITORING_STORAGE_KEY)
+    if (!raw) return
+    const registros = JSON.parse(raw)
+    if (!Array.isArray(registros)) {
+      window.localStorage.removeItem(MONITORING_STORAGE_KEY)
+      return
+    }
+    const next = registros.filter(item => fazendaId && item.fazendaId && item.fazendaId !== fazendaId)
+    if (next.length) window.localStorage.setItem(MONITORING_STORAGE_KEY, JSON.stringify(next))
+    else window.localStorage.removeItem(MONITORING_STORAGE_KEY)
+  } catch {
+    window.localStorage.removeItem(MONITORING_STORAGE_KEY)
+  }
+}
+
 export async function requestOfflineStorage() {
   if (typeof navigator === 'undefined') return { ok: false, message: 'Armazenamento offline indisponivel' }
   try {
@@ -387,6 +405,8 @@ export async function syncPendingMonitoringSessions({ fazendaId } = {}) {
       result.errors.push(item.error)
     }
   }
+
+  if (result.failed === 0) clearLegacyMonitoringHistory(fazendaId)
 
   return result
 }

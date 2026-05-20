@@ -7,7 +7,8 @@ import {
   getSeveridadeInfo,
   ESCALAS_SEVERIDADE
 } from '../../lib/monitoramentos'
-import { supabase } from '../../lib/supabase'
+import { podeAbrirOrdemServico, podeVerPeriodosLongosMonitoramento } from '../../lib/fazendaPapeis'
+import { useMediaQuery } from './hooks'
 import { formatCultura, formatMonitoramentoDate, getMonitoramentoMeta } from './utils'
 import { requestOfflineStorage } from './offline'
 import { eyebrowStyle } from './styles'
@@ -128,9 +129,14 @@ export function MonitoramentoInboxView({
   monitoramentosResumo = {},
   abrirTalhao,
   setActiveView,
-  navigate
+  navigate,
+  acesso
 }) {
-  const [periodo, setPeriodo] = useState(30)
+  const isDesktop = useMediaQuery('(min-width: 900px)')
+  const canOpenOs = podeAbrirOrdemServico(acesso)
+  const canUseLongPeriods = isDesktop && podeVerPeriodosLongosMonitoramento(acesso)
+  const periodOptions = useMemo(() => (canUseLongPeriods ? [8, 30, 90] : [8]), [canUseLongPeriods])
+  const [periodo, setPeriodo] = useState(8)
   const [filtroSev, setFiltroSev] = useState('todas')
   const [filtroTecnico, setFiltroTecnico] = useState(null)
   const [filtroCultura, setFiltroCultura] = useState(null)
@@ -140,12 +146,15 @@ export function MonitoramentoInboxView({
   const [visitas, setVisitas] = useState([])
   const [pontos, setPontos] = useState([])
   const [pontosSel, setPontosSel] = useState([])
-  const [perfis, setPerfis] = useState({})
   const [loading, setLoading] = useState(false)
   const [loadingDetalhe, setLoadingDetalhe] = useState(false)
   const [erro, setErro] = useState('')
 
   const talhoesMap = useMemo(() => new Map(talhoes.map(t => [t.id, t])), [talhoes])
+
+  useEffect(() => {
+    if (!periodOptions.includes(periodo)) setPeriodo(8)
+  }, [periodOptions, periodo])
 
   useEffect(() => {
     if (!fazendaId) return
@@ -162,19 +171,6 @@ export function MonitoramentoInboxView({
         if (!active) return
         setVisitas(monitoramentos)
         setPontos(pontosArr)
-
-        const ownerIds = Array.from(new Set(monitoramentos.map(m => m.created_by).filter(Boolean)))
-        if (ownerIds.length) {
-          const { data: perfilData } = await supabase
-            .from('perfis')
-            .select('user_id, nome, email')
-            .in('user_id', ownerIds)
-          if (active && perfilData) {
-            setPerfis(perfilData.reduce((acc, p) => ({ ...acc, [p.user_id]: p }), {}))
-          }
-        } else {
-          setPerfis({})
-        }
       } catch (err) {
         if (active) setErro(err.message || 'Nao foi possivel carregar visitas')
       } finally {
@@ -197,9 +193,7 @@ export function MonitoramentoInboxView({
   }, [pontos])
 
   function tecnicoNome(visita) {
-    if (!visita?.created_by) return 'Sem técnico'
-    const p = perfis[visita.created_by]
-    return p?.nome || p?.email || 'Técnico'
+    return visita?.tecnico_nome || 'Sem tecnico'
   }
 
   function severidadeAgregada(visita) {
@@ -221,7 +215,7 @@ export function MonitoramentoInboxView({
       counts.set(nome, (counts.get(nome) || 0) + 1)
     })
     return Array.from(counts.entries()).map(([n, c]) => ({ nome: n, count: c }))
-  }, [visitas, perfis])
+  }, [visitas])
 
   const culturas = useMemo(() => {
     const counts = new Map()
@@ -356,6 +350,7 @@ export function MonitoramentoInboxView({
   }
 
   async function abrirOSDoTalhao() {
+    if (!canOpenOs) return
     if (selectedTalhao) await abrirTalhao(selectedTalhao)
     navigate('/os')
   }
@@ -451,7 +446,7 @@ export function MonitoramentoInboxView({
           </h1>
           <p style={{ margin: '6px 0 0', fontSize: 12, color: C.textMid, maxWidth: 560, lineHeight: 1.45 }}>
             Todas as visitas a campo registradas em {fazenda?.nome || 'esta fazenda'}. Triagem por severidade,
-            técnico e cultura. Clique numa visita pra ver detalhes e abrir OS.
+            técnico e cultura. Clique numa visita pra ver detalhes{canOpenOs ? ' e abrir OS' : ''}.
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -464,7 +459,7 @@ export function MonitoramentoInboxView({
               background: C.bg
             }}
           >
-            {[7, 30, 90].map(d => (
+            {periodOptions.map(d => (
               <button key={d} onClick={() => setPeriodo(d)} style={periodBtnStyle(periodo === d)}>
                 {d}d
               </button>
@@ -1163,9 +1158,11 @@ export function MonitoramentoInboxView({
                 )}
 
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  <button onClick={abrirOSDoTalhao} style={{ ...primaryBtnStyle, flex: 1, minWidth: 140 }}>
-                    Abrir OS →
-                  </button>
+                  {canOpenOs && (
+                    <button onClick={abrirOSDoTalhao} style={{ ...primaryBtnStyle, flex: 1, minWidth: 140 }}>
+                      Abrir OS →
+                    </button>
+                  )}
                   <button onClick={novaVisita} style={secondaryBtnStyle}>
                     Nova visita
                   </button>

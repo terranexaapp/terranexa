@@ -91,3 +91,4 @@ Arquivos incrementais atuais:
 | `011_catalogo_monitoramento_campos_extras.sql` | Adiciona instrucoes e campos extras de monitoramento ao catalogo central. |
 | `012_recriar_rpc_catalogo_convites.sql` | Recria RPCs do catalogo/convites, corrige culturas por tipo e recarrega o schema cache do Supabase. |
 | `013_corrigir_rls_catalogo_culturas.sql` | Corrige RLS/grants/RPC para salvar culturas do catalogo sem erro em `catalogo_praga_culturas`. |
+| `014_usuarios_nomes_mobile_monitoramento.sql` | Adiciona nome em membros/convites, autorias operacionais, ajustes de papéis de campo e fluxo mobile de OS/monitoramento. |

@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { getCurrentUserIdentity } from './userIdentity'
 
 export const CATEGORIAS = [
   { id: 'plantio', label: 'Plantio', cor: '#5AAE38' },
@@ -26,7 +27,7 @@ export async function listarOperacoes(talhaoId) {
   const { data, error } = await supabase
     .from('operacoes')
     .select(
-      `id, categoria, tipo, data_operacao, custo_aplicacao, observacoes, receituario_agronomo, receituario_crea, created_at, insumos:operacao_insumos(id, dose, dose_unidade, quantidade_total, custo_total, insumo:insumos(id, nome, classe, unidade, custo_unitario, carencia_dias))`
+      `id, categoria, tipo, data_operacao, custo_aplicacao, observacoes, receituario_agronomo, receituario_crea, executada_por_id, executada_por_nome, created_at, insumos:operacao_insumos(id, dose, dose_unidade, quantidade_total, custo_total, insumo:insumos(id, nome, classe, unidade, custo_unitario, carencia_dias))`
     )
     .eq('talhao_id', talhaoId)
     .order('data_operacao', { ascending: false })
@@ -48,10 +49,13 @@ export async function criarOperacao({
   insumos_usados
 }) {
   const catInfo = getCategoriaInfo(categoria)
+  const identity = await getCurrentUserIdentity()
   const { data: op, error: opErr } = await supabase
     .from('operacoes')
     .insert({
       talhao_id,
+      executada_por_id: identity.id,
+      executada_por_nome: identity.nome || identity.email || null,
       safra_id: safra_id || null,
       categoria,
       tipo: catInfo.label,

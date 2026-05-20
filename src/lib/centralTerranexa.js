@@ -160,7 +160,7 @@ export async function listarHierarquiaUsuariosFazendas() {
 
   const membrosResult = await supabase
     .from('fazenda_membros')
-    .select('id, fazenda_id, convidado_por, email, papel, status, token, user_id, criado_em, aceito_em, updated_at')
+    .select('id, fazenda_id, convidado_por, nome, email, papel, status, token, user_id, criado_em, aceito_em, updated_at')
     .neq('status', 'revogado')
     .order('criado_em', { ascending: false })
 
@@ -237,14 +237,17 @@ export async function listarHierarquiaUsuariosFazendas() {
   }
 }
 
-export async function vincularUsuarioFazenda({ fazendaId, email, papel, userId = null, convidadoPor = null }) {
+export async function vincularUsuarioFazenda({ fazendaId, email, nome = '', papel, userId = null, convidadoPor = null }) {
   const normalizedEmail = toLowerEmail(email)
+  const normalizedName = String(nome || '').trim()
   if (!fazendaId) throw new Error('Selecione a fazenda.')
   if (!normalizedEmail || !normalizedEmail.includes('@')) throw new Error('Informe um e-mail valido.')
+  if (!normalizedName) throw new Error('Informe o nome do usuario.')
   if (!papel) throw new Error('Selecione o papel do usuario.')
 
   const payload = {
     fazenda_id: fazendaId,
+    nome: normalizedName,
     email: normalizedEmail,
     papel,
     status: userId ? 'aceito' : 'pendente',
@@ -263,6 +266,7 @@ export async function vincularUsuarioFazenda({ fazendaId, email, papel, userId =
     try {
       const emailStatus = await enviarEmailConviteFazenda({
         fazendaId,
+        nome: normalizedName,
         email: normalizedEmail,
         papel,
         conviteToken: data.token
@@ -284,6 +288,35 @@ export async function atualizarPapelUsuarioFazenda(vinculoId, papel) {
     .single()
   if (error) throw error
   return data
+}
+
+export async function atualizarNomeUsuarioFazenda(vinculoId, nome) {
+  const normalizedName = String(nome || '').trim()
+  if (!vinculoId) throw new Error('Vinculo obrigatorio para atualizar o nome.')
+  if (!normalizedName) throw new Error('Informe o nome do usuario.')
+
+  const {
+    data: { session },
+    error: sessionError
+  } = await supabase.auth.getSession()
+
+  if (sessionError || !session?.access_token) {
+    throw new Error('Sessao expirada. Entre novamente na Central TerraNexa.')
+  }
+
+  const response = await fetch('/api/atualizar-nome-usuario-fazenda', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${session.access_token}`
+    },
+    body: JSON.stringify({ vinculoId, nome: normalizedName })
+  })
+  const body = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    throw new Error(body.message || body.error || 'Nao foi possivel atualizar o nome do usuario.')
+  }
+  return body
 }
 
 export async function excluirVinculoUsuarioFazenda(vinculoId) {

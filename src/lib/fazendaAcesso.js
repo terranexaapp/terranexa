@@ -1,5 +1,5 @@
 import { supabase } from './supabase'
-import { FAZENDA_PAPEIS, PROPRIETARIO_PAPEL, getFazendaPapelMeta } from './fazendaPapeis'
+import { FAZENDA_PAPEIS, PROPRIETARIO_PAPEL, getFazendaPapelMeta, usaMenuCampoEnxuto } from './fazendaPapeis'
 
 export const VIEW_PERMISSAO = {
   mapa: 'mapa',
@@ -104,7 +104,8 @@ export function listarManagersPermitidos(acesso) {
 }
 
 export function filtrarNavItems(items, acesso) {
-  return items.filter(item => viewPermitida(item.id, acesso))
+  const hiddenForFieldMenu = usaMenuCampoEnxuto(acesso) ? new Set(['chuvas', 'solo']) : null
+  return items.filter(item => viewPermitida(item.id, acesso) && !hiddenForFieldMenu?.has(item.id))
 }
 
 export function filtrarDesktopNavGroups(groups, acesso) {

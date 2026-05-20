@@ -25,7 +25,7 @@ const PAPEL_LABEL = PAPEL_OPTIONS.reduce((acc, item) => {
 const STATUS_LABEL = { pendente: 'Pendente', aceito: 'Ativo' }
 
 function emptyDraft() {
-  return { email: '', papel: 'tecnico' }
+  return { nome: '', email: '', papel: 'tecnico' }
 }
 
 export function MembrosManager({ fazendaId }) {
@@ -40,6 +40,7 @@ export function MembrosManager({ fazendaId }) {
   const [copiedId, setCopiedId] = useState(null)
 
   const emailId = useId()
+  const nomeId = useId()
   const papelId = useId()
 
   async function carregar() {
@@ -75,13 +76,22 @@ export function MembrosManager({ fazendaId }) {
   async function handleConvitar(e) {
     e.preventDefault()
     setFormError('')
+    if (!draft.nome.trim()) {
+      setFormError('Informe o nome do usuario.')
+      return
+    }
     if (!draft.email.trim() || !draft.email.includes('@')) {
       setFormError('Informe um e-mail válido.')
       return
     }
     setSaving(true)
     try {
-      const convite = await convidarMembro({ fazenda_id: fazendaId, email: draft.email, papel: draft.papel })
+      const convite = await convidarMembro({
+        fazenda_id: fazendaId,
+        nome: draft.nome,
+        email: draft.email,
+        papel: draft.papel
+      })
       await carregar()
       cancel()
       setEmailNotice(convite.emailError || 'Convite criado e e-mail enviado ao usuario.')
@@ -164,6 +174,20 @@ export function MembrosManager({ fazendaId }) {
       {mode === 'convite' && (
         <form onSubmit={handleConvitar} style={formStyle}>
           <p style={eyebrowStyle}>NOVO CONVITE</p>
+
+          <div>
+            <label htmlFor={nomeId} style={formLabelStyle}>
+              NOME *
+            </label>
+            <input
+              id={nomeId}
+              required
+              value={draft.nome}
+              onChange={e => setDraft(d => ({ ...d, nome: e.target.value }))}
+              placeholder="Nome do colaborador"
+              style={inputStyle}
+            />
+          </div>
 
           <div>
             <label htmlFor={emailId} style={formLabelStyle}>
@@ -277,7 +301,7 @@ export function MembrosManager({ fazendaId }) {
 
 function MemberRow({ membro, copied, onCopiar, onEmail, onRevogar, onChangePapel }) {
   const isPendente = membro.status === 'pendente'
-  const nome = membro.profiles?.nome
+  const nome = membro.nome || membro.profiles?.nome
   const papelMeta = getFazendaPapelMeta(membro.papel)
 
   return (

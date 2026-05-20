@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { theme } from '../../styles/theme'
+import { podeAbrirOrdemServico } from '../../lib/fazendaPapeis'
 import {
   criarMonitoramento,
   criarMonitoramentoPonto,
@@ -130,7 +131,8 @@ export function FarmDesktopSidebar({
   )
 }
 
-export function DashboardView({ total, talhoes, talhoesSemMonitoramento, navigate, setActiveView }) {
+export function DashboardView({ total, talhoes, talhoesSemMonitoramento, navigate, setActiveView, acesso }) {
+  const canOpenOs = podeAbrirOrdemServico(acesso)
   const cards = [
     { label: 'Area monitorada', value: `${total.toFixed(2)} ha`, tone: C.greenDp },
     { label: 'Talhoes ativos', value: talhoes.length, tone: C.soilDk },
@@ -195,7 +197,7 @@ export function DashboardView({ total, talhoes, talhoesSemMonitoramento, navigat
         }
       ]
     }
-  ]
+  ].filter(card => canOpenOs || card.title !== 'Gestao da fazenda')
 
   return (
     <section style={viewStackStyle}>
@@ -209,9 +211,11 @@ export function DashboardView({ total, talhoes, talhoesSemMonitoramento, navigat
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button onClick={() => navigate('/os')} style={primaryActionStyle}>
-            Criar Ordem de Serviço
-          </button>
+          {canOpenOs && (
+            <button onClick={() => navigate('/os')} style={primaryActionStyle}>
+              Criar Ordem de Serviço
+            </button>
+          )}
           <button onClick={() => setActiveView('relatorios')} style={secondaryActionStyle}>
             Gerar Relatório
           </button>

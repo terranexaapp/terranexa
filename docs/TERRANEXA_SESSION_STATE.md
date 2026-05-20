@@ -1,5 +1,73 @@
 # TerraNexa Session State
 
+## Sessao de 2026-05-20 - nomes de usuarios e fluxo mobile de campo
+
+### O que foi solicitado
+
+- Na Central TerraNexa, deixar o campo superior do membro como nome do usuario, mantendo o e-mail apenas como acesso/login.
+- Registrar e exibir o nome do usuario em monitoramentos, apontamentos/operacoes e abertura/fechamento de OS.
+- No mobile, exibir no Scouting apenas talhoes com monitoramento realizado nos ultimos 8 dias e remover as opcoes 30d/90d.
+- Manter 30d/90d apenas para gerente/agronomo/proprietario em desktop.
+- Remover abertura de OS para tecnico, operador e coordenador, e simplificar o menu mobile do mapa para resumo, monitoramento e GPS.
+- Limpar historicos locais de pontos e caminhamento apos sincronizacao para reduzir uso de memoria no mobile.
+
+### O que foi alterado
+
+- Criado `src/lib/userIdentity.js` para centralizar `id`, `email` e `nome` do usuario autenticado.
+- Convites e vinculos de fazenda agora exigem `Nome no app`, salvam `fazenda_membros.nome` e enviam o nome nos metadados do convite.
+- Criada a API `api/atualizar-nome-usuario-fazenda.js` para corrigir nomes de usuarios ja vinculados e atualizar tambem `profiles.nome`.
+- Monitoramentos, operacoes e OS passam a gravar nome do executor/criador/fechador.
+- Tecnico, operador e coordenador deixam de abrir OS; o mapa mobile usa rail lateral direito com Menu, Resumo, Monitoramento e GPS.
+- Scouting mobile usa periodo fixo de 8 dias e lista somente talhoes que tiveram monitoramento no periodo.
+- Periodos 30d/90d ficam restritos a gerente/agronomo/proprietario em desktop.
+- Sincronizacao offline remove o historico legado de pontos/caminhamentos quando nao ha falhas.
+- Criada a migration `database/014_usuarios_nomes_mobile_monitoramento.sql`.
+
+### Arquivos modificados
+
+- `api/atualizar-nome-usuario-fazenda.js`
+- `api/enviar-convite.js`
+- `database/009_hierarquia_fazenda_papeis.sql`
+- `database/014_usuarios_nomes_mobile_monitoramento.sql`
+- `src/lib/centralTerranexa.js`
+- `src/lib/convites.js`
+- `src/lib/conviteEmail.js`
+- `src/lib/fazendaAcesso.js`
+- `src/lib/fazendaPapeis.js`
+- `src/lib/monitoramentos.js`
+- `src/lib/operacoes.js`
+- `src/lib/os.js`
+- `src/lib/userIdentity.js`
+- `src/pages/CentralTerranexaPage.jsx`
+- `src/pages/FazendaDetalhePage.jsx`
+- `src/pages/FazendaDetalhe/mapaPrincipal.jsx`
+- `src/pages/FazendaDetalhe/membrosManager.jsx`
+- `src/pages/FazendaDetalhe/monitoramentoCockpit.jsx`
+- `src/pages/FazendaDetalhe/monitoramentoInbox.jsx`
+- `src/pages/FazendaDetalhe/offline.js`
+- `src/pages/FazendaDetalhe/views.jsx`
+- `src/pages/OSPage.jsx`
+
+### Decisoes tecnicas tomadas
+
+- O e-mail continua sendo a credencial de login; o nome operacional fica em `profiles.nome` e em `fazenda_membros.nome` para exibicao na hierarquia.
+- Para cadastros antigos sem nome real, a Central ganhou a acao `Salvar nome`, que usa rota serverless com `SUPABASE_SERVICE_ROLE_KEY`.
+- A restricao de OS para papeis de campo foi aplicada tanto na UI quanto nos defaults/migration de papeis.
+- A reducao de carga mobile evita buscar historico remoto de pontos/caminhamentos no mapa mobile e limpa dados locais apos sync sem falha.
+
+### Pendencias
+
+- Aplicar `database/014_usuarios_nomes_mobile_monitoramento.sql` no SQL Editor do Supabase de producao antes de testar o deploy novo.
+- Conferir que `SUPABASE_SERVICE_ROLE_KEY` esta configurada na Vercel para a rota de atualizar nome funcionar.
+- Corrigir nomes dos usuarios ja existentes na Central usando o campo `Nome no app` / `Salvar nome`.
+
+### Validacao local
+
+- `git diff --check` executado sem erros.
+- `node --check api/enviar-convite.js` executado sem erros.
+- `node --check api/atualizar-nome-usuario-fazenda.js` executado sem erros.
+- Build de producao executado com sucesso: `node node_modules/vite/bin/vite.js build`.
+
 ## Sessao de 2026-05-20 - correcao RLS ao salvar culturas do catalogo
 
 ### O que foi solicitado

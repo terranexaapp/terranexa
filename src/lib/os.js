@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { getCurrentUserIdentity } from './userIdentity'
 
 export const OPERACOES_MAE = [
   {
@@ -103,7 +104,7 @@ export async function listarOS(fazendaId) {
   const { data, error } = await supabase
     .from('ordens_servico')
     .select(
-      `id, numero, status, prioridade, prazo, created_at, data_execucao, observacoes_execucao, observacoes, categoria, operacao_recomendada, operacao_mae, servico, cultura_alvo, vazao_lha, bico, area_parcial_ha, area_percentual, fazenda_id, talhao:talhoes(id, codigo, cultura, area_ha), equipe:equipes(id, nome, responsavel), criada_por:profiles!ordens_servico_criada_por_id_fkey(nome), os_talhoes:os_talhoes(talhao:talhoes(id, codigo, cultura, area_ha)), os_insumos:os_insumos(id, dose_recomendada, dose_unidade, dose_real, quantidade_real, custo_real, insumo:insumos(id, nome, classe, unidade, custo_unitario, carencia_dias))`
+      `id, numero, status, prioridade, prazo, created_at, data_execucao, observacoes_execucao, observacoes, categoria, operacao_recomendada, operacao_mae, servico, cultura_alvo, vazao_lha, bico, area_parcial_ha, area_percentual, criada_por_nome, fechada_por_id, fechada_por_nome, fazenda_id, talhao:talhoes(id, codigo, cultura, area_ha), equipe:equipes(id, nome, responsavel), criada_por:profiles!ordens_servico_criada_por_id_fkey(nome), os_talhoes:os_talhoes(talhao:talhoes(id, codigo, cultura, area_ha)), os_insumos:os_insumos(id, dose_recomendada, dose_unidade, dose_real, quantidade_real, custo_real, insumo:insumos(id, nome, classe, unidade, custo_unitario, carencia_dias))`
     )
     .eq('fazenda_id', fazendaId)
     .order('created_at', { ascending: false })
@@ -131,10 +132,8 @@ export async function criarOS({
   centro_custo_id,
   insumos_recomendados
 }) {
-  const {
-    data: { user }
-  } = await supabase.auth.getUser()
-  if (!user) throw new Error('Não autenticado')
+  const identity = await getCurrentUserIdentity()
+  if (!identity.user) throw new Error('Nao autenticado')
   const { data: numero, error: numErr } = await supabase.rpc('proximo_numero_os', { p_fazenda_id: fazenda_id })
   if (numErr) throw numErr
   const maeInfo = getOperacaoMae(operacao_mae)
@@ -162,7 +161,8 @@ export async function criarOS({
       area_parcial_ha: area_parcial_ha ? Number(area_parcial_ha) : null,
       area_percentual: area_percentual ? Number(area_percentual) : null,
       centro_custo_id: centro_custo_id || null,
-      criada_por_id: user.id
+      criada_por_id: identity.id,
+      criada_por_nome: identity.nome || identity.email || null
     })
     .select()
     .single()
@@ -196,6 +196,9 @@ export async function fecharOSCompleta({
   receituario_crea,
   insumos_reais
 }) {
+  const identity = await getCurrentUserIdentity()
+  if (!identity.user) throw new Error('Nao autenticado')
+
   for (const ins of insumos_reais || []) {
     await supabase
       .from('os_insumos')
@@ -229,6 +232,8 @@ export async function fecharOSCompleta({
       observacoes_execucao: observacoes,
       receituario_agronomo,
       receituario_crea,
+      fechada_por_id: identity.id,
+      fechada_por_nome: identity.nome || identity.email || null,
       updated_at: new Date().toISOString()
     })
     .eq('id', os_id)

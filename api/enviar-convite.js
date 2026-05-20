@@ -52,6 +52,7 @@ export default async function handler(req, res) {
   }
 
   const email = String(body?.email || '').trim().toLowerCase()
+  const nome = String(body?.nome || '').trim()
   const fazendaId = body?.fazendaId || body?.fazenda_id
   if (!email || !email.includes('@')) return json(res, 400, { error: 'email_invalido' })
   if (!fazendaId) return json(res, 400, { error: 'fazenda_obrigatoria' })
@@ -83,7 +84,7 @@ export default async function handler(req, res) {
 
   const { data: membro, error: membroError } = await adminClient
     .from('fazenda_membros')
-    .select('id, email, token, status, papel')
+    .select('id, nome, email, token, status, papel')
     .eq('fazenda_id', fazendaId)
     .eq('email', email)
     .neq('status', 'revogado')
@@ -92,12 +93,21 @@ export default async function handler(req, res) {
   if (membroError) return json(res, 500, { error: 'convite_consulta_falhou', message: membroError.message })
   if (!membro?.token) return json(res, 404, { error: 'convite_nao_encontrado' })
 
+  const nomeConvite = membro.nome || nome
   const redirectTo = `${getBaseUrl(req)}/aceitar-convite?token=${membro.token}&setup=senha`
   const metadata = {
     origem: 'terranexa_convite',
+    nome: nomeConvite || null,
     convite_token: membro.token,
     fazenda_id: fazendaId,
     papel: membro.papel
+  }
+
+  if (nomeConvite) {
+    await adminClient
+      .from('profiles')
+      .update({ nome: nomeConvite })
+      .eq('email', email)
   }
 
   const inviteResult = await adminClient.auth.admin.inviteUserByEmail(email, {

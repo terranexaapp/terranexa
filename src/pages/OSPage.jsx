@@ -16,6 +16,8 @@ import { listarInsumos } from '../lib/insumos'
 import { listarEquipes, criarEquipe, desativarEquipe } from '../lib/equipes'
 import { listarCentrosCusto } from '../lib/centrosCusto'
 import { calcularCustoInsumo } from '../lib/operacoes'
+import { buscarMeuAcessoFazenda } from '../lib/fazendaAcesso'
+import { podeAbrirOrdemServico } from '../lib/fazendaPapeis'
 import { supabase } from '../lib/supabase'
 import { theme } from '../styles/theme'
 import { ErrorPanel } from '../components/ErrorPanel'
@@ -37,6 +39,7 @@ export function OSPage() {
   const [modal, setModal] = useState(null)
   const [osSel, setOsSel] = useState(null)
   const [prefillMonitoramento, setPrefillMonitoramento] = useState(null)
+  const [acesso, setAcesso] = useState(null)
 
   useEffect(() => {
     listarFazendas().then(fs => {
@@ -54,6 +57,10 @@ export function OSPage() {
 
   useEffect(() => {
     if (!fazendaId) return
+    const fazendaAtual = fazendas.find(f => f.id === fazendaId)
+    buscarMeuAcessoFazenda(fazendaId, fazendaAtual)
+      .then(setAcesso)
+      .catch(() => setAcesso({ papel: 'operador', permissoes: {} }))
     carregar()
     supabase
       .from('talhoes')
@@ -65,7 +72,7 @@ export function OSPage() {
     listarInsumos(fazendaId).then(setInsumos)
     listarEquipes(fazendaId).then(setEquipes)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fazendaId])
+  }, [fazendaId, fazendas])
 
   async function carregar() {
     setLoading(true)
@@ -96,6 +103,7 @@ export function OSPage() {
     concluida: osList.filter(o => o.status === 'concluida').length,
     cancelada: osList.filter(o => o.status === 'cancelada').length
   }
+  const canCreateOs = podeAbrirOrdemServico(acesso)
 
   return (
     <div style={{ minHeight: '100vh', background: C.bgSoft }}>
@@ -177,22 +185,24 @@ export function OSPage() {
           >
             EQUIPES
           </button>
-          <button
-            onClick={() => setModal('nova')}
-            style={{
-              background: C.greenDp,
-              color: C.bg,
-              border: 'none',
-              borderRadius: 10,
-              padding: '9px 14px',
-              fontSize: 11,
-              fontFamily: 'monospace',
-              fontWeight: 700,
-              cursor: 'pointer'
-            }}
-          >
-            + NOVA ORDEM
-          </button>
+          {canCreateOs && (
+            <button
+              onClick={() => setModal('nova')}
+              style={{
+                background: C.greenDp,
+                color: C.bg,
+                border: 'none',
+                borderRadius: 10,
+                padding: '9px 14px',
+                fontSize: 11,
+                fontFamily: 'monospace',
+                fontWeight: 700,
+                cursor: 'pointer'
+              }}
+            >
+              + NOVA ORDEM
+            </button>
+          )}
         </div>
       </header>
       <main style={{ maxWidth: 900, margin: '0 auto', padding: '20px 16px 96px' }}>
@@ -270,9 +280,9 @@ export function OSPage() {
               {filtro === 'pendente' ? 'Nenhuma ordem pendente' : 'Nenhuma ordem encontrada'}
             </p>
             <p style={{ margin: '6px 0 16px', fontSize: 12, color: C.textMid }}>
-              {filtro === 'pendente' ? 'Abra uma nova Ordem de Serviço.' : ''}
+              {filtro === 'pendente' && canCreateOs ? 'Abra uma nova Ordem de Serviço.' : ''}
             </p>
-            {filtro === 'pendente' && (
+            {filtro === 'pendente' && canCreateOs && (
               <button
                 onClick={() => setModal('nova')}
                 style={{
@@ -353,6 +363,8 @@ function OSCard({ os, onExecutar, onCancelar }) {
   const st = STATUS_OS[os.status] || STATUS_OS.pendente
   const pr = PRIORIDADE_OS[os.prioridade] || PRIORIDADE_OS.media
   const maeInfo = getOperacaoMae(os.operacao_mae)
+  const criadaPorNome = os.criada_por_nome || os.criada_por?.nome
+  const fechadaPorNome = os.fechada_por_nome
   const todosTalhoes = useMemo(() => {
     const l = (os.os_talhoes || []).map(ot => ot.talhao).filter(Boolean)
     return l.length > 0 ? l : [os.talhao].filter(Boolean)
@@ -519,6 +531,8 @@ function OSCard({ os, onExecutar, onCancelar }) {
             {os.cultura_alvo && <Chip label="CULTURA" valor={os.cultura_alvo} />}
             {os.vazao_lha && <Chip label="VAZÃO" valor={os.vazao_lha + ' L/ha'} />}
             {os.bico && <Chip label="BICO" valor={os.bico} />}
+            {criadaPorNome && <Chip label="ABERTA POR" valor={criadaPorNome} />}
+            {fechadaPorNome && <Chip label="FECHADA POR" valor={fechadaPorNome} />}
             {os.equipe && <Chip label="EQUIPE" valor={os.equipe.nome + ' — ' + os.equipe.responsavel} />}
           </div>
           {os.observacoes && (

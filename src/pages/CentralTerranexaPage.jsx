@@ -5,6 +5,7 @@ import {
   aprovarSolicitacao,
   excluirUsuarioCentral,
   excluirVinculoUsuarioFazenda,
+  atualizarNomeUsuarioFazenda,
   atualizarPapelUsuarioFazenda,
   atualizarPermissoesPapelFazenda,
   atualizarContratoConta,
@@ -187,7 +188,7 @@ export function CentralTerranexaPage() {
   const [usuarioSearch, setUsuarioSearch] = useState('')
   const [hierarquia, setHierarquia] = useState(HIERARQUIA_INICIAL)
   const [hierarquiaSearch, setHierarquiaSearch] = useState('')
-  const [linkDraft, setLinkDraft] = useState({ fazendaId: '', userId: '', email: '', papel: 'tecnico' })
+  const [linkDraft, setLinkDraft] = useState({ fazendaId: '', userId: '', nome: '', email: '', papel: 'tecnico' })
   const [linkSaving, setLinkSaving] = useState(false)
   const [linkMessage, setLinkMessage] = useState('')
   const [linkError, setLinkError] = useState('')
@@ -426,6 +427,7 @@ export function CentralTerranexaPage() {
     setLinkDraft(draft => ({
       ...draft,
       userId,
+      nome: usuario?.nome || draft.nome,
       email: usuario?.email || draft.email
     }))
   }
@@ -439,6 +441,7 @@ export function CentralTerranexaPage() {
       const resultado = await vincularUsuarioFazenda({
         fazendaId: linkDraft.fazendaId,
         userId: linkDraft.userId || null,
+        nome: linkDraft.nome,
         email: linkDraft.email,
         papel: linkDraft.papel,
         convidadoPor: profile.id
@@ -450,7 +453,7 @@ export function CentralTerranexaPage() {
             ? 'Vinculo criado e e-mail enviado para o usuario definir senha.'
             : 'Vinculo atualizado com sucesso.'
       )
-      setLinkDraft(draft => ({ ...draft, userId: '', email: '' }))
+      setLinkDraft(draft => ({ ...draft, userId: '', nome: '', email: '' }))
       await carregar()
     } catch (err) {
       setLinkError(err.message || 'Nao foi possivel vincular o usuario a fazenda.')
@@ -469,6 +472,20 @@ export function CentralTerranexaPage() {
       await carregar()
     } catch (err) {
       setLinkError(err.message || 'Nao foi possivel alterar o papel.')
+    }
+  }
+
+  async function handleAlterarNomeVinculo(vinculo, nome) {
+    const normalizedName = String(nome || '').trim()
+    if (!normalizedName || normalizedName === vinculo.nome) return
+    setLinkError('')
+    setLinkMessage('')
+    try {
+      await atualizarNomeUsuarioFazenda(vinculo.id, normalizedName)
+      setLinkMessage('Nome do usuario atualizado.')
+      await carregar()
+    } catch (err) {
+      setLinkError(err.message || 'Nao foi possivel alterar o nome do usuario.')
     }
   }
 
@@ -1007,6 +1024,14 @@ export function CentralTerranexaPage() {
                 style={s.input}
               />
             </Field>
+            <Field label="Nome no app">
+              <input
+                value={linkDraft.nome}
+                onChange={e => setLinkDraft(draft => ({ ...draft, nome: e.target.value }))}
+                placeholder="Nome do usuario"
+                style={s.input}
+              />
+            </Field>
             <Field label="Hierarquia">
               <select
                 value={linkDraft.papel}
@@ -1045,6 +1070,7 @@ export function CentralTerranexaPage() {
                 grupo={grupo}
                 papeis={papeisDisponiveis}
                 onAlterarPapel={handleAlterarPapelVinculo}
+                onAlterarNome={handleAlterarNomeVinculo}
                 onExcluirMembro={handleExcluirVinculoFazenda}
                 memberDeletingId={memberDeletingId}
               />
@@ -1644,7 +1670,7 @@ function AgroCatalogSection({
   )
 }
 
-function OwnerHierarchyCard({ grupo, papeis, onAlterarPapel, onExcluirMembro, memberDeletingId }) {
+function OwnerHierarchyCard({ grupo, papeis, onAlterarPapel, onAlterarNome, onExcluirMembro, memberDeletingId }) {
   const owner = grupo.proprietario || {}
   return (
     <article style={s.ownerCard}>
@@ -1671,6 +1697,7 @@ function OwnerHierarchyCard({ grupo, papeis, onAlterarPapel, onExcluirMembro, me
             fazenda={fazenda}
             papeis={papeis}
             onAlterarPapel={onAlterarPapel}
+            onAlterarNome={onAlterarNome}
             onExcluirMembro={onExcluirMembro}
             memberDeletingId={memberDeletingId}
           />
@@ -1680,7 +1707,7 @@ function OwnerHierarchyCard({ grupo, papeis, onAlterarPapel, onExcluirMembro, me
   )
 }
 
-function FarmHierarchyBlock({ fazenda, papeis, onAlterarPapel, onExcluirMembro, memberDeletingId }) {
+function FarmHierarchyBlock({ fazenda, papeis, onAlterarPapel, onAlterarNome, onExcluirMembro, memberDeletingId }) {
   const owner = fazenda.proprietario
   return (
     <div style={s.farmCard}>
@@ -1716,6 +1743,7 @@ function FarmHierarchyBlock({ fazenda, papeis, onAlterarPapel, onExcluirMembro, 
             membro={membro}
             papeis={papeis}
             onAlterarPapel={onAlterarPapel}
+            onAlterarNome={onAlterarNome}
             onExcluir={onExcluirMembro}
             deleting={memberDeletingId === membro.id}
           />
@@ -1729,13 +1757,48 @@ function FarmHierarchyBlock({ fazenda, papeis, onAlterarPapel, onExcluirMembro, 
   )
 }
 
-function MemberHierarchyRow({ membro, papeis, onAlterarPapel, onExcluir, deleting }) {
+function MemberHierarchyRow({ membro, papeis, onAlterarPapel, onAlterarNome, onExcluir, deleting }) {
   const usuario = membro.usuario || {}
   const papelMeta = membro.papelMeta || getFazendaPapelMeta(membro.papel)
+  const nomeExibicao = membro.nome || usuario.nome || membro.email
+  const [nomeDraft, setNomeDraft] = useState(nomeExibicao || '')
+  const [savingName, setSavingName] = useState(false)
+  const nomeAlterado = nomeDraft.trim() && nomeDraft.trim() !== (membro.nome || usuario.nome || '')
+
+  useEffect(() => {
+    setNomeDraft(nomeExibicao || '')
+  }, [nomeExibicao])
+
+  async function salvarNome() {
+    if (!nomeAlterado) return
+    setSavingName(true)
+    try {
+      await onAlterarNome(membro, nomeDraft)
+    } finally {
+      setSavingName(false)
+    }
+  }
+
   return (
     <div style={s.memberRow}>
       <div style={s.memberIdentity}>
-        <strong>{usuario.nome || membro.email}</strong>
+        <strong>{nomeExibicao}</strong>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+          <input
+            value={nomeDraft}
+            onChange={e => setNomeDraft(e.target.value)}
+            placeholder="Nome no app"
+            style={{ ...s.input, minHeight: 32, padding: '6px 8px', maxWidth: 260 }}
+          />
+          <button
+            type="button"
+            disabled={!nomeAlterado || savingName}
+            onClick={salvarNome}
+            style={{ ...s.secondaryBtn, padding: '7px 10px', ...(nomeAlterado ? {} : s.disabledBtn) }}
+          >
+            {savingName ? 'Salvando...' : 'Salvar nome'}
+          </button>
+        </div>
         <span>
           {membro.email} / {membro.status} / {formatDate(membro.aceito_em || membro.criado_em)}
         </span>
@@ -2112,7 +2175,7 @@ const s = {
   },
   linkForm: {
     display: 'grid',
-    gridTemplateColumns: '1.3fr 1.3fr 1.2fr 0.9fr auto',
+    gridTemplateColumns: '1.2fr 1.2fr 1.1fr 1.1fr 0.8fr auto',
     gap: 10,
     alignItems: 'end',
     background: '#FBFCF8',

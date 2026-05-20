@@ -15,7 +15,7 @@ function newInviteToken() {
   return typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : undefined
 }
 
-export async function convidarMembro({ fazenda_id, email, papel }) {
+export async function convidarMembro({ fazenda_id, email, nome = '', papel }) {
   const {
     data: { user }
   } = await supabase.auth.getUser()
@@ -23,6 +23,7 @@ export async function convidarMembro({ fazenda_id, email, papel }) {
 
   const payload = {
     fazenda_id,
+    nome: nome.trim(),
     email: email.trim().toLowerCase(),
     papel,
     convidado_por: user.id,
@@ -43,6 +44,7 @@ export async function convidarMembro({ fazenda_id, email, papel }) {
     const emailStatus = await enviarEmailConviteFazenda({
       fazendaId: fazenda_id,
       email: payload.email,
+      nome: payload.nome,
       papel,
       conviteToken: data.token
     })
@@ -55,7 +57,7 @@ export async function convidarMembro({ fazenda_id, email, papel }) {
 export async function listarMembros(fazendaId) {
   const { data, error } = await supabase
     .from('fazenda_membros')
-    .select('id, email, papel, status, token, criado_em, aceito_em, user_id, profiles:user_id(nome)')
+    .select('id, nome, email, papel, status, token, criado_em, aceito_em, user_id, profiles:user_id(nome)')
     .eq('fazenda_id', fazendaId)
     .neq('status', 'revogado')
     .order('criado_em', { ascending: false })
