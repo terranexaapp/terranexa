@@ -2,10 +2,12 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
+const isAndroidBuild = process.env.TERRANEXA_ANDROID_BUILD === 'true'
+
 export default defineConfig({
   plugins: [
     react(),
-    VitePWA({
+    !isAndroidBuild && VitePWA({
       registerType: 'autoUpdate',
       includeAssets: [
         'favicon.svg',
@@ -76,7 +78,7 @@ export default defineConfig({
         ]
       }
     })
-  ],
+  ].filter(Boolean),
   server: { port: 5173, host: true },
   build: {
     rollupOptions: {
