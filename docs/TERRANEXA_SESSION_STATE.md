@@ -36,8 +36,8 @@
 ### Pendencias
 
 - Aplicar `database/013_corrigir_rls_catalogo_culturas.sql` no SQL Editor do Supabase de producao.
-- Fazer commit/push das alteracoes para `main`; o workspace local esta em `codex/monitoramento-fotos`, atras de `origin/main`, com alteracoes pendentes preexistentes em `package.json` e `.codex/agents/terranexa-dev.toml`.
-- A Vercel ja possui projeto `terranexa`, mas o deploy atual de producao ainda aponta para o commit `885f83c`, anterior a esta correcao.
+- Testar em producao com usuario interno TerraNexa autenticado, alterando culturas de uma praga/doenca/daninha real.
+- O workspace local principal segue em `codex/monitoramento-fotos`, atras de `origin/main`, com alteracoes pendentes preexistentes em `package.json` e `.codex/agents/terranexa-dev.toml`; a publicacao foi feita por worktree limpo em `C:\tmp\terranexa-catalogo-rls`.
 - Lint nao executou porque `node_modules/eslint/bin/eslint.js` nao existe neste checkout.
 - Prettier nao executou porque `node_modules/prettier/bin/prettier.cjs` nao existe neste checkout.
 
@@ -57,7 +57,10 @@
 - `node --check api/excluir-usuario.js` executado sem erros.
 - `git diff --check` executado sem erros.
 - Build de producao executado com sucesso: `node node_modules/vite/bin/vite.js build`.
-- Impacto esperado na Vercel: apos commit/push/deploy, a Central passa a salvar culturas pelo backend protegido quando a RPC nao estiver disponivel ou quando o cliente bater em RLS.
+- Commit e push para `main` concluidos: `4d2c0ee`.
+- Deploy Vercel de producao confirmado como `READY`: `dpl_7bDHEkCVh6w8zDw6KoYE8Vh23J4c`.
+- Endpoint publicado verificado em `https://terranexa-4745xnunx-terranexa-s-projects.vercel.app/api/salvar-culturas-catalogo`; `GET` retornou `405 metodo_nao_permitido`, esperado para rota POST.
+- Impacto esperado na Vercel: a Central passa a salvar culturas pelo backend protegido quando a RPC nao estiver disponivel ou quando o cliente bater em RLS.
 
 ## Sessao de 2026-05-20 - Central TerraNexa ligada ao Supabase e exclusao de usuarios
 

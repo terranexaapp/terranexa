@@ -14,7 +14,6 @@
 
 - Aplicar `database/013_corrigir_rls_catalogo_culturas.sql` no SQL Editor do Supabase de producao.
 - Confirmar que `SUPABASE_SERVICE_ROLE_KEY` esta configurada na Vercel.
-- Fazer commit/push para `main`; a Vercel deve criar um novo deploy de producao.
 - Testar na Central com usuario interno TerraNexa: marcar/desmarcar culturas de uma praga, doenca ou daninha e salvar.
 
 ### Status
@@ -24,7 +23,9 @@
 - `git diff --check` passou.
 - Build de producao passou.
 - Lint/Prettier nao rodaram porque os binarios nao existem neste `node_modules`.
-- O deploy atual da Vercel ainda esta no commit `885f83c`; esta correcao ainda precisa de commit/push.
+- Commit e push para `main` concluidos: `4d2c0ee`.
+- Deploy Vercel de producao confirmado como `READY`: `dpl_7bDHEkCVh6w8zDw6KoYE8Vh23J4c`.
+- Endpoint novo publicado e respondendo: `GET /api/salvar-culturas-catalogo` retornou `405 metodo_nao_permitido`, esperado para rota POST.
 
 ## 2026-05-20 - Central TerraNexa Supabase e exclusao de usuarios
 
