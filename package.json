@@ -14,6 +14,8 @@
     "format:check": "prettier --check ."
   },
   "dependencies": {
+    "@capacitor/android": "^8.3.4",
+    "@capacitor/core": "^8.3.4",
     "@supabase/supabase-js": "^2.45.0",
     "@tmcw/togeojson": "^5.8.1",
     "@turf/turf": "^7.1.0",
@@ -24,6 +26,7 @@
     "shpjs": "^6.1.0"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.3.4",
     "@eslint/js": "9.39.4",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
@@ -36,6 +39,7 @@
     "eslint-plugin-unused-imports": "4.4.1",
     "globals": "15.15.0",
     "prettier": "3.8.3",
+    "typescript": "^6.0.3",
     "vite": "^5.4.1",
     "vite-plugin-pwa": "^0.20.5"
   }
