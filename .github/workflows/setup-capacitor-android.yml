@@ -29,10 +29,10 @@ jobs:
             npm install
           fi
 
-      - name: Instalar Capacitor
+      - name: Instalar Capacitor e TypeScript
         run: |
           npm install @capacitor/core @capacitor/android
-          npm install -D @capacitor/cli
+          npm install -D @capacitor/cli typescript
 
       - name: Criar configuração do Capacitor
         run: |
@@ -49,8 +49,10 @@ jobs:
           export default config;
           EOF
 
-      - name: Gerar build web
-        run: npm run build
+      - name: Gerar build web sem PWA para Android
+        env:
+          TERRANEXA_ANDROID_BUILD: 'true'
+        run: npm run build --if-present
 
       - name: Criar ou sincronizar Android
         run: |
