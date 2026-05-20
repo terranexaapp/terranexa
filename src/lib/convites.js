@@ -1,6 +1,16 @@
 import { supabase } from './supabase'
 import { enviarEmailConviteFazenda } from './conviteEmail'
 
+export const PAPEIS_CONVIDADOS_FAZENDA = ['gerente', 'agronomo', 'tecnico', 'coordenador_equipe', 'operador']
+
+export function conviteSenhaPath(token) {
+  return `/aceitar-convite?token=${encodeURIComponent(token)}&setup=senha`
+}
+
+export function fazendaPath(fazendaId) {
+  return fazendaId ? `/fazenda/${encodeURIComponent(fazendaId)}` : '/'
+}
+
 function newInviteToken() {
   return typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : undefined
 }
@@ -75,6 +85,68 @@ export async function buscarConviteInfo(token) {
   return data
 }
 
+export async function buscarConvitePendentePorEmail(email) {
+  const normalizedEmail = String(email || '').trim().toLowerCase()
+  if (!normalizedEmail) return null
+
+  const { data, error } = await supabase
+    .from('fazenda_membros')
+    .select('token, email, status, criado_em')
+    .eq('email', normalizedEmail)
+    .eq('status', 'pendente')
+    .order('criado_em', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (error) throw error
+  return data || null
+}
+
+async function consultarVinculosAceitos({ userId, email }) {
+  let query = supabase
+    .from('fazenda_membros')
+    .select('fazenda_id, papel, status, aceito_em, criado_em, user_id, email')
+    .eq('status', 'aceito')
+    .order('aceito_em', { ascending: false })
+    .order('criado_em', { ascending: false })
+
+  if (userId) query = query.eq('user_id', userId)
+  else if (email) query = query.eq('email', email)
+  else return []
+
+  const { data, error } = await query
+  if (error) throw error
+  return data || []
+}
+
+export async function listarVinculosAceitosDoUsuario(email = '') {
+  const normalizedEmail = String(email || '').trim().toLowerCase()
+  const {
+    data: { user }
+  } = await supabase.auth.getUser()
+
+  let vinculos = await consultarVinculosAceitos({ userId: user?.id })
+  if (vinculos.length === 0 && normalizedEmail) {
+    vinculos = await consultarVinculosAceitos({ email: normalizedEmail })
+  }
+  return vinculos.filter(vinculo => PAPEIS_CONVIDADOS_FAZENDA.includes(vinculo.papel))
+}
+
+export async function buscarPrimeiroVinculoAceitoDoUsuario(email = '') {
+  const vinculos = await listarVinculosAceitosDoUsuario(email)
+  return vinculos[0] || null
+}
+
+export async function buscarDestinoAposLogin(email = '') {
+  const pendingInvite = await buscarConvitePendentePorEmail(email)
+  if (pendingInvite?.token) return conviteSenhaPath(pendingInvite.token)
+
+  const acceptedInvite = await buscarPrimeiroVinculoAceitoDoUsuario(email)
+  if (acceptedInvite?.fazenda_id) return fazendaPath(acceptedInvite.fazenda_id)
+
+  return '/'
+}
+
 export async function aceitarConvite(token) {
   const { data, error } = await supabase.rpc('aceitar_convite', { p_token: token })
   if (error) throw error
@@ -83,5 +155,5 @@ export async function aceitarConvite(token) {
 
 export function gerarLinkConvite(token) {
   const base = window.location.origin
-  return `${base}/aceitar-convite?token=${token}`
+  return `${base}${conviteSenhaPath(token)}`
 }

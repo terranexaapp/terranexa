@@ -1,4 +1,5 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { AuthProvider, useAuth } from './hooks/useAuth'
 import { LoginPage } from './pages/LoginPage'
 import { FazendasPage } from './pages/FazendasPage'
@@ -8,6 +9,7 @@ import { OSPage } from './pages/OSPage'
 import { AceitarConvitePage } from './pages/AceitarConvitePage'
 import { CentralTerranexaPage } from './pages/CentralTerranexaPage'
 import { INTERNAL_ROLES, isInternalUser } from './lib/internalRoles'
+import { buscarConviteInfo, buscarConvitePendentePorEmail, buscarDestinoAposLogin, conviteSenhaPath } from './lib/convites'
 import { theme } from './styles/theme'
 import { Logo } from './components/Logo'
 import { ErrorBoundary } from './components/ErrorBoundary'
@@ -18,7 +20,7 @@ function PrivateRoute({ children }) {
   const { session, loading } = useAuth()
   if (loading) return <LoadingScreen />
   if (!session) return <Navigate to="/login" replace />
-  return children
+  return <PendingInviteGate session={session}>{children}</PendingInviteGate>
 }
 
 function InternalRoute({ children }) {
@@ -32,8 +34,93 @@ function InternalRoute({ children }) {
 function PublicRoute({ children }) {
   const { session, loading } = useAuth()
   if (loading) return <LoadingScreen />
-  if (session) return <Navigate to="/" replace />
+  if (session) return <PostAuthRedirect session={session} />
   return children
+}
+
+function safeRedirectPath(value) {
+  if (!value || typeof value !== 'string') return ''
+  if (!value.startsWith('/') || value.startsWith('//')) return ''
+  return value
+}
+
+async function resolvePendingInvitePath(session) {
+  const metadataToken = session?.user?.user_metadata?.convite_token
+  if (metadataToken) {
+    try {
+      const info = await buscarConviteInfo(metadataToken)
+      if (info?.status === 'pendente') return conviteSenhaPath(metadataToken)
+    } catch {
+      return conviteSenhaPath(metadataToken)
+    }
+  }
+
+  try {
+    const pendingInvite = await buscarConvitePendentePorEmail(session?.user?.email)
+    if (pendingInvite?.token) return conviteSenhaPath(pendingInvite.token)
+  } catch {
+    return ''
+  }
+
+  return ''
+}
+
+function PendingInviteGate({ session, children }) {
+  const location = useLocation()
+  const [target, setTarget] = useState(null)
+
+  useEffect(() => {
+    let active = true
+
+    setTarget(null)
+    resolvePendingInvitePath(session).then(nextTarget => {
+      if (!active) return
+      setTarget(nextTarget || '')
+    })
+
+    return () => {
+      active = false
+    }
+  }, [location.pathname, session])
+
+  if (target === null) return <LoadingScreen />
+  if (target && location.pathname !== '/aceitar-convite') return <Navigate to={target} replace />
+  return children
+}
+
+function PostAuthRedirect({ session }) {
+  const location = useLocation()
+  const [target, setTarget] = useState('')
+
+  useEffect(() => {
+    let active = true
+
+    async function resolveTarget() {
+      const params = new URLSearchParams(location.search)
+      const explicitRedirect = safeRedirectPath(params.get('redirect'))
+      if (explicitRedirect) return explicitRedirect
+
+      try {
+        const pendingInvitePath = await resolvePendingInvitePath(session)
+        if (pendingInvitePath) return pendingInvitePath
+        return buscarDestinoAposLogin(session?.user?.email)
+      } catch {
+        return '/'
+      }
+    }
+
+    setTarget('')
+    resolveTarget().then(nextTarget => {
+      if (active) setTarget(nextTarget || '/')
+    })
+
+    return () => {
+      active = false
+    }
+  }, [location.search, session])
+
+  if (!target) return <LoadingScreen />
+  return <Navigate to={target} replace />
 }
 
 function LoadingScreen() {

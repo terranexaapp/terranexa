@@ -5,7 +5,7 @@ function conviteRedirectUrl(token) {
   return `${window.location.origin}/aceitar-convite?token=${token}&setup=senha`
 }
 
-async function enviarMagicLinkConvite({ email, conviteToken }) {
+async function enviarMagicLinkConvite({ email, conviteToken, fazendaId, papel }) {
   const emailRedirectTo = conviteRedirectUrl(conviteToken)
   if (!emailRedirectTo) throw new Error('Convite criado, mas nao foi possivel montar o link de acesso.')
 
@@ -13,7 +13,13 @@ async function enviarMagicLinkConvite({ email, conviteToken }) {
     email,
     options: {
       emailRedirectTo,
-      shouldCreateUser: true
+      shouldCreateUser: true,
+      data: {
+        origem: 'terranexa_convite',
+        convite_token: conviteToken,
+        fazenda_id: fazendaId,
+        papel
+      }
     }
   })
   if (error) throw error
@@ -38,12 +44,12 @@ export async function enviarEmailConviteFazenda({ fazendaId, email, papel, convi
       body: JSON.stringify({ fazendaId, email, papel })
     })
   } catch {
-    return enviarMagicLinkConvite({ email, conviteToken })
+    return enviarMagicLinkConvite({ email, conviteToken, fazendaId, papel })
   }
 
   const payload = await response.json().catch(() => ({}))
   if (!response.ok && payload.error === 'configuracao_indisponivel') {
-    return enviarMagicLinkConvite({ email, conviteToken })
+    return enviarMagicLinkConvite({ email, conviteToken, fazendaId, papel })
   }
   if (!response.ok) {
     throw new Error(payload.message || 'Convite criado, mas o e-mail nao foi enviado.')

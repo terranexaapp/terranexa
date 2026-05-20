@@ -1,9 +1,16 @@
 import { cloneElement, isValidElement, useId, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
+import { buscarDestinoAposLogin } from '../lib/convites'
 
 // Lavoura brasileira — soja, milho, algodão
 const BG_IMAGE = 'https://images.unsplash.com/photo-1625246333195-78d9c38ad449?w=1920&q=80'
+
+function safeRedirectPath(value) {
+  if (!value || typeof value !== 'string') return ''
+  if (!value.startsWith('/') || value.startsWith('//')) return ''
+  return value
+}
 
 export function LoginPage() {
   const [email, setEmail] = useState('')
@@ -14,18 +21,25 @@ export function LoginPage() {
   const { signIn } = useAuth()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
+  const senhaCriada = searchParams.get('senha') === 'criada'
 
   async function handleSubmit(e) {
     e.preventDefault()
     setError('')
     setLoading(true)
-    const { error } = await signIn({ email, password })
+    const { data, error } = await signIn({ email, password })
     if (error) {
       setError(error.message.includes('Invalid login') ? 'E-mail ou senha incorretos' : error.message)
       setLoading(false)
     } else {
-      const redirect = searchParams.get('redirect')
-      navigate(redirect || '/')
+      const redirect = safeRedirectPath(searchParams.get('redirect'))
+      if (redirect) {
+        navigate(redirect)
+        return
+      }
+
+      const target = await buscarDestinoAposLogin(data?.user?.email || email).catch(() => '/')
+      navigate(target)
     }
   }
 
@@ -110,6 +124,9 @@ export function LoginPage() {
               </div>
             </Field>
 
+            {senhaCriada && (
+              <div style={s.success}>Senha cadastrada. Entre com seu e-mail e senha para acessar a fazenda.</div>
+            )}
             {error && <div style={s.error}>{error}</div>}
 
             <button
@@ -294,6 +311,15 @@ const s = {
     marginBottom: 14,
     fontSize: 13,
     border: '1px solid rgba(232,90,58,0.35)'
+  },
+  success: {
+    background: 'rgba(126,200,80,0.16)',
+    color: '#C9F2B6',
+    borderRadius: 10,
+    padding: '10px 14px',
+    marginBottom: 14,
+    fontSize: 13,
+    border: '1px solid rgba(126,200,80,0.36)'
   },
   btnPrimary: {
     width: '100%',

@@ -12,7 +12,7 @@ function getBearerToken(req) {
 }
 
 function getBaseUrl(req) {
-  const configured = process.env.PUBLIC_APP_URL || process.env.VERCEL_PROJECT_PRODUCTION_URL
+  const configured = process.env.PUBLIC_APP_URL || process.env.VITE_PUBLIC_APP_URL || process.env.VERCEL_PROJECT_PRODUCTION_URL
   if (configured) return configured.startsWith('http') ? configured : `https://${configured}`
   const proto = req.headers['x-forwarded-proto'] || 'https'
   const host = req.headers['x-forwarded-host'] || req.headers.host
@@ -95,6 +95,7 @@ export default async function handler(req, res) {
   const redirectTo = `${getBaseUrl(req)}/aceitar-convite?token=${membro.token}&setup=senha`
   const metadata = {
     origem: 'terranexa_convite',
+    convite_token: membro.token,
     fazenda_id: fazendaId,
     papel: membro.papel
   }

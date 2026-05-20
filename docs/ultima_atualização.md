@@ -1,5 +1,25 @@
 # Última Atualização TerraNexa
 
+## 2026-05-20 - Correção do fluxo de convite de usuários
+
+### Onde paramos
+
+- Corrigido o fluxo para convites pendentes não caírem na tela de cadastro de fazenda.
+- O cadastro de senha em `/aceitar-convite?token=...&setup=senha` agora aceita o convite, encerra a sessão temporária e volta para o login.
+- O login de usuários convidados aceitos agora direciona direto para a fazenda vinculada.
+- Convidados sem propriedade própria não veem mais os botões de criar/cadastrar fazenda.
+
+### Próxima retomada
+
+- Testar em produção com um convite novo recebido por e-mail.
+- Conferir no Supabase Auth se o template do e-mail usa o redirect correto (`RedirectTo`/confirmation URL), não apenas `SiteURL`.
+
+### Status
+
+- Build de produção passou.
+- Lint não rodou porque `eslint` não está presente em `node_modules`.
+- Correção preparada para publicação no GitHub/main.
+
 ## 2026-05-20 - Diretrizes de produção e agente Codex
 
 ### Onde paramos

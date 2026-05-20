@@ -1,5 +1,70 @@
 # TerraNexa Session State
 
+## Sessao de 2026-05-20 - correcao do fluxo de convite e login de usuarios convidados
+
+### O que foi solicitado
+
+- Corrigir o fluxo de criacao de novos usuarios convidados.
+- Ao clicar em "Conecte-se" no e-mail de convite, o usuario nao deve cair em cadastro de fazenda.
+- O convidado deve ir para uma tela de cadastro de senha.
+- Depois de cadastrar a senha, o convidado deve voltar para a tela de login.
+- Usuarios convidados com papel `gerente`, `agronomo`, `tecnico`, `coordenador_equipe` ou `operador` devem, apos login, ir direto para a fazenda do proprietario.
+- Usuarios convidados nao devem ter opcao de cadastrar fazenda.
+
+### O que foi alterado
+
+- O app agora detecta convite pendente mesmo quando o Supabase redireciona para a raiz do app, usando metadata do usuario e busca por e-mail pendente.
+- A rota privada passa por um gate de convite pendente antes de renderizar a tela de fazendas.
+- A tela de aceitar convite, quando usada para cadastro de senha, define a senha, aceita o convite, limpa metadata temporaria, encerra a sessao e redireciona para `/login?senha=criada`.
+- O login agora direciona convites pendentes para a tela de senha e vinculos aceitos direto para `/fazenda/:id`.
+- A tela de fazendas identifica usuarios convidados aceitos e, quando ha uma unica fazenda vinculada, redireciona direto para ela.
+- A tela de fazendas oculta os botoes de nova fazenda/cadastrar fazenda para usuarios convidados sem propriedade propria.
+- A API/fallback de envio de convite preserva `convite_token`, `fazenda_id` e `papel` na metadata e usa `/aceitar-convite?token=...&setup=senha` como redirect.
+
+### Arquivos modificados
+
+- `api/enviar-convite.js`
+- `src/App.jsx`
+- `src/lib/conviteEmail.js`
+- `src/lib/convites.js`
+- `src/pages/AceitarConvitePage.jsx`
+- `src/pages/FazendasPage.jsx`
+- `src/pages/LoginPage.jsx`
+- `docs/TERRANEXA_SESSION_STATE.md`
+- `docs/ultima_atualização.md`
+
+### Decisoes tecnicas tomadas
+
+- O aceite do convite continua acontecendo somente pela RPC `aceitar_convite`, que valida usuario autenticado, e-mail e status pendente.
+- `user_metadata.convite_token` e usado apenas para recuperar rota depois do redirect do Supabase, nao como autorizacao.
+- Apos cadastrar senha, a sessao do link magico/convite e encerrada para obrigar login normal com e-mail e senha.
+- O redirecionamento pos-login usa o vinculo aceito em `fazenda_membros`, nao permissao visual ou profile local.
+- A opcao de criar fazenda fica reservada a usuarios que nao sejam apenas convidados aceitos de uma fazenda de terceiro.
+
+### Pendencias
+
+- Conferir no Supabase Auth se o template de e-mail usa `{{ .RedirectTo }}` ou `{{ .ConfirmationURL }}` em vez de mandar sempre para `{{ .SiteURL }}`. O app agora recupera o fluxo quando cai na raiz, mas o template correto evita esse desvio.
+- Lint nao executou porque `node_modules/eslint/bin/eslint.js` nao existe neste checkout.
+- A verificacao visual automatizada com Playwright nao rodou porque o pacote `playwright` disponivel no runtime nao encontrou `playwright-core`.
+
+### Como testar
+
+- Convidar um novo usuario como tecnico, agronomo, gerente, coordenador de equipe ou operador.
+- Abrir o e-mail e tocar em "Conecte-se".
+- Confirmar que o app abre a tela de convite/cadastro de senha, mesmo se a URL inicial cair em `/#` ou `/`.
+- Cadastrar uma senha de pelo menos 8 caracteres.
+- Confirmar que o app volta para a tela de login com a mensagem de senha cadastrada.
+- Fazer login com e-mail e senha do convidado.
+- Confirmar que o usuario entra direto em `/fazenda/:id` da fazenda do proprietario.
+- Confirmar que o usuario convidado nao ve os botoes `+ NOVA FAZENDA` nem `+ CADASTRAR FAZENDA`.
+
+### Status do deploy/build
+
+- Build de producao executado com sucesso: `node node_modules/vite/bin/vite.js build`.
+- `git diff --check` executado sem erros nos arquivos alterados desta correcao.
+- Lint nao executado por ausencia do pacote `eslint` em `node_modules`.
+- Impacto esperado na Vercel: apos deploy, convites deixam de cair na tela de criacao de fazenda, senha de convidado volta ao login e convidados entram direto na fazenda vinculada.
+
 ## Sessao de 2026-05-20 - diretrizes de producao e agente terranexa_producao
 
 ### O que foi solicitado

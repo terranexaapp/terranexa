@@ -9,6 +9,19 @@ import { Logo } from '../components/Logo'
 
 const C = theme.normal
 
+async function limparMetadataConvite() {
+  try {
+    await supabase.auth.updateUser({
+      data: {
+        origem: null,
+        convite_token: null,
+        fazenda_id: null,
+        papel: null
+      }
+    })
+  } catch {}
+}
+
 export function AceitarConvitePage() {
   const [searchParams] = useSearchParams()
   const token = searchParams.get('token')
@@ -21,6 +34,7 @@ export function AceitarConvitePage() {
   const [accepting, setAccepting] = useState(false)
   const [acceptError, setAcceptError] = useState('')
   const [done, setDone] = useState(false)
+  const [doneTarget, setDoneTarget] = useState('fazenda')
   const [passwordDraft, setPasswordDraft] = useState({ password: '', confirm: '' })
 
   useEffect(() => {
@@ -76,6 +90,18 @@ export function AceitarConvitePage() {
         setAccepting(false)
         return
       }
+      await limparMetadataConvite()
+      if (setupSenha) {
+        setDoneTarget('login')
+        setDone(true)
+        setTimeout(async () => {
+          await supabase.auth.signOut()
+          navigate('/login?senha=criada', { replace: true })
+        }, 1400)
+        return
+      }
+
+      setDoneTarget('fazenda')
       setDone(true)
       setTimeout(() => navigate(`/fazenda/${result.fazenda_id}`), 1800)
     } catch (err) {
@@ -138,8 +164,10 @@ export function AceitarConvitePage() {
         ) : done ? (
           <div style={{ textAlign: 'center' }}>
             <div style={successIconStyle}>✓</div>
-            <h2 style={titleStyle}>Acesso liberado!</h2>
-            <p style={subtitleStyle}>Redirecionando para a fazenda…</p>
+            <h2 style={titleStyle}>{doneTarget === 'login' ? 'Senha cadastrada!' : 'Acesso liberado!'}</h2>
+            <p style={subtitleStyle}>
+              {doneTarget === 'login' ? 'Redirecionando para o login…' : 'Redirecionando para a fazenda…'}
+            </p>
           </div>
         ) : (
           <div>
@@ -179,7 +207,7 @@ export function AceitarConvitePage() {
                     disabled={accepting}
                     style={{ ...primaryBtnStyle, opacity: accepting ? 0.6 : 1 }}
                   >
-                    {accepting ? 'Salvando...' : 'Definir senha e aceitar convite'}
+                    {accepting ? 'Salvando...' : 'Cadastrar senha'}
                   </button>
                 </div>
               ) : (

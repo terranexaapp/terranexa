@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import { supabase } from '../lib/supabase'
+import { listarVinculosAceitosDoUsuario } from '../lib/convites'
 import { isInternalUser } from '../lib/internalRoles'
 import { theme } from '../styles/theme'
 import { Logo } from '../components/Logo'
@@ -13,7 +14,7 @@ async function listarFazendas() {
   const { data, error } = await supabase
     .from('fazendas')
     .select(
-      'id, nome, municipio, estado, area_total_ha, ativa, talhoes:talhoes(id, codigo, cultura, area_ha, fase, saude, ativo)'
+      'id, nome, municipio, estado, area_total_ha, ativa, proprietario_id, talhoes:talhoes(id, codigo, cultura, area_ha, fase, saude, ativo)'
     )
     .eq('ativa', true)
     .order('created_at', { ascending: false })
@@ -42,6 +43,8 @@ export function FazendasPage() {
   const [loading, setLoading] = useState(true)
   const [erro, setErro] = useState(null)
   const [showNova, setShowNova] = useState(false)
+  const [podeCriarFazenda, setPodeCriarFazenda] = useState(true)
+  const [convidadoSemPropriedade, setConvidadoSemPropriedade] = useState(false)
 
   useEffect(() => {
     carregar()
@@ -51,7 +54,23 @@ export function FazendasPage() {
     try {
       setLoading(true)
       setErro(null)
-      setFazendas(await listarFazendas())
+      const {
+        data: { user }
+      } = await supabase.auth.getUser()
+      const [fazendasData, vinculosAceitos] = await Promise.all([
+        listarFazendas(),
+        listarVinculosAceitosDoUsuario(user?.email).catch(() => [])
+      ])
+      const possuiFazendaPropria = Boolean(user?.id && fazendasData.some(fazenda => fazenda.proprietario_id === user.id))
+      const usuarioConvidado = vinculosAceitos.length > 0 && !possuiFazendaPropria
+
+      setPodeCriarFazenda(!usuarioConvidado)
+      setConvidadoSemPropriedade(usuarioConvidado)
+      setFazendas(fazendasData)
+
+      if (usuarioConvidado && fazendasData.length === 1) {
+        navigate(`/fazenda/${fazendasData[0].id}`, { replace: true })
+      }
     } catch (e) {
       console.error(e)
       setErro(e)
@@ -169,23 +188,25 @@ export function FazendasPage() {
               Fazendas
             </h1>
           </div>
-          <button
-            onClick={() => setShowNova(true)}
-            style={{
-              background: C.greenDp,
-              color: C.bg,
-              border: 'none',
-              borderRadius: 10,
-              padding: '10px 16px',
-              fontSize: 11,
-              fontFamily: 'monospace',
-              fontWeight: 700,
-              letterSpacing: '1.5px',
-              cursor: 'pointer'
-            }}
-          >
-            + NOVA FAZENDA
-          </button>
+          {podeCriarFazenda && (
+            <button
+              onClick={() => setShowNova(true)}
+              style={{
+                background: C.greenDp,
+                color: C.bg,
+                border: 'none',
+                borderRadius: 10,
+                padding: '10px 16px',
+                fontSize: 11,
+                fontFamily: 'monospace',
+                fontWeight: 700,
+                letterSpacing: '1.5px',
+                cursor: 'pointer'
+              }}
+            >
+              + NOVA FAZENDA
+            </button>
+          )}
         </div>
         {loading ? (
           <p style={{ color: C.textDim, textAlign: 'center', padding: 40, fontFamily: 'monospace', fontSize: 11 }}>
@@ -205,28 +226,32 @@ export function FazendasPage() {
           >
             <div style={{ fontSize: 48, marginBottom: 12 }}>🌾</div>
             <h2 style={{ margin: 0, fontSize: 18, color: C.textDk, fontWeight: 700, fontFamily: 'Georgia, serif' }}>
-              Cadastre sua primeira fazenda
+              {convidadoSemPropriedade ? 'Nenhuma fazenda liberada' : 'Cadastre sua primeira fazenda'}
             </h2>
             <p style={{ margin: '8px 0 20px', color: C.textMid, fontSize: 13 }}>
-              Adicione fazendas, talhões e registre operações.
+              {convidadoSemPropriedade
+                ? 'Seu usuário é convidado. Peça ao proprietário para revisar o vínculo da fazenda.'
+                : 'Adicione fazendas, talhões e registre operações.'}
             </p>
-            <button
-              onClick={() => setShowNova(true)}
-              style={{
-                background: C.greenDp,
-                color: C.bg,
-                border: 'none',
-                borderRadius: 10,
-                padding: '12px 20px',
-                fontSize: 12,
-                fontFamily: 'monospace',
-                fontWeight: 700,
-                letterSpacing: '2px',
-                cursor: 'pointer'
-              }}
-            >
-              + CADASTRAR FAZENDA
-            </button>
+            {podeCriarFazenda && (
+              <button
+                onClick={() => setShowNova(true)}
+                style={{
+                  background: C.greenDp,
+                  color: C.bg,
+                  border: 'none',
+                  borderRadius: 10,
+                  padding: '12px 20px',
+                  fontSize: 12,
+                  fontFamily: 'monospace',
+                  fontWeight: 700,
+                  letterSpacing: '2px',
+                  cursor: 'pointer'
+                }}
+              >
+                + CADASTRAR FAZENDA
+              </button>
+            )}
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -304,7 +329,7 @@ export function FazendasPage() {
           </div>
         )}
       </main>
-      {showNova && (
+      {showNova && podeCriarFazenda && (
         <NovaFazendaModal
           onClose={() => setShowNova(false)}
           onCreated={nova => {
