@@ -20,3 +20,4 @@
 - Alteração apenas documental/configuração de agente.
 - Sem impacto funcional direto no app.
 - Build/lint não são necessários para esta mudança.
+- Commit e push para `main` concluídos nesta sessão.

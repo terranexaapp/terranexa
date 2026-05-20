@@ -50,6 +50,7 @@
 
 - Mudanca apenas documental/configuracao de agente.
 - Build/lint nao sao necessarios para esta alteracao.
+- Commit e push para `main` concluidos nesta sessao.
 - Impacto esperado na Vercel: nenhum impacto funcional direto.
 
 ## Sessao de 2026-05-19 - convite de tecnico e RPC de culturas
