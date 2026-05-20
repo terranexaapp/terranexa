@@ -1,5 +1,66 @@
 # TerraNexa Session State
 
+## Sessao de 2026-05-20 - Central TerraNexa ligada ao Supabase e exclusao de usuarios
+
+### O que foi solicitado
+
+- Ajustar a Central TerraNexa para operar diretamente com Supabase.
+- Deixar as alteracoes oficiais, funcionais e prontas para producao.
+- Criar logica para excluir usuarios na pagina "Usuarios e fazendas".
+- Corrigir o erro da Central ao salvar culturas do catalogo agronomico quando a RPC `definir_culturas_catalogo_praga` nao existe no schema cache.
+
+### O que foi alterado
+
+- Criada a API serverless `api/excluir-usuario.js` para excluir usuarios do Supabase Auth usando `SUPABASE_SERVICE_ROLE_KEY` apenas no backend.
+- A pagina "Usuarios e fazendas" agora permite revogar vinculo de usuario com fazenda e excluir usuario cadastrado pela Central.
+- A exclusao definitiva bloqueia autoexclusao, usuarios internos TerraNexa e usuarios proprietarios de fazendas.
+- A listagem de usuarios agora traz as fazendas proprias do usuario para bloquear exclusao perigosa antes do clique.
+- O fluxo de catalogo agronomico passou a tratar RPC ausente/schema cache e possui fallback direto via tabelas do Supabase, alem da migration oficial.
+- A migration `database/012_recriar_rpc_catalogo_convites.sql` recria as RPCs do catalogo, aplica grants e força `notify pgrst, 'reload schema'`.
+- O README de deploy agora registra `SUPABASE_SERVICE_ROLE_KEY` como variavel obrigatoria protegida na Vercel.
+
+### Arquivos modificados
+
+- `api/excluir-usuario.js`
+- `src/lib/centralTerranexa.js`
+- `src/pages/CentralTerranexaPage.jsx`
+- `database/012_recriar_rpc_catalogo_convites.sql`
+- `database/README.md`
+- `README.md`
+- `docs/TERRANEXA_SESSION_STATE.md`
+- `docs/ultima_atualização.md`
+
+### Decisoes tecnicas tomadas
+
+- A chave `service_role` nao foi exposta no frontend; a exclusao de Auth fica restrita a endpoint serverless protegido por Bearer token do usuario logado.
+- A API valida a sessao com `supabase.auth.getUser()` e confere `profiles.papel = 'terranexa_admin'` antes de excluir.
+- A remocao de usuario revoga vinculos em `fazenda_membros`, marca vinculos de conta como `removido`, apaga o usuario no Supabase Auth e depois remove o profile.
+- Usuarios que ainda possuem fazendas como `proprietario_id` nao sao excluidos para evitar fazendas sem dono operacional.
+- A correcao da RPC do catalogo permanece oficial via migration, mas a Central tambem consegue salvar culturas usando operacoes diretas em tabelas quando o PostgREST ainda nao reconhece a funcao.
+
+### Pendencias
+
+- Aplicar `database/012_recriar_rpc_catalogo_convites.sql` no SQL Editor do Supabase de producao se ela ainda nao tiver sido aplicada.
+- Conferir na Vercel se `SUPABASE_SERVICE_ROLE_KEY` esta configurada como variavel protegida de producao.
+- Lint nao executou porque `node_modules/eslint/bin/eslint.js` nao existe neste checkout.
+- Nao foi feita verificacao visual autenticada da Central porque esta sessao nao tem ferramenta de navegador local autenticado disponivel.
+
+### Como testar
+
+- Entrar na Central com um usuario `terranexa_admin`.
+- Abrir "Usuarios e fazendas".
+- Em uma fazenda, clicar em "Excluir" em um membro e confirmar que o vinculo sai da lista e o acesso e revogado.
+- Em "Cadastros de usuarios", tentar excluir um usuario sem fazendas proprias e confirmar que ele some do Supabase Auth/profiles.
+- Confirmar que o proprio usuario logado, usuarios internos e proprietarios de fazendas ficam bloqueados.
+- Na aba "Pragas, doencas e daninhas", alterar culturas de um item e salvar; a mensagem deve indicar as fazendas sincronizadas.
+
+### Status do deploy/build
+
+- `git diff --check` executado sem erros.
+- `api/excluir-usuario.js` validado com `node --check`.
+- Build de producao executado com sucesso: `node node_modules/vite/bin/vite.js build`.
+- Impacto esperado na Vercel: apos deploy, a Central passa a excluir usuarios de forma real no Supabase Auth/backend e deixa de travar no erro de RPC ausente ao salvar culturas do catalogo.
+
 ## Sessao de 2026-05-20 - correcao do fluxo de convite e login de usuarios convidados
 
 ### O que foi solicitado

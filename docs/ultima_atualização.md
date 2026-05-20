@@ -1,5 +1,29 @@
 # Última Atualização TerraNexa
 
+## 2026-05-20 - Central TerraNexa Supabase e exclusao de usuarios
+
+### Onde paramos
+
+- A Central agora tem exclusao operacional de usuarios na aba "Usuarios e fazendas".
+- A exclusao definitiva usa `api/excluir-usuario.js` com `SUPABASE_SERVICE_ROLE_KEY` somente no backend.
+- O frontend bloqueia exclusao do proprio usuario, de usuarios internos e de usuarios proprietarios de fazendas.
+- Vinculos em fazendas podem ser revogados diretamente pela hierarquia da pagina.
+- O catalogo agronomico trata a RPC ausente `definir_culturas_catalogo_praga` e tem migration oficial para recriar RPCs e recarregar o schema cache.
+- O README de deploy registra `SUPABASE_SERVICE_ROLE_KEY` como variavel protegida obrigatoria na Vercel.
+
+### Proxima retomada
+
+- Aplicar `database/012_recriar_rpc_catalogo_convites.sql` no Supabase de producao se ainda nao tiver sido aplicada.
+- Conferir na Vercel se `SUPABASE_SERVICE_ROLE_KEY` esta configurada no ambiente de producao.
+- Testar com usuario `terranexa_admin`: revogar um membro de fazenda, excluir um usuario sem fazendas proprias e salvar culturas na aba de pragas/doencas/daninhas.
+
+### Status
+
+- `git diff --check` passou.
+- `api/excluir-usuario.js` passou em `node --check`.
+- Build de producao passou com Vite.
+- Lint nao rodou porque o executavel do ESLint nao existe em `node_modules` neste checkout.
+
 ## 2026-05-20 - Correção do fluxo de convite de usuários
 
 ### Onde paramos

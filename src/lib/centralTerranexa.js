@@ -26,6 +26,26 @@ function toLowerEmail(email) {
   return String(email || '').trim().toLowerCase()
 }
 
+function isMissingRpcError(error, functionName) {
+  const message = String(error?.message || '').toLowerCase()
+  const details = String(error?.details || '').toLowerCase()
+  const code = String(error?.code || '').toUpperCase()
+  return (
+    code === 'PGRST202' ||
+    message.includes('schema cache') ||
+    message.includes('could not find the function') ||
+    details.includes(functionName)
+  )
+}
+
+function catalogoRpcError(error) {
+  if (!isMissingRpcError(error, 'definir_culturas_catalogo_praga')) return error
+
+  return new Error(
+    'A funcao do banco para salvar culturas do catalogo ainda nao esta instalada ou o cache do Supabase nao recarregou. Rode database/012_recriar_rpc_catalogo_convites.sql no SQL Editor do Supabase.'
+  )
+}
+
 async function fetchByIds(table, ids, select = '*') {
   if (!ids.length) return {}
   const { data, error } = await supabase.from(table).select(select).in('id', ids)
@@ -43,7 +63,7 @@ export async function listarResumoContas() {
 }
 
 export async function listarUsuariosCadastrados() {
-  const [profilesResult, membrosResult, contasResult] = await Promise.all([
+  const [profilesResult, membrosResult, contasResult, fazendasResult] = await Promise.all([
     supabase
       .from('profiles')
       .select('id, nome, email, papel, created_at, updated_at')
@@ -55,12 +75,17 @@ export async function listarUsuariosCadastrados() {
     supabase
       .from('contas')
       .select('id, nome, status, plano_nome, hectares_contratados, hectares_tolerancia, controle_hectares_ativo')
+      .order('nome', { ascending: true }),
+    supabase
+      .from('fazendas')
+      .select('id, nome, proprietario_id')
       .order('nome', { ascending: true })
   ])
 
   if (profilesResult.error) throw profilesResult.error
   if (membrosResult.error) throw membrosResult.error
   if (contasResult.error) throw contasResult.error
+  if (fazendasResult.error) throw fazendasResult.error
 
   const contasById = indexById(contasResult.data || [])
   const vinculosPorUsuario = (membrosResult.data || []).reduce((acc, membro) => {
@@ -68,10 +93,16 @@ export async function listarUsuariosCadastrados() {
     acc[membro.user_id] = [...(acc[membro.user_id] || []), vinculo]
     return acc
   }, {})
+  const fazendasPorProprietario = (fazendasResult.data || []).reduce((acc, fazenda) => {
+    if (!fazenda.proprietario_id) return acc
+    acc[fazenda.proprietario_id] = [...(acc[fazenda.proprietario_id] || []), fazenda]
+    return acc
+  }, {})
 
   return (profilesResult.data || []).map(profile => ({
     ...profile,
-    vinculos: vinculosPorUsuario[profile.id] || []
+    vinculos: vinculosPorUsuario[profile.id] || [],
+    fazendasProprias: fazendasPorProprietario[profile.id] || []
   }))
 }
 
@@ -245,6 +276,48 @@ export async function atualizarPapelUsuarioFazenda(vinculoId, papel) {
   return data
 }
 
+export async function excluirVinculoUsuarioFazenda(vinculoId) {
+  if (!vinculoId) throw new Error('Vinculo obrigatorio para remover usuario da fazenda.')
+  const { data, error } = await supabase
+    .from('fazenda_membros')
+    .update({
+      status: 'revogado',
+      user_id: null,
+      aceito_em: null,
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', vinculoId)
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function excluirUsuarioCentral({ userId, email }) {
+  const {
+    data: { session },
+    error: sessionError
+  } = await supabase.auth.getSession()
+
+  if (sessionError || !session?.access_token) {
+    throw new Error('Sessao expirada. Entre novamente na Central TerraNexa.')
+  }
+
+  const response = await fetch('/api/excluir-usuario', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${session.access_token}`
+    },
+    body: JSON.stringify({ userId, email })
+  })
+  const body = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    throw new Error(body.message || body.error || 'Nao foi possivel excluir o usuario.')
+  }
+  return body
+}
+
 export async function atualizarPermissoesPapelFazenda(papel, permissoes) {
   const { data, error } = await supabase
     .from('fazenda_papeis')
@@ -356,8 +429,88 @@ export async function salvarCatalogoPraga(payload) {
     .single()
   if (error) throw error
 
-  await supabase.rpc('sincronizar_catalogo_pragas_todas_fazendas').catch(() => null)
-  return { ...data, culturaIds: payload.culturaIds || [] }
+  const totalFazendas = await sincronizarCatalogoPragasTodasFazendas()
+  return { ...data, culturaIds: payload.culturaIds || [], totalFazendas }
+}
+
+async function sincronizarCatalogoPragasPorFazenda() {
+  const { data: fazendas, error: fazendasError } = await supabase
+    .from('fazendas')
+    .select('id')
+    .order('nome', { ascending: true })
+  if (fazendasError) throw fazendasError
+
+  let total = 0
+  for (const fazenda of fazendas || []) {
+    const { error } = await supabase.rpc('sincronizar_pragas_doencas_catalogo', {
+      p_fazenda_id: fazenda.id
+    })
+    if (error) throw error
+    total += 1
+  }
+  return total
+}
+
+async function sincronizarCatalogoPragasTodasFazendas() {
+  const { data, error } = await supabase.rpc('sincronizar_catalogo_pragas_todas_fazendas')
+  if (!error) return data
+  if (isMissingRpcError(error, 'sincronizar_catalogo_pragas_todas_fazendas')) {
+    return sincronizarCatalogoPragasPorFazenda()
+  }
+  throw error
+}
+
+async function salvarCulturasPragaDireto({ catalogoPragaId, culturaIds }) {
+  if (!catalogoPragaId) throw new Error('Selecione o item do catalogo.')
+  const culturas = unique(culturaIds || [])
+
+  const { error: pragaError } = await supabase
+    .from('catalogo_pragas')
+    .select('id')
+    .eq('id', catalogoPragaId)
+    .single()
+  if (pragaError) throw pragaError
+
+  if (culturas.length) {
+    const { data: culturasValidas, error: culturasError } = await supabase
+      .from('catalogo_culturas')
+      .select('id')
+      .in('id', culturas)
+    if (culturasError) throw culturasError
+
+    const validIds = new Set((culturasValidas || []).map(cultura => cultura.id))
+    const invalidas = culturas.filter(culturaId => !validIds.has(culturaId))
+    if (invalidas.length) throw new Error(`Culturas invalidas: ${invalidas.join(', ')}`)
+  }
+
+  const { error: deleteError } = await supabase
+    .from('catalogo_praga_culturas')
+    .delete()
+    .eq('catalogo_praga_id', catalogoPragaId)
+  if (deleteError) throw deleteError
+
+  if (culturas.length) {
+    const rows = culturas.map(culturaId => ({
+      catalogo_praga_id: catalogoPragaId,
+      cultura_id: culturaId
+    }))
+    const { error: insertError } = await supabase.from('catalogo_praga_culturas').insert(rows)
+    if (insertError) throw insertError
+  }
+
+  const { error: updateError } = await supabase
+    .from('catalogo_pragas')
+    .update({ updated_at: new Date().toISOString() })
+    .eq('id', catalogoPragaId)
+  if (updateError) throw updateError
+
+  try {
+    return await sincronizarCatalogoPragasTodasFazendas()
+  } catch (err) {
+    throw new Error(
+      `Culturas salvas no catalogo central, mas a sincronizacao das fazendas falhou: ${err.message || err}`
+    )
+  }
 }
 
 export async function salvarCulturasPraga({ catalogoPragaId, culturaIds }) {
@@ -365,7 +518,12 @@ export async function salvarCulturasPraga({ catalogoPragaId, culturaIds }) {
     p_catalogo_praga_id: catalogoPragaId,
     p_culturas: culturaIds || []
   })
-  if (error) throw error
+  if (error) {
+    if (isMissingRpcError(error, 'definir_culturas_catalogo_praga')) {
+      return salvarCulturasPragaDireto({ catalogoPragaId, culturaIds })
+    }
+    throw catalogoRpcError(error)
+  }
   return data
 }
 

@@ -129,6 +129,7 @@ Isso cria uma fazenda **São José** com 4 talhões, 3 insumos e 1 operação de
 5. Em **Environment Variables**, adicione:
    - `VITE_SUPABASE_URL`
    - `VITE_SUPABASE_ANON_KEY`
+   - `SUPABASE_SERVICE_ROLE_KEY` (somente no ambiente protegido da Vercel, nunca no frontend)
    - `VITE_MAPBOX_TOKEN`
 6. Clique em **Deploy**
 

@@ -89,3 +89,4 @@ Arquivos incrementais atuais:
 | `009_hierarquia_fazenda_papeis.sql` | Amplia papeis por fazenda, matriz de permissoes e vinculacao pela Central TerraNexa. |
 | `010_central_permissoes_catalogo_agronomico.sql` | Libera a Central para editar permissoes por papel e pragas/doencas por cultura. |
 | `011_catalogo_monitoramento_campos_extras.sql` | Adiciona instrucoes e campos extras de monitoramento ao catalogo central. |
+| `012_recriar_rpc_catalogo_convites.sql` | Recria RPCs do catalogo/convites, corrige culturas por tipo e recarrega o schema cache do Supabase. |

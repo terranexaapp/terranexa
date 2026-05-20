@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
 import {
   aprovarSolicitacao,
+  excluirUsuarioCentral,
+  excluirVinculoUsuarioFazenda,
   atualizarPapelUsuarioFazenda,
   atualizarPermissoesPapelFazenda,
   atualizarContratoConta,
@@ -19,6 +21,7 @@ import {
   salvarCulturasPraga,
   vincularUsuarioFazenda
 } from '../lib/centralTerranexa'
+import { INTERNAL_ROLES } from '../lib/internalRoles'
 import {
   FAZENDA_PAPEIS,
   FAZENDA_PERMISSAO_GROUPS,
@@ -188,6 +191,8 @@ export function CentralTerranexaPage() {
   const [linkSaving, setLinkSaving] = useState(false)
   const [linkMessage, setLinkMessage] = useState('')
   const [linkError, setLinkError] = useState('')
+  const [memberDeletingId, setMemberDeletingId] = useState('')
+  const [userDeletingId, setUserDeletingId] = useState('')
   const [permissionsDraft, setPermissionsDraft] = useState(buildPermissionsDraft(FAZENDA_PAPEIS))
   const [permissionSaving, setPermissionSaving] = useState('')
   const [permissionMessage, setPermissionMessage] = useState('')
@@ -464,6 +469,52 @@ export function CentralTerranexaPage() {
       await carregar()
     } catch (err) {
       setLinkError(err.message || 'Nao foi possivel alterar o papel.')
+    }
+  }
+
+  async function handleExcluirVinculoFazenda(vinculo) {
+    const label = vinculo.usuario?.nome || vinculo.email || 'este usuario'
+    const confirmado = window.confirm(`Remover ${label} desta fazenda? O acesso sera revogado imediatamente.`)
+    if (!confirmado) return
+
+    setMemberDeletingId(vinculo.id)
+    setLinkError('')
+    setLinkMessage('')
+    try {
+      await excluirVinculoUsuarioFazenda(vinculo.id)
+      setLinkMessage('Usuario removido da fazenda.')
+      await carregar()
+    } catch (err) {
+      setLinkError(err.message || 'Nao foi possivel remover o usuario da fazenda.')
+    } finally {
+      setMemberDeletingId('')
+    }
+  }
+
+  async function handleExcluirUsuario(usuario) {
+    if (!canDeleteCentralUser(usuario, profile)) {
+      setLinkError('Este usuario nao pode ser excluido pela Central nesta tela.')
+      setLinkMessage('')
+      return
+    }
+
+    const label = usuario.nome || usuario.email || usuario.id
+    const confirmado = window.confirm(
+      `Excluir definitivamente ${label}? O login sera removido do Supabase Auth e os vinculos serao revogados.`
+    )
+    if (!confirmado) return
+
+    setUserDeletingId(usuario.id)
+    setLinkError('')
+    setLinkMessage('')
+    try {
+      const resultado = await excluirUsuarioCentral({ userId: usuario.id, email: usuario.email })
+      setLinkMessage(resultado.message || 'Usuario excluido.')
+      await carregar()
+    } catch (err) {
+      setLinkError(err.message || 'Nao foi possivel excluir o usuario.')
+    } finally {
+      setUserDeletingId('')
     }
   }
 
@@ -994,6 +1045,8 @@ export function CentralTerranexaPage() {
                 grupo={grupo}
                 papeis={papeisDisponiveis}
                 onAlterarPapel={handleAlterarPapelVinculo}
+                onExcluirMembro={handleExcluirVinculoFazenda}
+                memberDeletingId={memberDeletingId}
               />
             ))}
             {hierarquiaFiltrada.length === 0 && <p style={s.emptyText}>Nenhum vinculo encontrado neste filtro.</p>}
@@ -1029,29 +1082,46 @@ export function CentralTerranexaPage() {
                   <Th>Criado em</Th>
                   <Th>Atualizado</Th>
                   <Th>ID</Th>
+                  <Th>Acao</Th>
                 </tr>
               </thead>
               <tbody>
-                {usuariosFiltrados.map(usuario => (
-                  <tr key={usuario.id}>
-                    <Td>{usuario.nome || '-'}</Td>
-                    <Td>{usuario.email || '-'}</Td>
-                    <Td>
-                      <span style={{ ...s.badge, ...userRoleTone(usuario.papel) }}>{usuario.papel || 'sem papel'}</span>
-                    </Td>
-                    <Td>
-                      <UserAccounts vinculos={usuario.vinculos} />
-                    </Td>
-                    <Td>{formatDate(usuario.created_at)}</Td>
-                    <Td>{formatDate(usuario.updated_at)}</Td>
-                    <Td>
-                      <code style={s.userId}>{usuario.id}</code>
-                    </Td>
-                  </tr>
-                ))}
+                {usuariosFiltrados.map(usuario => {
+                  const deleting = userDeletingId === usuario.id
+                  const deleteDisabled = deleting || !canDeleteCentralUser(usuario, profile)
+                  return (
+                    <tr key={usuario.id}>
+                      <Td>{usuario.nome || '-'}</Td>
+                      <Td>{usuario.email || '-'}</Td>
+                      <Td>
+                        <span style={{ ...s.badge, ...userRoleTone(usuario.papel) }}>{usuario.papel || 'sem papel'}</span>
+                      </Td>
+                      <Td>
+                        <UserAccounts vinculos={usuario.vinculos} />
+                      </Td>
+                      <Td>{formatDate(usuario.created_at)}</Td>
+                      <Td>{formatDate(usuario.updated_at)}</Td>
+                      <Td>
+                        <code style={s.userId}>{usuario.id}</code>
+                      </Td>
+                      <Td>
+                        <button
+                          type="button"
+                          disabled={deleteDisabled}
+                          onClick={() => handleExcluirUsuario(usuario)}
+                          title={deleteDisabled ? deleteUserBlockedReason(usuario, profile) : 'Excluir usuario'}
+                          style={{ ...s.dangerMiniBtn, ...(deleteDisabled ? s.disabledBtn : {}) }}
+                        >
+                          {deleting ? 'Excluindo...' : 'Excluir'}
+                        </button>
+                      </Td>
+                    </tr>
+                  )
+                })}
                 {usuariosFiltrados.length === 0 && (
                   <tr>
                     <Td>Nenhum usuario encontrado.</Td>
+                    <Td>-</Td>
                     <Td>-</Td>
                     <Td>-</Td>
                     <Td>-</Td>
@@ -1574,7 +1644,7 @@ function AgroCatalogSection({
   )
 }
 
-function OwnerHierarchyCard({ grupo, papeis, onAlterarPapel }) {
+function OwnerHierarchyCard({ grupo, papeis, onAlterarPapel, onExcluirMembro, memberDeletingId }) {
   const owner = grupo.proprietario || {}
   return (
     <article style={s.ownerCard}>
@@ -1601,6 +1671,8 @@ function OwnerHierarchyCard({ grupo, papeis, onAlterarPapel }) {
             fazenda={fazenda}
             papeis={papeis}
             onAlterarPapel={onAlterarPapel}
+            onExcluirMembro={onExcluirMembro}
+            memberDeletingId={memberDeletingId}
           />
         ))}
       </div>
@@ -1608,7 +1680,7 @@ function OwnerHierarchyCard({ grupo, papeis, onAlterarPapel }) {
   )
 }
 
-function FarmHierarchyBlock({ fazenda, papeis, onAlterarPapel }) {
+function FarmHierarchyBlock({ fazenda, papeis, onAlterarPapel, onExcluirMembro, memberDeletingId }) {
   const owner = fazenda.proprietario
   return (
     <div style={s.farmCard}>
@@ -1644,6 +1716,8 @@ function FarmHierarchyBlock({ fazenda, papeis, onAlterarPapel }) {
             membro={membro}
             papeis={papeis}
             onAlterarPapel={onAlterarPapel}
+            onExcluir={onExcluirMembro}
+            deleting={memberDeletingId === membro.id}
           />
         ))}
 
@@ -1655,7 +1729,7 @@ function FarmHierarchyBlock({ fazenda, papeis, onAlterarPapel }) {
   )
 }
 
-function MemberHierarchyRow({ membro, papeis, onAlterarPapel }) {
+function MemberHierarchyRow({ membro, papeis, onAlterarPapel, onExcluir, deleting }) {
   const usuario = membro.usuario || {}
   const papelMeta = membro.papelMeta || getFazendaPapelMeta(membro.papel)
   return (
@@ -1678,7 +1752,17 @@ function MemberHierarchyRow({ membro, papeis, onAlterarPapel }) {
           </option>
         ))}
       </select>
-      <RolePermissionChips papelMeta={papelMeta} />
+      <div style={s.memberActions}>
+        <RolePermissionChips papelMeta={papelMeta} />
+        <button
+          type="button"
+          disabled={deleting}
+          onClick={() => onExcluir(membro)}
+          style={{ ...s.dangerMiniBtn, ...(deleting ? s.disabledBtn : {}) }}
+        >
+          {deleting ? 'Excluindo...' : 'Excluir'}
+        </button>
+      </div>
     </div>
   )
 }
@@ -1718,8 +1802,25 @@ function statusUsoTone(status) {
   return { color: C.greenDp, background: C.greenLight }
 }
 
+function canDeleteCentralUser(usuario, profile) {
+  if (profile?.papel !== 'terranexa_admin') return false
+  if (!usuario?.id) return false
+  if (usuario.id === profile?.id) return false
+  if (usuario.fazendasProprias?.length > 0) return false
+  return !INTERNAL_ROLES.includes(usuario.papel)
+}
+
+function deleteUserBlockedReason(usuario, profile) {
+  if (profile?.papel !== 'terranexa_admin') return 'Somente terranexa_admin pode excluir usuarios.'
+  if (!usuario?.id) return 'Usuario sem ID de autenticacao.'
+  if (usuario.id === profile?.id) return 'Nao e permitido excluir o proprio usuario logado.'
+  if (usuario.fazendasProprias?.length > 0) return 'Usuario proprietario de fazenda. Transfira ou regularize as fazendas antes.'
+  if (INTERNAL_ROLES.includes(usuario.papel)) return 'Usuario interno protegido.'
+  return 'Excluir usuario'
+}
+
 function userRoleTone(papel) {
-  if (['terranexa_admin', 'comercial', 'suporte'].includes(papel)) {
+  if (INTERNAL_ROLES.includes(papel)) {
     return { color: C.blue, background: C.blueLight }
   }
   if (['proprietario', 'admin'].includes(papel)) {
@@ -1939,6 +2040,21 @@ const s = {
     color: C.redDk,
     fontWeight: 900,
     cursor: 'pointer'
+  },
+  dangerMiniBtn: {
+    border: `1px solid ${C.red}`,
+    borderRadius: 8,
+    padding: '6px 9px',
+    background: C.redLight,
+    color: C.redDk,
+    fontSize: 11,
+    fontWeight: 900,
+    cursor: 'pointer',
+    whiteSpace: 'nowrap'
+  },
+  disabledBtn: {
+    opacity: 0.55,
+    cursor: 'not-allowed'
   },
   errorBox: {
     background: C.redLight,
@@ -2220,6 +2336,7 @@ const s = {
     cursor: 'pointer',
     fontFamily: 'inherit'
   },
+  memberActions: { display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8, flexWrap: 'wrap' },
   permissionChips: { display: 'flex', gap: 5, flexWrap: 'wrap', justifyContent: 'flex-end' },
   permissionChip: {
     borderRadius: 999,
