@@ -42,7 +42,17 @@ function catalogoRpcError(error) {
   if (!isMissingRpcError(error, 'definir_culturas_catalogo_praga')) return error
 
   return new Error(
-    'A funcao do banco para salvar culturas do catalogo ainda nao esta instalada ou o cache do Supabase nao recarregou. Rode database/012_recriar_rpc_catalogo_convites.sql no SQL Editor do Supabase.'
+    'A funcao do banco para salvar culturas do catalogo ainda nao esta instalada ou o cache do Supabase nao recarregou. O app tentara usar o backend protegido; se persistir, rode a migration mais recente do catalogo no SQL Editor do Supabase.'
+  )
+}
+
+function isCatalogoWriteFallbackError(error) {
+  const text = `${error?.message || ''} ${error?.details || ''} ${error?.hint || ''} ${error?.code || ''}`.toLowerCase()
+  return (
+    isMissingRpcError(error, 'definir_culturas_catalogo_praga') ||
+    text.includes('row-level security') ||
+    text.includes('permission denied') ||
+    text.includes('catalogo_praga_culturas')
   )
 }
 
@@ -460,57 +470,32 @@ async function sincronizarCatalogoPragasTodasFazendas() {
   throw error
 }
 
-async function salvarCulturasPragaDireto({ catalogoPragaId, culturaIds }) {
+async function salvarCulturasPragaBackend({ catalogoPragaId, culturaIds }) {
   if (!catalogoPragaId) throw new Error('Selecione o item do catalogo.')
-  const culturas = unique(culturaIds || [])
 
-  const { error: pragaError } = await supabase
-    .from('catalogo_pragas')
-    .select('id')
-    .eq('id', catalogoPragaId)
-    .single()
-  if (pragaError) throw pragaError
+  const {
+    data: { session },
+    error: sessionError
+  } = await supabase.auth.getSession()
 
-  if (culturas.length) {
-    const { data: culturasValidas, error: culturasError } = await supabase
-      .from('catalogo_culturas')
-      .select('id')
-      .in('id', culturas)
-    if (culturasError) throw culturasError
-
-    const validIds = new Set((culturasValidas || []).map(cultura => cultura.id))
-    const invalidas = culturas.filter(culturaId => !validIds.has(culturaId))
-    if (invalidas.length) throw new Error(`Culturas invalidas: ${invalidas.join(', ')}`)
+  if (sessionError || !session?.access_token) {
+    throw new Error('Sessao expirada. Entre novamente na Central TerraNexa.')
   }
 
-  const { error: deleteError } = await supabase
-    .from('catalogo_praga_culturas')
-    .delete()
-    .eq('catalogo_praga_id', catalogoPragaId)
-  if (deleteError) throw deleteError
-
-  if (culturas.length) {
-    const rows = culturas.map(culturaId => ({
-      catalogo_praga_id: catalogoPragaId,
-      cultura_id: culturaId
-    }))
-    const { error: insertError } = await supabase.from('catalogo_praga_culturas').insert(rows)
-    if (insertError) throw insertError
+  const response = await fetch('/api/salvar-culturas-catalogo', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${session.access_token}`
+    },
+    body: JSON.stringify({ catalogoPragaId, culturaIds: unique(culturaIds || []) })
+  })
+  const body = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    throw new Error(body.message || body.error || 'Nao foi possivel salvar as culturas desta praga/doenca.')
   }
 
-  const { error: updateError } = await supabase
-    .from('catalogo_pragas')
-    .update({ updated_at: new Date().toISOString() })
-    .eq('id', catalogoPragaId)
-  if (updateError) throw updateError
-
-  try {
-    return await sincronizarCatalogoPragasTodasFazendas()
-  } catch (err) {
-    throw new Error(
-      `Culturas salvas no catalogo central, mas a sincronizacao das fazendas falhou: ${err.message || err}`
-    )
-  }
+  return body.totalFazendas || 0
 }
 
 export async function salvarCulturasPraga({ catalogoPragaId, culturaIds }) {
@@ -519,8 +504,8 @@ export async function salvarCulturasPraga({ catalogoPragaId, culturaIds }) {
     p_culturas: culturaIds || []
   })
   if (error) {
-    if (isMissingRpcError(error, 'definir_culturas_catalogo_praga')) {
-      return salvarCulturasPragaDireto({ catalogoPragaId, culturaIds })
+    if (isCatalogoWriteFallbackError(error)) {
+      return salvarCulturasPragaBackend({ catalogoPragaId, culturaIds })
     }
     throw catalogoRpcError(error)
   }

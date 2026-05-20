@@ -90,3 +90,4 @@ Arquivos incrementais atuais:
 | `010_central_permissoes_catalogo_agronomico.sql` | Libera a Central para editar permissoes por papel e pragas/doencas por cultura. |
 | `011_catalogo_monitoramento_campos_extras.sql` | Adiciona instrucoes e campos extras de monitoramento ao catalogo central. |
 | `012_recriar_rpc_catalogo_convites.sql` | Recria RPCs do catalogo/convites, corrige culturas por tipo e recarrega o schema cache do Supabase. |
+| `013_corrigir_rls_catalogo_culturas.sql` | Corrige RLS/grants/RPC para salvar culturas do catalogo sem erro em `catalogo_praga_culturas`. |

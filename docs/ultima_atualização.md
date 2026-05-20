@@ -1,5 +1,31 @@
 # Última Atualização TerraNexa
 
+## 2026-05-20 - Correcao RLS ao salvar culturas do catalogo
+
+### Onde paramos
+
+- Corrigido o fluxo da Central em "Pragas, doencas e daninhas" para nao depender mais de escrita direta do navegador em `catalogo_praga_culturas`.
+- Criada a rota serverless `api/salvar-culturas-catalogo.js`, usando `SUPABASE_SERVICE_ROLE_KEY` somente no backend.
+- `src/lib/centralTerranexa.js` agora usa essa rota protegida quando a RPC do catalogo falta, o schema cache ainda nao recarregou ou a operacao direta bate em RLS.
+- Criada a migration `database/013_corrigir_rls_catalogo_culturas.sql` para consolidar RLS, grants e RPCs do catalogo no Supabase.
+- Build de producao passou com Vite.
+
+### Proxima retomada
+
+- Aplicar `database/013_corrigir_rls_catalogo_culturas.sql` no SQL Editor do Supabase de producao.
+- Confirmar que `SUPABASE_SERVICE_ROLE_KEY` esta configurada na Vercel.
+- Fazer commit/push para `main`; a Vercel deve criar um novo deploy de producao.
+- Testar na Central com usuario interno TerraNexa: marcar/desmarcar culturas de uma praga, doenca ou daninha e salvar.
+
+### Status
+
+- `node --check api/salvar-culturas-catalogo.js` passou.
+- `node --check api/excluir-usuario.js` passou.
+- `git diff --check` passou.
+- Build de producao passou.
+- Lint/Prettier nao rodaram porque os binarios nao existem neste `node_modules`.
+- O deploy atual da Vercel ainda esta no commit `885f83c`; esta correcao ainda precisa de commit/push.
+
 ## 2026-05-20 - Central TerraNexa Supabase e exclusao de usuarios
 
 ### Onde paramos

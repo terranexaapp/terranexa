@@ -1,5 +1,64 @@
 # TerraNexa Session State
 
+## Sessao de 2026-05-20 - correcao RLS ao salvar culturas do catalogo
+
+### O que foi solicitado
+
+- Verificar e resolver o erro ao alterar culturas de pragas, doencas e daninhas na Central TerraNexa.
+- Erro observado na tela: `new row violates row-level security policy for table "catalogo_praga_culturas"`.
+- Manter a solucao pronta para producao com GitHub, Supabase e Vercel.
+
+### O que foi alterado
+
+- O frontend deixou de usar fallback direto do navegador em `catalogo_praga_culturas` quando a RPC do Supabase falta ou bate em RLS.
+- Criada a API serverless `api/salvar-culturas-catalogo.js`, protegida por Bearer token do usuario logado e `SUPABASE_SERVICE_ROLE_KEY` apenas no backend.
+- A API valida que o operador possui papel interno TerraNexa (`terranexa_admin`, `comercial` ou `suporte`) antes de alterar o catalogo.
+- A API troca os vinculos de culturas no catalogo-mae usando service role, valida culturas existentes e sincroniza o catalogo por fazenda sem depender do RLS do cliente.
+- Criada a migration `database/013_corrigir_rls_catalogo_culturas.sql` para consolidar policies, grants e RPCs do catalogo, incluindo `service_role`.
+- Atualizado o `database/README.md` para registrar a migration 013.
+
+### Arquivos modificados
+
+- `api/salvar-culturas-catalogo.js`
+- `src/lib/centralTerranexa.js`
+- `database/013_corrigir_rls_catalogo_culturas.sql`
+- `database/README.md`
+- `docs/TERRANEXA_SESSION_STATE.md`
+- `docs/ultima_atualização.md`
+
+### Decisoes tecnicas tomadas
+
+- A causa raiz e que o fallback direto no cliente tentava inserir em `public.catalogo_praga_culturas`, tabela com RLS ativo e sem policy/grant suficiente no banco de producao.
+- A correcao principal move a escrita sensivel para uma rota serverless com service role, sem expor a chave no frontend.
+- A migration 013 permanece como correcao oficial de banco para que RPC, policies e grants fiquem alinhados e idempotentes.
+- O backend faz sincronizacao direta por tabelas para evitar depender do cache de schema do PostgREST quando a RPC ainda nao foi aplicada.
+
+### Pendencias
+
+- Aplicar `database/013_corrigir_rls_catalogo_culturas.sql` no SQL Editor do Supabase de producao.
+- Fazer commit/push das alteracoes para `main`; o workspace local esta em `codex/monitoramento-fotos`, atras de `origin/main`, com alteracoes pendentes preexistentes em `package.json` e `.codex/agents/terranexa-dev.toml`.
+- A Vercel ja possui projeto `terranexa`, mas o deploy atual de producao ainda aponta para o commit `885f83c`, anterior a esta correcao.
+- Lint nao executou porque `node_modules/eslint/bin/eslint.js` nao existe neste checkout.
+- Prettier nao executou porque `node_modules/prettier/bin/prettier.cjs` nao existe neste checkout.
+
+### Como testar
+
+- Aplicar a migration 013 no Supabase.
+- Confirmar que `SUPABASE_SERVICE_ROLE_KEY` esta configurada na Vercel.
+- Publicar o commit na branch `main` e aguardar o deploy da Vercel.
+- Entrar na Central como usuario interno TerraNexa.
+- Abrir "Pragas, doencas e daninhas".
+- Marcar ou desmarcar culturas de um item e clicar em "Salvar culturas".
+- Confirmar que a mensagem de sucesso aparece e que o erro de RLS em `catalogo_praga_culturas` nao volta.
+
+### Status do deploy/build
+
+- `node --check api/salvar-culturas-catalogo.js` executado sem erros.
+- `node --check api/excluir-usuario.js` executado sem erros.
+- `git diff --check` executado sem erros.
+- Build de producao executado com sucesso: `node node_modules/vite/bin/vite.js build`.
+- Impacto esperado na Vercel: apos commit/push/deploy, a Central passa a salvar culturas pelo backend protegido quando a RPC nao estiver disponivel ou quando o cliente bater em RLS.
+
 ## Sessao de 2026-05-20 - Central TerraNexa ligada ao Supabase e exclusao de usuarios
 
 ### O que foi solicitado
