@@ -11,6 +11,11 @@ function getBearerToken(req) {
   return match?.[1] || ''
 }
 
+function isMissingColumnError(error, columnName) {
+  const text = `${error?.message || ''} ${error?.details || ''} ${error?.hint || ''}`.toLowerCase()
+  return String(error?.code || '').toUpperCase() === '42703' || text.includes(`column ${columnName}`)
+}
+
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return json(res, 204, {})
   if (req.method !== 'POST') return json(res, 405, { error: 'metodo_nao_permitido' })
@@ -78,7 +83,8 @@ export default async function handler(req, res) {
     .update({ nome, updated_at: new Date().toISOString() })
     .eq('id', vinculoId)
 
-  if (updateMembroError) {
+  const nomeMembroAtualizado = !updateMembroError
+  if (updateMembroError && !isMissingColumnError(updateMembroError, 'nome')) {
     return json(res, 500, { error: 'nome_membro_falhou', message: updateMembroError.message })
   }
 
@@ -96,5 +102,5 @@ export default async function handler(req, res) {
     if (profileError) return json(res, 500, { error: 'nome_profile_falhou', message: profileError.message })
   }
 
-  return json(res, 200, { ok: true, nome })
+  return json(res, 200, { ok: true, nome, nomeMembroAtualizado })
 }

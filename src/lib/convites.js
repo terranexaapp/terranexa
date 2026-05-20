@@ -15,6 +15,11 @@ function newInviteToken() {
   return typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : undefined
 }
 
+function isMissingColumnError(error, columnName) {
+  const text = `${error?.message || ''} ${error?.details || ''} ${error?.hint || ''}`.toLowerCase()
+  return String(error?.code || '').toUpperCase() === '42703' || text.includes(`column ${columnName}`)
+}
+
 export async function convidarMembro({ fazenda_id, email, nome = '', papel }) {
   const {
     data: { user }
@@ -34,11 +39,21 @@ export async function convidarMembro({ fazenda_id, email, nome = '', papel }) {
   const token = newInviteToken()
   if (token) payload.token = token
 
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from('fazenda_membros')
     .upsert(payload, { onConflict: 'fazenda_id,email' })
     .select()
     .single()
+  if (error && isMissingColumnError(error, 'nome')) {
+    const { nome: _nome, ...payloadSemNome } = payload
+    const fallback = await supabase
+      .from('fazenda_membros')
+      .upsert(payloadSemNome, { onConflict: 'fazenda_id,email' })
+      .select()
+      .single()
+    data = fallback.data
+    error = fallback.error
+  }
   if (error) throw error
   try {
     const emailStatus = await enviarEmailConviteFazenda({
@@ -55,12 +70,19 @@ export async function convidarMembro({ fazenda_id, email, nome = '', papel }) {
 }
 
 export async function listarMembros(fazendaId) {
-  const { data, error } = await supabase
-    .from('fazenda_membros')
-    .select('id, nome, email, papel, status, token, criado_em, aceito_em, user_id, profiles:user_id(nome)')
-    .eq('fazenda_id', fazendaId)
-    .neq('status', 'revogado')
-    .order('criado_em', { ascending: false })
+  const buildQuery = select =>
+    supabase
+      .from('fazenda_membros')
+      .select(select)
+      .eq('fazenda_id', fazendaId)
+      .neq('status', 'revogado')
+      .order('criado_em', { ascending: false })
+  let { data, error } = await buildQuery('id, nome, email, papel, status, token, criado_em, aceito_em, user_id, profiles:user_id(nome)')
+  if (error && isMissingColumnError(error, 'nome')) {
+    const fallback = await buildQuery('id, email, papel, status, token, criado_em, aceito_em, user_id, profiles:user_id(nome)')
+    data = (fallback.data || []).map(item => ({ ...item, nome: item.profiles?.nome || '' }))
+    error = fallback.error
+  }
   if (error) throw error
   return data || []
 }

@@ -1,5 +1,35 @@
 # TerraNexa Session State
 
+## Sessao de 2026-05-20 - aviso de migration na Central apos deploy mobile
+
+### O que foi solicitado
+
+- Revisar a tela da Central que ainda mostrava o aviso `Rode a migration 009 para liberar a Central a auditar membros por fazenda`.
+
+### Diagnostico
+
+- O aviso vinha do `catch` da consulta de `fazenda_membros`.
+- Depois do deploy dos nomes de usuarios, a consulta passou a selecionar `fazenda_membros.nome`.
+- Se a migration `014` ainda nao estiver aplicada, o erro real pode ser coluna `nome` ausente, mas a Central mostrava o texto antigo da migration `009`.
+
+### O que foi alterado
+
+- `src/lib/centralTerranexa.js` agora tenta consultar membros com `nome` e, se a coluna nao existir, refaz a consulta sem `nome`.
+- Nesse fallback, a hierarquia continua carregando e usa `profiles.nome` quando houver usuario aceito.
+- O aviso agora aponta a migration `014` quando o problema for coluna `nome` ausente.
+- Convites e API de atualizar nome tambem ganharam fallback para nao quebrar se `fazenda_membros.nome` ainda nao existir.
+
+### Validacao
+
+- `git diff --check` passou.
+- `node --check api/enviar-convite.js` passou.
+- `node --check api/atualizar-nome-usuario-fazenda.js` passou.
+- Build de producao com Vite passou.
+
+### Pendencia
+
+- Aplicar `database/014_usuarios_nomes_mobile_monitoramento.sql` no SQL Editor do Supabase para liberar persistencia completa de `Nome no app` e autorias operacionais.
+
 ## Sessao de 2026-05-20 - nomes de usuarios e fluxo mobile de campo
 
 ### O que foi solicitado

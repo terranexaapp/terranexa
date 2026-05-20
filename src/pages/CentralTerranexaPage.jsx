@@ -447,7 +447,9 @@ export function CentralTerranexaPage() {
         convidadoPor: profile.id
       })
       setLinkMessage(
-        resultado.emailError
+        resultado.schemaWarning
+          ? resultado.schemaWarning
+          : resultado.emailError
           ? resultado.emailError
           : resultado.emailStatus
             ? 'Vinculo criado e e-mail enviado para o usuario definir senha.'

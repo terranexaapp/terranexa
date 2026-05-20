@@ -56,11 +56,38 @@ function isCatalogoWriteFallbackError(error) {
   )
 }
 
+function isMissingColumnError(error, columnName) {
+  const text = `${error?.message || ''} ${error?.details || ''} ${error?.hint || ''}`.toLowerCase()
+  return String(error?.code || '').toUpperCase() === '42703' || text.includes(`column ${columnName}`)
+}
+
 async function fetchByIds(table, ids, select = '*') {
   if (!ids.length) return {}
   const { data, error } = await supabase.from(table).select(select).in('id', ids)
   if (error) throw error
   return indexById(data)
+}
+
+async function listarMembrosHierarquia() {
+  const fullSelect = 'id, fazenda_id, convidado_por, nome, email, papel, status, token, user_id, criado_em, aceito_em, updated_at'
+  const baseSelect = 'id, fazenda_id, convidado_por, email, papel, status, token, user_id, criado_em, aceito_em, updated_at'
+  const query = select =>
+    supabase
+      .from('fazenda_membros')
+      .select(select)
+      .neq('status', 'revogado')
+      .order('criado_em', { ascending: false })
+
+  const result = await query(fullSelect)
+  if (!result.error) return { data: result.data || [], missingNome: false, error: null }
+  if (!isMissingColumnError(result.error, 'nome')) return { data: [], missingNome: false, error: result.error }
+
+  const fallback = await query(baseSelect)
+  return {
+    data: fallback.data || [],
+    missingNome: !fallback.error,
+    error: fallback.error || null
+  }
 }
 
 export async function listarResumoContas() {
@@ -158,15 +185,13 @@ export async function listarHierarquiaUsuariosFazendas() {
   if (fazendasResult.error) throw fazendasResult.error
   if (contasResult.error) throw contasResult.error
 
-  const membrosResult = await supabase
-    .from('fazenda_membros')
-    .select('id, fazenda_id, convidado_por, nome, email, papel, status, token, user_id, criado_em, aceito_em, updated_at')
-    .neq('status', 'revogado')
-    .order('criado_em', { ascending: false })
+  const membrosResult = await listarMembrosHierarquia()
 
   const membros = membrosResult.error ? [] : membrosResult.data || []
   if (membrosResult.error) {
     avisos.push('Rode a migration 009 para liberar a Central a auditar membros por fazenda.')
+  } else if (membrosResult.missingNome) {
+    avisos.push('Rode a migration 014 para liberar Nome no app em membros e autorias operacionais.')
   }
 
   const papeis = await listarFazendaPapeisDisponiveis(avisos)
@@ -256,11 +281,24 @@ export async function vincularUsuarioFazenda({ fazendaId, email, nome = '', pape
     aceito_em: userId ? new Date().toISOString() : null
   }
 
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from('fazenda_membros')
     .upsert(payload, { onConflict: 'fazenda_id,email' })
     .select()
     .single()
+
+  let schemaWarning = ''
+  if (error && isMissingColumnError(error, 'nome')) {
+    schemaWarning = 'Vinculo salvo sem Nome no app porque a migration 014 ainda nao foi aplicada no Supabase.'
+    const { nome: _nome, ...payloadSemNome } = payload
+    const fallback = await supabase
+      .from('fazenda_membros')
+      .upsert(payloadSemNome, { onConflict: 'fazenda_id,email' })
+      .select()
+      .single()
+    data = fallback.data
+    error = fallback.error
+  }
   if (error) throw error
   if (!userId) {
     try {
@@ -271,12 +309,12 @@ export async function vincularUsuarioFazenda({ fazendaId, email, nome = '', pape
         papel,
         conviteToken: data.token
       })
-      return { ...data, emailStatus }
+      return { ...data, emailStatus, schemaWarning }
     } catch (err) {
       return { ...data, emailError: err.message || 'Vinculo criado, mas o e-mail de convite nao foi enviado.' }
     }
   }
-  return data
+  return { ...data, schemaWarning }
 }
 
 export async function atualizarPapelUsuarioFazenda(vinculoId, papel) {

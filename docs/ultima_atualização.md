@@ -1,5 +1,26 @@
 # Última Atualização TerraNexa
 
+## 2026-05-20 - Aviso de migration na Central
+
+### Onde paramos
+
+- A Central mostrava o aviso antigo de migration `009` ao abrir "Usuarios e fazendas".
+- O provavel erro real era a coluna `fazenda_membros.nome` ainda ausente no Supabase, que pertence a migration `014`.
+- O app agora refaz a consulta de membros sem `nome` quando essa coluna nao existe e usa `profiles.nome` como fallback visual.
+- Convites e a rota de atualizar nome tambem toleram a ausencia temporaria de `fazenda_membros.nome`.
+
+### Proxima retomada
+
+- Aplicar `database/014_usuarios_nomes_mobile_monitoramento.sql` no Supabase de producao.
+- Reabrir a Central e confirmar que a hierarquia carrega sem o aviso incorreto de `009`.
+
+### Status
+
+- `git diff --check` passou.
+- `node --check api/enviar-convite.js` passou.
+- `node --check api/atualizar-nome-usuario-fazenda.js` passou.
+- Build de producao passou com Vite.
+
 ## 2026-05-20 - Nomes de usuarios e fluxo mobile de campo
 
 ### Onde paramos

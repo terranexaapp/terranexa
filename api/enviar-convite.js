@@ -24,6 +24,27 @@ function isAlreadyRegistered(error) {
   return msg.includes('already') || msg.includes('registered') || msg.includes('exists')
 }
 
+function isMissingColumnError(error, columnName) {
+  const text = `${error?.message || ''} ${error?.details || ''} ${error?.hint || ''}`.toLowerCase()
+  return String(error?.code || '').toUpperCase() === '42703' || text.includes(`column ${columnName}`)
+}
+
+async function buscarMembroConvite(adminClient, fazendaId, email) {
+  const buildQuery = select =>
+    adminClient
+      .from('fazenda_membros')
+      .select(select)
+      .eq('fazenda_id', fazendaId)
+      .eq('email', email)
+      .neq('status', 'revogado')
+      .maybeSingle()
+
+  const result = await buildQuery('id, nome, email, token, status, papel')
+  if (!result.error) return result
+  if (!isMissingColumnError(result.error, 'nome')) return result
+  return buildQuery('id, email, token, status, papel')
+}
+
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return json(res, 204, {})
   if (req.method !== 'POST') return json(res, 405, { error: 'metodo_nao_permitido' })
@@ -82,13 +103,7 @@ export default async function handler(req, res) {
   if (permissaoError) return json(res, 403, { error: 'permissao_indisponivel', message: permissaoError.message })
   if (!permitido) return json(res, 403, { error: 'acesso_negado' })
 
-  const { data: membro, error: membroError } = await adminClient
-    .from('fazenda_membros')
-    .select('id, nome, email, token, status, papel')
-    .eq('fazenda_id', fazendaId)
-    .eq('email', email)
-    .neq('status', 'revogado')
-    .maybeSingle()
+  const { data: membro, error: membroError } = await buscarMembroConvite(adminClient, fazendaId, email)
 
   if (membroError) return json(res, 500, { error: 'convite_consulta_falhou', message: membroError.message })
   if (!membro?.token) return json(res, 404, { error: 'convite_nao_encontrado' })
