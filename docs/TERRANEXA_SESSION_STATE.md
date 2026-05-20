@@ -63,6 +63,7 @@
 - Build de producao executado com sucesso: `node node_modules/vite/bin/vite.js build`.
 - `git diff --check` executado sem erros nos arquivos alterados desta correcao.
 - Lint nao executado por ausencia do pacote `eslint` em `node_modules`.
+- Commit e push para `main` concluidos: `4ba5333`.
 - Impacto esperado na Vercel: apos deploy, convites deixam de cair na tela de criacao de fazenda, senha de convidado volta ao login e convidados entram direto na fazenda vinculada.
 
 ## Sessao de 2026-05-20 - diretrizes de producao e agente terranexa_producao

@@ -18,7 +18,7 @@
 
 - Build de produção passou.
 - Lint não rodou porque `eslint` não está presente em `node_modules`.
-- Correção preparada para publicação no GitHub/main.
+- Commit e push para `main` concluídos: `4ba5333`.
 
 ## 2026-05-20 - Diretrizes de produção e agente Codex
 
