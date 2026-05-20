@@ -67,6 +67,10 @@
 - `node --check api/enviar-convite.js` executado sem erros.
 - `node --check api/atualizar-nome-usuario-fazenda.js` executado sem erros.
 - Build de producao executado com sucesso: `node node_modules/vite/bin/vite.js build`.
+- Revisao posterior confirmou que o commit da correcao foi enviado para `origin/main`: `04af257`.
+- Deploy Vercel de producao confirmado como `READY`: `dpl_467qPsjq7fBu834bHqrTaUNf8PyX`.
+- Endpoint novo verificado em producao: `GET /api/atualizar-nome-usuario-fazenda` retornou `405 metodo_nao_permitido`, esperado para rota POST.
+- A migration `database/014_usuarios_nomes_mobile_monitoramento.sql` ainda precisa ser aplicada no Supabase de producao.
 
 ## Sessao de 2026-05-20 - correcao RLS ao salvar culturas do catalogo
 

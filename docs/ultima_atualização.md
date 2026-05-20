@@ -25,6 +25,9 @@
 - `node --check api/enviar-convite.js` passou.
 - `node --check api/atualizar-nome-usuario-fazenda.js` passou.
 - Build de producao passou com Vite.
+- Commit da correcao enviado para `origin/main`: `04af257`.
+- Deploy Vercel de producao confirmado como `READY`: `dpl_467qPsjq7fBu834bHqrTaUNf8PyX`.
+- Endpoint novo publicado e respondendo: `GET /api/atualizar-nome-usuario-fazenda` retornou `405 metodo_nao_permitido`, esperado para rota POST.
 - O conector Supabase desta sessao nao expos execucao SQL; migration 014 ainda precisa ser aplicada no Supabase.
 
 ## 2026-05-20 - Correcao RLS ao salvar culturas do catalogo
